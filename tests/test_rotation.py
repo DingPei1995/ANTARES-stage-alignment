@@ -118,17 +118,17 @@ def test_relocate_recentre_piezo():
 
 
 # Measured: the same sample point found again after an SRn turn (ARPES viewer metadata / notes)
-WWS2_ZONE_PLATE = [  # standard plate, zone plate, 2025-10-01 / 2025-10-02
+SampleC_ZONE_PLATE = [  # standard plate, zone plate, 2025-10-01 / 2025-10-02
     MotorPositions(st=-0.24994375, sz=43.202, sn=0.34838125, srn=132.000539892, srz=0.003053133),
     MotorPositions(st=0.24625625, sz=42.901, sn=0.34788125, srn=118.000279011, srz=0.002939244),
 ]
-WS_2026_09_18 = [  # non-standard plate, capillary
+MEASURED_2026_09_18 = [  # non-standard plate, capillary
     MotorPositions(st=-0.6017718749999971, sz=39.243, sn=6.499146875, srn=119.997322626, srz=0.000661464),
     MotorPositions(st=-1.001471874999997, sz=39.345, sn=6.498646875, srn=103.999790352, srz=0.000775353),
 ]
 
 
-@pytest.mark.parametrize("pair", [WWS2_ZONE_PLATE, WS_2026_09_18])
+@pytest.mark.parametrize("pair", [SampleC_ZONE_PLATE, MEASURED_2026_09_18])
 def test_fit_srn_axis_reproduces_measured_pairs(pair):
     model = StageModel()
     fit = fit_srn_axis(model, pair, 5.0)
@@ -144,7 +144,7 @@ def test_fit_srn_axis_reproduces_measured_pairs(pair):
 
 def test_fit_srn_axis_values():
     # surface in the focal plane: H = SN - SN_f = 0.348 (with SN_f = 0)
-    fit = fit_srn_axis(StageModel(), WWS2_ZONE_PLATE, 5.348)
+    fit = fit_srn_axis(StageModel(), SampleC_ZONE_PLATE, 5.348)
     assert (fit.config.srn_axis_u, fit.config.srn_axis_v) == pytest.approx((1.228, -1.033), abs=2e-3)
     assert fit.lever_arm == pytest.approx(2.379, abs=1e-3)
 
@@ -172,7 +172,7 @@ def test_keep_sn_slides_along_the_beam_with_srz():
 
 
 def test_starting_configuration_zone_plate_reference():
-    """configs/calibration_2026-10-24_170000_zone_plate.json: ZP_ZS 53.21985 focuses on the first WWS2 Map (+ = towards the sample)."""
+    """configs/calibration_2026-10-24_170000_zone_plate.json: ZP_ZS 53.21985 focuses on the first SampleC Map (+ = towards the sample)."""
     from pathlib import Path
 
     from quickalignment.core.calibration import CalibrationStore
@@ -181,8 +181,8 @@ def test_starting_configuration_zone_plate_reference():
     record = next(r for r in CalibrationStore(root / "configs").records() if r.created == "2026-10-24 17:00:00")
     assert record.optics.enabled and record.optics.optic_sign == 1
     model = StageModel(record.config)
-    first, second = WWS2_ZONE_PLATE
-    layout = SampleLayout(samples=[Sample("WWS2", u=-0.2, v=-3.0, length=3, width=3, height=0.348)])
+    first, second = SampleC_ZONE_PLATE
+    layout = SampleLayout(samples=[Sample("SampleC", u=-0.2, v=-3.0, length=3, width=3, height=0.348)])
     rel = relocate(model, layout, first, second.srn, second.srz, record.optics)  # optic from the configuration
     assert rel.optic_measured == pytest.approx(53.21985, abs=1e-3)
     assert rel.optic_new == pytest.approx(53.21985, abs=1e-3)  # SRn keeps the surface plane

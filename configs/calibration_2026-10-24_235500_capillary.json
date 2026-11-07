@@ -1,6 +1,6 @@
 {
   "created": "2026-10-24 23:55:00",
-  "comment": "Gating plate + capillary, joint fit of two devices on Si (H 0.525 mm), SN kept at ~0 and the capillary refocused: RG_GMC (2026-10-15, x 1.51 / y 2.82 mm from the photos) at SRn 120 / SRz -12 (CPS 60.30) and SRn 92 / SRz -24 (CPS 61.74); Cav (2026-10-17, other gating plate, no photo: position fitted, x -2.44 / y 2.02 mm in this configuration) at SRn 120 / SRz -24 (CPS 58.75) and SRn 142 / SRz -24 (CPS 58.48). 12 equations, 9 unknowns, rms 22 um (CPS residuals <= 0.05). SRz axis 2.59 +- 0.39 mm behind the standard riser top, -0.23 +- 0.23 mm along ST. ST0 and SN_f cannot be separated by these data (no measurement on the analyzer focus): SN_f = -0.525 taken so that the measured surfaces (SN ~ 0) were in the analyzer focal plane; ST0 fitted. Replaces calibration_2026-10-24_234000 (ST0 = 0 there: 1.3 mm off in ST at the Cav rotation). CPS increasing moves the capillary towards the sample. Beamline notes (2026-10-25): ST0 -0.95 agrees with experience (plate centre at ST ~ -1 without rotation); all four measurements were made after the same capillary alignment. SZ0 (40.63) and the CPS reference probably depend on the capillary alignment (pitch) and have to be redone after realigning it: InitialCalibration, 'optics only', one set at SRn 120 / SRz 0 (more sets check the kept axes). SN_f, the SRn axis and the SRz axis are mechanics and stay.",
+  "comment": "Gating plate + capillary, joint fit of two devices on Si (H 0.525 mm), SN kept at ~0 and the capillary refocused: SampleA (2026-10-15, x 1.51 / y 2.82 mm from the photos) at SRn 120 / SRz -12 (CPS 60.30) and SRn 92 / SRz -24 (CPS 61.74); SampleB (2026-10-17, other gating plate, no photo: position fitted, x -2.44 / y 2.02 mm in this configuration) at SRn 120 / SRz -24 (CPS 58.75) and SRn 142 / SRz -24 (CPS 58.48). 12 equations, 9 unknowns, rms 22 um (CPS residuals <= 0.05). SRz axis 2.59 +- 0.39 mm behind the standard riser top, -0.23 +- 0.23 mm along ST. ST0 and SN_f cannot be separated by these data (no measurement on the analyzer focus): SN_f = -0.525 taken so that the measured surfaces (SN ~ 0) were in the analyzer focal plane; ST0 fitted. Replaces calibration_2026-10-24_234000 (ST0 = 0 there: 1.3 mm off in ST at the SampleB rotation). CPS increasing moves the capillary towards the sample. Beamline notes (2026-10-25): ST0 -0.95 agrees with experience (plate centre at ST ~ -1 without rotation); all four measurements were made after the same capillary alignment. SZ0 (40.63) and the CPS reference probably depend on the capillary alignment (pitch) and have to be redone after realigning it: RealSampleCalibration, 'optics only', one set at SRn 120 / SRz 0 (more sets check the kept axes). SN_f, the SRn axis and the SRz axis are mechanics and stay.",
   "stage_config": {
     "st0": -0.9501,
     "sz0": 40.6295,
@@ -34,14 +34,14 @@
     "plate": "gating",
     "sample_height_mm": 0.525,
     "devices": {
-      "RG_GMC": {
+      "SampleA": {
         "uv": [
           1.51,
           2.82
         ],
-        "from": "photos (Data for config/RG_GMC_position_on_plate.png)"
+        "from": "photos of the plate"
       },
-      "Cav": {
+      "SampleB": {
         "uv": [
           -2.4439,
           2.023
@@ -50,7 +50,7 @@
       }
     },
     "measured": {
-      "RG_GMC": [
+      "SampleA": [
         {
           "st": -3.498671875,
           "sz": 37.796,
@@ -58,7 +58,7 @@
           "srn": 119.999828184,
           "srz": -11.999708577,
           "cps": 60.3,
-          "source": "RG_GMC_2026-10-15_00-36-31_metadata.csv"
+          "source": "SampleA_2026-10-15_00-36-31_metadata.csv"
         },
         {
           "st": -6.047871875,
@@ -67,10 +67,10 @@
           "srn": 91.999192533,
           "srz": -24.000078618,
           "cps": 61.74,
-          "source": "RG_GMC_2026-10-15_18-04-06_metadata.csv"
+          "source": "SampleA_2026-10-15_18-04-06_metadata.csv"
         }
       ],
-      "Cav": [
+      "SampleB": [
         {
           "st": 0.643128125,
           "sz": 38.591,
@@ -119,7 +119,7 @@
     },
     "optic_focus": 59.6926,
     "residuals_st_sz_cps": {
-      "RG_GMC": [
+      "SampleA": [
         [
           -0.0,
           0.0136,
@@ -131,7 +131,7 @@
           -0.0107
         ]
       ],
-      "Cav": [
+      "SampleB": [
         [
           0.0262,
           0.0156,

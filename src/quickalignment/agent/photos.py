@@ -136,41 +136,48 @@ def grid_png(rgb: np.ndarray, region=None, step: float | None = None, marks=(), 
     return _png(canvas), info
 
 
-def _poly(h_plate_to_photo, pts, n: int = 12):
-    """Plate polygon -> photo pixel polygon (edges subdivided, the homography bends nothing but this is exact)."""
+def _poly(to_photo, pts, w: float, n: int = 12):
+    """Plate polygon at height w -> photo pixel polygon."""
     out = []
     for a, b in zip(pts, pts[1:] + pts[:1]):
         for t in np.linspace(0, 1, n, endpoint=False):
             out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
-    return [tuple(p) for p in apply_homography(h_plate_to_photo, out)]
+    return [tuple(p) for p in to_photo(out, w)]
 
 
-def overlay_png(rgb: np.ndarray, h_plate_to_photo: np.ndarray, plate: PlateGeometry, layout: SampleLayout | None,
-                corners_px=(), max_size: int = MAX_SIZE, region=None) -> bytes:
+def overlay_png(rgb: np.ndarray, to_photo, plate: PlateGeometry, layout: SampleLayout | None,
+                corners_px=(), max_size: int = MAX_SIZE, region=None, outline: bool = True) -> bytes:
     """The photo with the plate model drawn on it: sample area (green), samples (blue, with names), devices (red),
-    the clicked corners (numbered, yellow), and the plate outline (white)."""
+    the clicked corners (numbered, yellow), and the back plate outline (white, `outline`).
+
+    to_photo(points_uv, w) -> photo pixels of plate points at height w (or a 3 x 3 plate -> photo homography)."""
+    if isinstance(to_photo, np.ndarray):
+        h = to_photo
+        to_photo = lambda pts, w: apply_homography(h, pts)  # noqa: E731 - one plane only
     Image, ImageDraw, _, _ = _pil()
     x0, y0, x1, y1 = crop_box(rgb.shape, region)
     im = Image.fromarray(rgb).convert("RGB")
     draw = ImageDraw.Draw(im, "RGBA")
     width = max(2, round(max(im.size) / 600))
     font = _font(max(14, round(max(im.size) / 70)))
-    draw.line(_poly(h_plate_to_photo, plate.outline(), 4) + [_poly(h_plate_to_photo, plate.outline(), 4)[0]],
-              fill=(255, 255, 255, 200), width=width)
+    top = plate.total_thickness
+    if outline:  # the back plate, at its own height (only right with the 3D correction)
+        poly = _poly(to_photo, plate.outline(), plate.base_thickness, 4)
+        draw.line(poly + [poly[0]], fill=(255, 255, 255, 200), width=width)
     u0, v0, u1, v1 = plate.riser_bounds()
-    area = _poly(h_plate_to_photo, [(u0, v1), (u1, v1), (u1, v0), (u0, v0)])
+    area = _poly(to_photo, [(u0, v1), (u1, v1), (u1, v0), (u0, v0)], top)
     draw.line(area + [area[0]], fill=(0, 220, 0, 255), width=width)
     for s in (layout.samples if layout else []):
         a, b, c, d = s.bounds()
-        quad = _poly(h_plate_to_photo, [(a, d), (c, d), (c, b), (a, b)])
+        quad = _poly(to_photo, [(a, d), (c, d), (c, b), (a, b)], top + s.height)
         draw.polygon(quad, outline=(30, 120, 255, 255), fill=(30, 120, 255, 40))
         draw.line(quad + [quad[0]], fill=(30, 120, 255, 255), width=width)
-        cx, cy = apply_homography(h_plate_to_photo, [(s.u, s.v)])[0]
+        cx, cy = to_photo([(s.u, s.v)], top + s.height)[0]
         draw.text((cx, cy), s.name, fill=(255, 255, 0, 255), font=font, anchor="mm", stroke_width=2,
                   stroke_fill=(0, 0, 0, 255))
         for dev in s.devices:
             du, dv = dev.position(s)
-            px, py = apply_homography(h_plate_to_photo, [(du, dv)])[0]
+            px, py = to_photo([(du, dv)], top + s.height)[0]
             r = 2.5 * width
             draw.ellipse([px - r, py - r, px + r, py + r], outline=(255, 40, 40, 255), width=width)
             draw.text((px + 2 * r, py), dev.name, fill=(255, 80, 80, 255), font=font, anchor="lm", stroke_width=2,

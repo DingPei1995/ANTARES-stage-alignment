@@ -12,13 +12,17 @@ What a conversation looks like:
 3. **Find samples**: the agent looks at the photo with a pixel grid, zooms on the four corners of the riser /
    sample area, registers the photo on the plate model, finds the samples and devices (colour detection and its own
    reading of the photo), shows you the overlay to confirm, asks the sample heights, and gives the **ST / SZ / SN** of
-   every sample. You report where a sample was really found → it corrects the model (*found here*). You ask for
+   every sample. It then asks whether you are **satisfied**; if not, you tell it what to change, or switch to **manual
+   annotation**: the photo window opens on your screen with the photo already registered, you mark the samples
+   yourself and press OK, and the agent reads them back. For a photo not taken from straight above, an optional **3D
+   correction** (off by default) uses points at several heights (sample-area corners, back plate and tab corners).
+   You report where a sample was really found → it corrects the model (*found here*). You ask for
    another SRn / SRz, or to turn an edge along the slit, or for a Brillouin-zone point → it gives the new **ST / SZ /
    SN and optic position**, with range and collision checks.
 4. **Calibrate**: the agent asks *real sample* or *gold frame*, then leads you one step at a time (what to set, what
    to read), fits, shows the result, and saves the configuration only when you say so.
 
-![The plate model drawn back on a photo by the agent tools (green: sample area, blue: samples)](images/photo_overlay.png)
+![The plate model drawn back on a photo by the agent tools (green: sample area, blue: the sample marked)](images/photo_overlay.png)
 
 ## Setup
 
@@ -61,9 +65,9 @@ api = AgentAPI()
 a = api.alignment
 a.start("gating", "capillary")
 a.register_photo([[207, 212], [543, 298], [466, 624], [128, 542]], path="tests/data/gating_plate_photo.jpg")
-a.add_sample_from_photo([[290, 330], [520, 370], [480, 590], [250, 545]], height=0.525, name="flake")
+a.add_sample_from_photo([[312, 272], [536, 329], [480, 566], [255, 511]], height=0.525, name="SampleA")
 print(a.sample_positions())
-print(a.rotate(140, -10, target="flake"))
+print(a.rotate(140, -10, target="SampleA"))
 
 r = api.real_sample.start("optics", "capillary", "standard", feature_x=0.5, feature_y=1.0, feature_height=0.3)
 api.gold_frame.start("capillary", gold_height=0.05)
@@ -94,6 +98,10 @@ for the user. Code: `src/quickalignment/agent/` (`alignment.py`, `real_sample.py
 | `align_photo_info` | Size in pixels of a photo file (after its EXIF rotation). |
 | `align_photo_grid` | A photo (or a zoomed region of it) with a pixel grid labelled in photo pixels, to read positions precisely; optional marks to check points. Use a path, or photo_id of a registered photo. |
 | `align_register_photo` | Map a plate photo onto the plate from the 4 sample-area corners (photo px, order of align_photo_corners). |
+| `align_photo_points_3d` | OPTIONAL 3D correction: the plate points at several heights that can be read on an oblique photo. |
+| `align_register_photo_3d` | OPTIONAL (off by default): register an oblique photo with a camera model from >= 6 points at 2+ heights (sample-area corners + back plate / tab corners). Use only when the photo is clearly not from straight above or the user asks for it. |
+| `align_manual_annotation` | Open the photo window on the user's screen (photo already registered) so the user marks the samples by hand. Use when the user is not satisfied with the samples found. |
+| `align_load_annotation` | Read the samples the user marked in the manual-annotation window (after they pressed OK). |
 | `align_photo_overlay` | The registered plate photo with the model drawn on it (sample area, samples, devices): check it. |
 | `align_plate_view` | Drawing of the plate model with samples and devices (mm). |
 | `align_photo_to_plate` | Photo pixels -> plate mm. |

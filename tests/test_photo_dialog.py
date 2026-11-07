@@ -16,7 +16,7 @@ from test_photo import PHOTO_CORNERS, SAMPLES, synthetic_photo  # noqa: E402
 QtCore, QtWidgets = qt.QtCore, qt.QtWidgets
 Qt = QtCore.Qt
 
-# photo of a gating plate with the RG_GMC substrate (cropped, downscaled), and its sample area corners
+# photo of a gating plate with the SampleA substrate (cropped, downscaled), and its sample area corners
 REAL_PHOTO = Path(__file__).parent / "data" / "gating_plate_photo.jpg"
 REAL_CORNERS = [(207.5, 212.0), (543.5, 298.0), (466.5, 624.0), (128.0, 542.0)]
 

@@ -1,7 +1,7 @@
 {
   "created": "2026-10-24 17:00:00",
   "kind": "staff",
-  "comment": "Standard plate, starting SRn axis from WWS2 (2025-10-01/02, zone plate): same point at SRn 132.00 / 118.00, ST -0.2499 / 0.2463, SZ 43.202 / 42.901, SN 0.348. The axis on the plate changes with each mounting: learn it per sample in the Rotate sample tab (section 4). Optics reference: ZP_ZS 53.21985 in focus at the first Map (surface in the analyzer focal plane); ZP_ZS increasing moves the zone plate towards the sample.",
+  "comment": "Standard plate, starting SRn axis from SampleC (2025-10-01/02, zone plate): same point at SRn 132.00 / 118.00, ST -0.2499 / 0.2463, SZ 43.202 / 42.901, SN 0.348. The axis on the plate changes with each mounting: learn it per sample in the Rotate sample tab (section 4). Optics reference: ZP_ZS 53.21985 in focus at the first Map (surface in the analyzer focal plane); ZP_ZS increasing moves the zone plate towards the sample.",
   "stage_config": {
     "st0": 0.0,
     "sz0": 40.0,
@@ -32,8 +32,8 @@
   },
   "check": {
     "source": [
-      "WWS2_2025-10-01_15-49-52.nxs",
-      "WWS2_2025-10-02_03-27-40.nxs"
+      "SampleC_2025-10-01_15-49-52.nxs",
+      "SampleC_2025-10-02_03-27-40.nxs"
     ],
     "measured": [
       {

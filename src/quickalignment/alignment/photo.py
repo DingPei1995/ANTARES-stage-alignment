@@ -369,3 +369,106 @@ def detect_samples(rect: Rectified, area_rect: Rect, threshold: float = 12.0, mi
     # reading order: top to bottom, then left to right
     detections.sort(key=lambda d: (-round(d.center[1]), d.center[0]))
     return DetectionResult(detections, fg, bg, de)
+
+
+# -- oblique photos: a camera model from points at several heights ---------------------------------------------
+# A homography maps one plane exactly (the sample-area plane, from its four corners), whatever the viewing angle.
+# Things at other heights (thick samples, the back plate, the tab) appear shifted on an oblique photo (parallax).
+# With points at two or more heights a full pinhole camera P (3 x 4, photo ~ P (u, v, w, 1)) is fitted; the plane
+# at any height w then maps with the homography [p1, p2, w p3 + p4]. Optional: the four corners are enough for
+# photos taken from about straight above.
+
+def reference_points_3d(plate: PlateGeometry) -> list[tuple[str, tuple[float, float, float]]]:
+    """Points that can be clicked on a plate photo, with their plate coordinates (u, v, w) in mm, w = height above
+    the back face. The first eight (sample-area corners, back-plate top corners, tab top corners) are the ones the
+    photo window asks for in 3D mode; the others are optional extras."""
+    top = plate.total_thickness
+    base = plate.base_thickness
+    w, h = plate.width / 2, plate.height / 2
+    tab_top = h + plate.neck_height + plate.tab_height
+    tw = plate.tab_width / 2
+    out = [(name, (u, v, top)) for name, (u, v) in corner_points(plate)]
+    out += [("back plate top left corner", (-w, h, base)), ("back plate top right corner", (w, h, base)),
+            ("tab top left corner", (-tw, tab_top, base)), ("tab top right corner", (tw, tab_top, base)),
+            ("back plate bottom left (end of the chamfer)", (-w + plate.chamfer_width, -h, base)),
+            ("back plate bottom right (end of the chamfer)", (w - plate.chamfer_width, -h, base)),
+            ("tab bottom left (shoulder)", (-tw, h + plate.neck_height, base)),
+            ("tab bottom right (shoulder)", (tw, h + plate.neck_height, base))]
+    if plate.contact_block:
+        b0, c0, b1, _ = plate.contact_block
+        out += [("contact block bottom left", (b0, c0, plate.contact_block_top)),
+                ("contact block bottom right", (b1, c0, plate.contact_block_top))]
+    return out
+
+
+GUI_POINTS_3D = 8  # the photo window asks for the first eight of reference_points_3d
+
+
+def project(p: np.ndarray, pts3d) -> np.ndarray:
+    """Photo pixels of plate points (u, v, w) with the camera matrix p."""
+    x = np.c_[np.asarray(pts3d, float).reshape(-1, 3), np.ones(len(np.asarray(pts3d).reshape(-1, 3)))] @ p.T
+    return x[:, :2] / x[:, 2:3]
+
+
+def camera_matrix(pts3d, pts2d, refine: bool = True) -> tuple[np.ndarray, float, np.ndarray]:
+    """3 x 4 camera matrix from plate points (u, v, w) and their photo pixels: normalised DLT, then a least-squares
+    refinement of the pixel residuals. Returns (P, rms residual in px, residual per point in px).
+
+    Needs at least 6 points, not all at the same height (on one plane the camera is not determined: use the
+    four-corner homography)."""
+    X, x = np.asarray(pts3d, float), np.asarray(pts2d, float)
+    if X.ndim != 2 or X.shape[1] != 3 or x.shape != (len(X), 2):
+        raise ValueError("Give (u, v, w) plate points and their (x, y) photo pixels.")
+    if len(X) < 6:
+        raise ValueError(f"The 3D correction needs at least 6 points ({len(X)} given).")
+    if np.ptp(X[:, 2]) < 0.5:
+        raise ValueError("The points must be at different heights (e.g. sample-area corners on the riser and "
+                         "corners of the back plate or of the tab).")
+    cx, sx = X.mean(axis=0), np.sqrt(((X - X.mean(axis=0)) ** 2).sum(axis=1)).mean() / np.sqrt(3)
+    cp, sp = x.mean(axis=0), np.sqrt(((x - x.mean(axis=0)) ** 2).sum(axis=1)).mean() / np.sqrt(2)
+    T3 = np.diag([1 / sx] * 3 + [1.0])
+    T3[:3, 3] = -cx / sx
+    T2 = np.diag([1 / sp, 1 / sp, 1.0])
+    T2[:2, 2] = -cp / sp
+    Xn = (np.c_[X, np.ones(len(X))] @ T3.T)
+    xn = (np.c_[x, np.ones(len(x))] @ T2.T)[:, :2]
+    rows = []
+    for (a, b, c, d), (u, v) in zip(Xn, xn):
+        rows.append([a, b, c, d, 0, 0, 0, 0, -u * a, -u * b, -u * c, -u * d])
+        rows.append([0, 0, 0, 0, a, b, c, d, -v * a, -v * b, -v * c, -v * d])
+    _, sv, vt = np.linalg.svd(np.asarray(rows))
+    if sv[-2] < 1e-8 * sv[0]:
+        raise ValueError("The points do not determine the camera (degenerate layout).")
+    pn = vt[-1].reshape(3, 4)
+    if refine:
+        def res(q):
+            return (project(q.reshape(3, 4), Xn[:, :3]) - xn).ravel()
+        q = pn.ravel() / np.linalg.norm(pn)
+        for _ in range(20):
+            r = res(q)
+            jac = np.column_stack([(res(q + e) - r) / 1e-7 for e in np.eye(12) * 1e-7])
+            step = np.linalg.lstsq(jac, -r, rcond=None)[0]
+            q = q + step
+            q /= np.linalg.norm(q)
+            if np.max(np.abs(step)) < 1e-12:
+                break
+        pn = q.reshape(3, 4)
+    p = np.linalg.inv(T2) @ pn @ T3
+    p /= np.linalg.norm(p[2, :3])
+    if (np.c_[X, np.ones(len(X))] @ p[2]).mean() < 0:  # points in front of the camera: positive depth
+        p = -p
+    r = np.linalg.norm(project(p, X) - x, axis=1)
+    return p, float(np.sqrt((r ** 2).mean())), r
+
+
+def plane_homography(p: np.ndarray, w: float) -> np.ndarray:
+    """Plate (u, v) at height w -> photo pixels, from the camera matrix p."""
+    h = np.column_stack([p[:, 0], p[:, 1], w * p[:, 2] + p[:, 3]])
+    return h / h[2, 2]
+
+
+def check_mirror_3d(p: np.ndarray, w: float) -> None:
+    """A photo seen from the sample side keeps the turning sense of the plate (raises ValueError if mirrored)."""
+    h = plane_homography(p, w)
+    corners = np.array([(-1.0, 1.0), (1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)])
+    check_corners([tuple(c) for c in corners], apply_homography(h, corners))

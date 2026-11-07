@@ -29,8 +29,8 @@ from pathlib import Path
 import numpy as np
 
 from ..alignment.photo import (
-    apply_homography, check_corners, corner_points, detect_samples, homography, pair_transform, plate_view_bounds,
-    rectify, rgb_to_lab,
+    apply_homography, camera_matrix, check_corners, check_mirror_3d, corner_points, detect_samples, homography,
+    pair_transform, plane_homography, plate_view_bounds, rectify, reference_points_3d, rgb_to_lab,
 )
 from ..alignment.rotation import relocate, wrap180
 from ..core.calibration import CalibrationRecord, CalibrationStore
@@ -50,24 +50,35 @@ class _Photo:
     """A registered photo: pixels (if read from a file) and the map photo pixel <-> plate mm."""
 
     def __init__(self, photo_id: str, kind: str, to_plate: np.ndarray, path: str | None, size, corners=None,
-                 rgb=None, rms: float = 0.0):
+                 rgb=None, rms: float = 0.0, camera: np.ndarray | None = None, points_3d=None):
         self.id, self.kind, self.path, self.size = photo_id, kind, path, size
-        self.to_plate = to_plate  # 3 x 3: photo px -> plate mm
+        self.to_plate = to_plate  # 3 x 3: photo px -> plate mm, in the plane of the registration
         self.to_photo = np.linalg.inv(to_plate)
-        self.corners = corners or []
+        self.corners = corners or []  # the four sample-area corners on the photo
         self.rgb = rgb
         self.rms = rms
+        self.camera = camera  # 3 x 4 camera matrix with the 3D correction, else None
+        self.points_3d = points_3d or []  # [(name, (u, v, w), (x, y))] used for the camera
 
-    def plate(self, pts) -> np.ndarray:
-        return apply_homography(self.to_plate, np.asarray(pts, float).reshape(-1, 2))
+    def homography(self, w: float | None = None) -> np.ndarray:
+        """Plate (u, v) -> photo px in the plane at height w (3D correction); the registration plane otherwise."""
+        if self.camera is None or w is None:
+            return self.to_photo
+        return plane_homography(self.camera, w)
 
-    def pixels(self, pts) -> np.ndarray:
-        return apply_homography(self.to_photo, np.asarray(pts, float).reshape(-1, 2))
+    def plate(self, pts, w: float | None = None) -> np.ndarray:
+        return apply_homography(np.linalg.inv(self.homography(w)), np.asarray(pts, float).reshape(-1, 2))
+
+    def pixels(self, pts, w: float | None = None) -> np.ndarray:
+        return apply_homography(self.homography(w), np.asarray(pts, float).reshape(-1, 2))
 
     def info(self) -> dict:
         out = {"photo_id": self.id, "kind": self.kind, "path": self.path, "size_px": list(self.size) if self.size else None}
         if self.kind == "plate":
             out["corners_px"] = rounded([list(c) for c in self.corners], 1)
+            out["3d_correction"] = self.camera is not None
+            if self.camera is not None:
+                out["camera_rms_px"] = rounded(self.rms, 2)
         else:
             out["pair_rms_mm"] = rounded(self.rms, 4)
         return out
@@ -263,6 +274,67 @@ class AlignmentSession:
                 "next": "Check with photo_overlay (the green outline must lie on the sample-area edges), then find the "
                         "samples (detect_samples / add_sample_from_photo)."}
 
+    def photo_points_3d(self) -> dict:
+        """Points that can be used for the optional 3D correction of an oblique photo, with their plate (x, y) and
+        height w above the back face (mm)."""
+        self._need_start()
+        pts = reference_points_3d(self.layout.plate)
+        return {"points": [{"number": i + 1, "name": n, "plate_mm": [u, v, w]} for i, (n, (u, v, w)) in enumerate(pts)],
+                "note": "Optional, only for photos not taken from straight above. Give at least 6 points, at two heights "
+                        "or more: the 4 sample-area corners (on the riser) plus corners of the back plate or of the tab "
+                        "(1.1 mm above the back face). More points = better; skip what you cannot see clearly."}
+
+    def register_photo_3d(self, points, path: str | None = None, image_size=None, photo_id: str | None = None) -> dict:
+        """OPTIONAL 3D correction for an oblique photo: a camera model from >= 6 points at several heights
+        ([{"name" or "number" from photo_points_3d, "px": [x, y]}] or [{"plate_mm": [x, y, w], "px": [x, y]}]).
+        Positions at any height (thick samples, devices) are then corrected for the perspective."""
+        self._need_start()
+        known = reference_points_3d(self.layout.plate)
+        names = {n.lower(): (n, xyz) for n, xyz in known}
+        used = []
+        for i, p in enumerate(points or []):
+            if not isinstance(p, dict) or "px" not in p:
+                raise APIError(f"point {i + 1}: give 'px' [x, y] and 'name' / 'number' or 'plate_mm' [x, y, w].")
+            px = (number(p["px"][0], "x"), number(p["px"][1], "y"))
+            if "plate_mm" in p:
+                xyz = tuple(number(c, "plate_mm") for c in p["plate_mm"])
+                if len(xyz) != 3:
+                    raise APIError(f"point {i + 1}: plate_mm is [x, y, w] (w: height above the back face).")
+                used.append((p.get("name") or f"point {i + 1}", xyz, px))
+            elif "number" in p:
+                k = int(number(p["number"], "number")) - 1
+                if not 0 <= k < len(known):
+                    raise APIError(f"point {i + 1}: number 1 … {len(known)} (photo_points_3d).")
+                used.append((known[k][0], known[k][1], px))
+            elif str(p.get("name", "")).lower() in names:
+                n, xyz = names[str(p["name"]).lower()]
+                used.append((n, xyz, px))
+            else:
+                raise APIError(f"point {i + 1}: unknown name {p.get('name')!r}; see photo_points_3d.")
+        try:
+            cam, rms, res = camera_matrix([u for _, u, _ in used], [x for _, _, x in used])
+            top = self.layout.plate.total_thickness
+            check_mirror_3d(cam, top)
+        except ValueError as exc:
+            raise APIError(str(exc)) from None
+        h = plane_homography(cam, top)
+        rgb, size = None, None
+        if path:
+            rgb = read_image(path)
+            size = (int(rgb.shape[1]), int(rgb.shape[0]))
+        elif image_size is not None:
+            size = (int(number(image_size[0], "width")), int(number(image_size[1], "height")))
+        corners = apply_homography(h, [uv for _, uv in corner_points(self.layout.plate)])
+        pid = photo_id or (Path(path).stem if path else f"photo{len(self.photos) + 1}")
+        self.photos[pid] = _Photo(pid, "plate", np.linalg.inv(h), str(Path(path).expanduser()) if path else None, size,
+                                  [tuple(c) for c in corners.tolist()], rgb, rms, cam, used)
+        worst = sorted(zip(res, [n for n, _, _ in used]), reverse=True)
+        warn = [f"'{n}' is {r:.1f} px off the camera model: check it." for r, n in worst
+                if r > max(8.0, 3 * float(np.median(res)))]
+        return {"photo_id": pid, "3d_correction": True, "points_used": len(used), "rms_px": rounded(rms, 2),
+                "residual_px": {n: rounded(float(r), 1) for r, n in worst}, "warnings": warn,
+                "next": "Check with photo_overlay (back plate outline at its own height, samples at theirs)."}
+
     def register_device_photo(self, pairs, path: str | None = None, photo_id: str | None = None,
                               plate_photo_id: str | None = None) -> dict:
         """A close-up (microscope) photo of a substrate, mapped onto the plate from point pairs: the same feature
@@ -295,31 +367,102 @@ class AlignmentSession:
                 "mm_per_px": rounded(float(np.sqrt(abs(np.linalg.det(t[:2, :2])))), 6),
                 "next": "add_device(sample, name, photo_px=[x, y], photo_id=...) for each device on this photo."}
 
-    def photo_to_plate(self, points_px, photo_id: str | None = None) -> dict:
+    def _w(self, height: float | None) -> float:
+        """Height above the back face of a surface `height` mm above the plate surface (sample area)."""
+        return self.layout.plate.total_thickness + (0.0 if height is None else number(height, "height"))
+
+    def photo_to_plate(self, points_px, photo_id: str | None = None, height: float | None = None) -> dict:
+        """Photo pixels -> plate mm, in the plane `height` mm above the plate surface (only with the 3D correction;
+        default 0: the sample-area plane)."""
         photo = self._photo(photo_id)
-        uv = photo.plate(points_px)
+        uv = photo.plate(points_px, self._w(height))
         r0, s0, r1, s1 = self.layout.plate.riser_bounds()
         return {"photo_id": photo.id, "plate_mm": [
             {"x": rounded(float(u), 3), "y": rounded(float(v), 3),
              "in_sample_area": bool(r0 <= u <= r1 and s0 <= v <= s1)} for u, v in uv]}
 
-    def plate_to_photo(self, points_mm, photo_id: str | None = None) -> dict:
+    def plate_to_photo(self, points_mm, photo_id: str | None = None, height: float | None = None) -> dict:
         photo = self._photo(photo_id)
-        return {"photo_id": photo.id, "photo_px": rounded(photo.pixels(points_mm).tolist(), 1)}
+        return {"photo_id": photo.id, "photo_px": rounded(photo.pixels(points_mm, self._w(height)).tolist(), 1)}
 
     def photo_overlay(self, photo_id: str | None = None, region=None) -> dict:
         """The registered plate photo with the model drawn on it, to check the corners and the samples."""
         photo = self._photo(photo_id, "plate")
         rgb, _ = self._rgb(None, photo.id)
-        png = overlay_png(rgb, photo.to_photo, self.layout.plate, self.layout, photo.corners, region=region)
+        png = overlay_png(rgb, photo.pixels, self.layout.plate, self.layout, photo.corners, region=region,
+                          outline=photo.camera is not None)
         return {"image_png": png, "legend": "green: sample area of the model; blue: samples (names in yellow); red: "
-                "devices; yellow crosses: the corners given; white: plate outline. Everything should lie on the photo's "
+                "devices; yellow crosses: the corners given; white (3D correction only): back plate outline. Everything should lie on the photo's "
                 "edges; if not, correct the corners (register_photo again) or the samples."}
 
     def plate_view(self) -> dict:
         """The plate model (front view, tab up) with the samples and devices, axes in plate mm."""
         self._need_start()
         return {"image_png": plate_png(self.layout, f"{self.layout.plate.name} — {len(self.layout.samples)} sample(s)")}
+
+    # --------------------------------------------------------------------------------- manual annotation
+    def manual_annotation(self, photo_id: str | None = None) -> dict:
+        """Open the "Samples from a photo" window on the user's screen with this photo and its registration, so the
+        user marks / corrects the samples and devices by hand (when they are not satisfied with what was found).
+        Returns at once; call load_annotation when the user has pressed OK."""
+        import importlib.util
+        import subprocess
+        import sys
+        import tempfile
+
+        photo = self._photo(photo_id, "plate")
+        if not photo.path:
+            raise APIError("The window needs the photo file: register_photo with its path first.")
+        if not any(importlib.util.find_spec(m) for m in ("PyQt5", "PySide6")):
+            raise APIError("No Qt on this computer, the window cannot open. Alternatives: the user tells the corrections "
+                           "(positions / sizes) in the chat, or gives the sample corners read on photo_grid.")
+        folder = Path(tempfile.mkdtemp(prefix="quickalignment_annotation_"))
+        layout_file, out = folder / "layout.json", folder / "result.json"
+        self.layout.save(layout_file)
+        args = [sys.executable, "-m", "quickalignment.ui.annotate", "--photo", photo.path, "--layout", str(layout_file),
+                "--out", str(out), "--height", f"{DEFAULT_HEIGHT}"]
+        if photo.camera is not None:
+            from ..alignment.photo import GUI_POINTS_3D, project
+            xyz = [p_ for _, p_ in reference_points_3d(self.layout.plate)[:GUI_POINTS_3D]]
+            args += ["--points-3d", ";".join(f"{x:.2f},{y:.2f}" for x, y in project(photo.camera, xyz))]
+        else:
+            args += ["--corners", ";".join(f"{x:.2f},{y:.2f}" for x, y in photo.corners)]
+        src = str(Path(__file__).resolve().parents[2])
+        env = dict(__import__("os").environ, PYTHONPATH=src)
+        self._annotation = (subprocess.Popen(args, env=env), out)
+        return {"opened": True, "result_file": str(out),
+                "tell_the_user": "A window 'Samples from a photo — manual annotation' is open with your photo, already "
+                                 "registered. Draw boxes on the samples (Draw box), delete or merge wrong ones, set the "
+                                 "names and heights H, add devices in tab 2 if needed, then press OK.",
+                "next": "When the user says they are done, call load_annotation."}
+
+    def load_annotation(self, path: str | None = None, wait: bool = False) -> dict:
+        """Read the result of the manual-annotation window into the plate (replacing the samples if the user chose
+        so in the window, else adding them)."""
+        proc, out = getattr(self, "_annotation", (None, None))
+        if path:
+            out = Path(path)
+        if out is None:
+            raise APIError("No manual annotation was started (manual_annotation).")
+        if proc is not None and proc.poll() is None:
+            if not wait:
+                return {"done": False, "note": "The window is still open: ask the user to press OK (or Cancel)."}
+            proc.wait()
+        if not Path(out).exists():
+            raise APIError("The window was closed without a result (it may have failed to start).")
+        from ..core.fileio import read_json
+        data = read_json(out)
+        if not data.get("accepted"):
+            return {"done": True, "accepted": False, "note": "The user cancelled: nothing changed."}
+        new = SampleLayout.from_dict({"plate_type": "standard", "samples": data.get("samples", [])}).samples
+        if data.get("replace"):
+            self.layout.samples.clear()
+        for s in new:
+            if not s.name or any(o.name == s.name for o in self.layout.samples):
+                s.name = self.layout.unique_name()
+            self.layout.samples.append(s)
+        self._annotation = (None, None)
+        return {"done": True, "accepted": True, "replaced": bool(data.get("replace")), **self.samples()}
 
     # ----------------------------------------------------------------------------------------------- samples
     def detect_samples(self, photo_id: str | None = None, threshold: float = 12.0, min_area_mm2: float = 0.2,
@@ -391,7 +534,7 @@ class AlignmentSession:
         pts = np.asarray(points_px, float).reshape(-1, 2)
         if len(pts) < 2:
             raise APIError("Give at least 2 opposite corners (better all 4) of the sample in photo pixels.")
-        uv = photo.plate(pts)
+        uv = photo.plate(pts, self._w(DEFAULT_HEIGHT if height is None else height))  # the sample's top face
         u0, v0 = uv.min(axis=0)
         u1, v1 = uv.max(axis=0)
         out = self.add_sample((u0 + u1) / 2, (v0 + v1) / 2, u1 - u0, v1 - v0, height, name)
@@ -436,7 +579,7 @@ class AlignmentSession:
         It is stored relative to the substrate edges (x_edge left/right, y_edge bottom/top), so it moves with it."""
         s = self._sample(sample)
         if photo_px is not None:
-            x, y = self._photo(photo_id).plate([photo_px])[0]
+            x, y = self._photo(photo_id).plate([photo_px], self._w(s.height))[0]
         if x is None or y is None:
             raise APIError("Give the device position: x, y (plate mm) or photo_px.")
         if x_edge not in X_EDGES or y_edge not in Y_EDGES:

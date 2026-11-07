@@ -60,6 +60,6 @@ optic are kept.
 ## Configurations in use
 
 The SRn axis position on the plate comes from the configuration (`configs/calibration_2026-10-24_170000_zone_plate.json`:
-standard plate, zone plate data WWS2 2025-10-01/02). Capillary: `configs/calibration_2026-10-24_235500_capillary.json`
+standard plate, zone plate data SampleC 2025-10-01/02). Capillary: `configs/calibration_2026-10-24_235500_capillary.json`
 (gating plate, joint fit of two devices on Si measured at two rotations each; details in `../QuickAlignment/README.md`,
 *Anti-collision* section end, and in the file's `check` record).

@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from quickalignment import bz_target as bt
-from quickalignment.rotation import AnalyzerGeometry, analyzer_angles, emission_in_plate, plate_to_lab_dir
-from quickalignment.stage import MotorPositions, StageModel
+from quickalignment.alignment import bz_target as bt
+from quickalignment.alignment.rotation import AnalyzerGeometry, analyzer_angles, emission_in_plate, plate_to_lab_dir
+from quickalignment.core.stage import MotorPositions, StageModel
 
 MODEL, GEO = StageModel(), AnalyzerGeometry()
 

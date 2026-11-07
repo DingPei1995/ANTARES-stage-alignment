@@ -8,10 +8,10 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from quickalignment import fileio  # noqa: E402
-from quickalignment.calibration import CalibrationStore  # noqa: E402
-from quickalignment.geometry import Sample, SampleLayout  # noqa: E402
-from quickalignment.session import Session  # noqa: E402
+from quickalignment.core import fileio  # noqa: E402
+from quickalignment.core.calibration import CalibrationStore  # noqa: E402
+from quickalignment.core.geometry import Sample, SampleLayout  # noqa: E402
+from quickalignment.core.session import Session  # noqa: E402
 
 
 def test_write_json_keeps_old_file_on_failure(tmp_path, monkeypatch):
@@ -98,8 +98,8 @@ def test_excepthook_reports_and_keeps_running(monkeypatch):
 
 
 def test_main_with_unreadable_session_starts_empty(tmp_path, monkeypatch):
-    from quickalignment import app as app_module
-    from quickalignment.geometry import STANDARD_PLATE
+    from quickalignment.ui import main_window as app_module
+    from quickalignment.core.geometry import STANDARD_PLATE
     from quickalignment.ui._qt import QtWidgets
 
     bad = tmp_path / "bad.json"

@@ -1,6 +1,6 @@
-"""Figures and numbers of the gold-frame report (docs/GOLD_FRAME_REPORT_<lang>.md).
+"""Figures and numbers of the gold-frame report (GoldFrameCalibration/docs/GOLD_FRAME_REPORT_<lang>.md).
 
-Writes docs/images/gold_frame/*.png and docs/images/gold_frame/results.json, and fills the tables of each
+Writes GoldFrameCalibration/docs/images/gold_frame/*.png and docs/images/gold_frame/results.json, and fills the tables of each
 report (between its RESULTS TABLE / EFFORT TABLE markers); the PDFs are then built with
 ``python devtools/build_guides.py gold``.
 
@@ -23,16 +23,17 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 HERE = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE / "src"))
 
-from quickalignment.gold_frame import (  # noqa: E402
+from quickalignment.goldframe.model import (  # noqa: E402
     GoldFrame, Instrument, Setup, fit_global, simulated_measurement, sn_focus_error, sn_point_plan, sn_scan,
     survey_plan,
 )
-from quickalignment.gold_frame_plot import draw_survey  # noqa: E402
-from quickalignment.stage import N_HAT, T_HAT, StageConfig  # noqa: E402
+from quickalignment.goldframe.plot import draw_survey  # noqa: E402
+from quickalignment.core.stage import N_HAT, T_HAT, StageConfig  # noqa: E402
 
-OUT = HERE / "docs" / "images" / "gold_frame"
+DOCS = HERE / "GoldFrameCalibration" / "docs"
+OUT = DOCS / "images" / "gold_frame"
 H = 0.05  # gold top above the riser top
 # perfect: frame at the plate centre, SRn axis through it, SRz axis in the gold surface through it
 PERFECT = StageConfig(st0=-0.95, sz0=40.63, sn_f=-0.525, srn_axis_u=0.0, srn_axis_v=0.0,
@@ -330,7 +331,7 @@ def fill_tables(results):
                        f"{old['srn_settings']} | {old['srz_settings']} |",
                        f"| {names[1]} | {new['sz_lines']} | 0 | {new['st_steps']} ({mm.format(new['st_travel_mm'])}) | "
                        f"{new['srn_settings']} | {new['srz_settings']} |"]
-        path = HERE / "docs" / f"GOLD_FRAME_REPORT_{lang}.md"
+        path = DOCS / f"GOLD_FRAME_REPORT_{lang}.md"
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8")

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quickalignment"
+version = "2.0.0"
+description = "ANTARES sample alignment: QuickAlignment, RealSampleCalibration, GoldFrameCalibration, and their agent API / MCP server"
+requires-python = ">=3.9"
+dependencies = ["numpy", "matplotlib>=3.5"]
+
+[project.optional-dependencies]
+gui = ["PyQt5>=5.15"]
+nxs = ["h5py"]
+test = ["pytest"]
+
+[project.scripts]
+quickalignment-mcp = "quickalignment.agent.mcp_server:main"
+
+[project.gui-scripts]
+quickalignment = "quickalignment.ui.main_window:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

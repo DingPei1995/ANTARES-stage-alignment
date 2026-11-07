@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "quickalignment": {
+      "command": "python",
+      "args": ["Agent/quickalignment_mcp.py"]
+    }
+  }
+}

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from quickalignment.geometry import Device, Sample, SampleLayout
-from quickalignment.stage import (
+from quickalignment.core.geometry import Device, Sample, SampleLayout
+from quickalignment.core.stage import (
     N_HAT, T_HAT, MotorPositions, OpticsCalibration, StageConfig, StageModel, focus_correction, slide_to_sn, sn_to_focus,
 )
 
@@ -127,7 +127,7 @@ def test_device_target_detected():
 
 
 def test_custom_plate_keeps_standard_sn_reference():
-    from quickalignment.geometry import custom_plate
+    from quickalignment.core.geometry import custom_plate
 
     # after maintenance the analyzer plane may sit at SN_f = -0.1
     cfg = StageConfig(sn_f=-0.1)

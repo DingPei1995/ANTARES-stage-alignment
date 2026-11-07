@@ -1,10 +1,11 @@
-"""Take the screenshots of the user and staff guides (``docs/images/guide/``).
+"""Take the screenshots of the user and staff guides (``QuickAlignment/docs/images/guide/`` and
+``RealSampleCalibration/docs/images/guide/``, the ``ic_*`` ones).
 
-Drives QuickAlignment and InitialCalibration off-screen. The user guide follows
+Drives QuickAlignment and RealSampleCalibration off-screen. The user guide follows
 one real example: the gating plate photo of the tests (substrate RG_GMC, device
 R7G on the microscope photo), found, then turned to SRn 92 / SRz -24 as on the
 beamtime, with the newest capillary configuration of ``configs/``;
-InitialCalibration works on a temporary copy of the configurations, so nothing
+RealSampleCalibration works on a temporary copy of the configurations, so nothing
 is written to ``configs/``.
 
 Nothing here is part of the program; run it by hand after a change of the
@@ -24,20 +25,21 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 HERE = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE / "src"))
 
 import numpy as np  # noqa: E402
 from matplotlib.transforms import Bbox  # noqa: E402
 
-from quickalignment.calibration import CalibrationStore  # noqa: E402
-from quickalignment.geometry import STANDARD_PLATE, SampleLayout  # noqa: E402
-from quickalignment.rotation import AnalyzerGeometry, analyzer_angles, plate_to_lab_dir  # noqa: E402
-from quickalignment.session import Session  # noqa: E402
-from quickalignment.stage import MotorPositions, StageModel  # noqa: E402
-from quickalignment import bz_target as bt  # noqa: E402
+from quickalignment.core.calibration import CalibrationStore  # noqa: E402
+from quickalignment.core.geometry import STANDARD_PLATE, SampleLayout  # noqa: E402
+from quickalignment.alignment.rotation import AnalyzerGeometry, analyzer_angles, plate_to_lab_dir  # noqa: E402
+from quickalignment.core.session import Session  # noqa: E402
+from quickalignment.core.stage import MotorPositions, StageModel  # noqa: E402
+from quickalignment.alignment import bz_target as bt  # noqa: E402
 from quickalignment.ui._qt import QtCore, QtGui, QtWidgets  # noqa: E402
 
-OUT = HERE / "docs" / "images" / "guide"
+USER_OUT = HERE / "QuickAlignment" / "docs" / "images" / "guide"
+STAFF_OUT = HERE / "RealSampleCalibration" / "docs" / "images" / "guide"
 Qt = QtCore.Qt
 
 
@@ -46,9 +48,14 @@ def settle(app, n: int = 5) -> None:
         app.processEvents()
 
 
+def out_dir(name: str) -> Path:
+    """RealSampleCalibration shots (ic_*) go with the staff guide, the others with the user guide."""
+    return STAFF_OUT if name.startswith("ic_") else USER_OUT
+
+
 def save(widget, name: str, app) -> None:
     settle(app)
-    widget.grab().save(str(OUT / f"{name}.png"))
+    widget.grab().save(str(out_dir(name) / f"{name}.png"))
     print("wrote", name)
 
 
@@ -100,7 +107,7 @@ def correct_sn_figure(kept: QtGui.QImage, corrected: QtGui.QImage) -> None:
         p.drawText(QtCore.QRectF(x, 0, img.width(), head), Qt.AlignCenter, text)
         p.drawImage(x, head, img)
     p.end()
-    out.save(str(OUT / "correct_sn.png"))
+    out.save(str(USER_OUT / "correct_sn.png"))
     print("wrote correct_sn")
 
 
@@ -124,8 +131,8 @@ def refuse_warning(parent, title, text, *args, **kwargs):
 def quickalignment_shots(app, store: CalibrationStore) -> None:
     """One example all along: the gating plate of the tests (RG_GMC, device R7G; capillary), samples from the
     photo, start positions, R7G found, then turned to SRn 92 / SRz -24 as on the beamtime (2026-10-24)."""
-    from quickalignment.app import MainWindow
-    from quickalignment.geometry import GATING_PLATE
+    from quickalignment.ui.main_window import MainWindow
+    from quickalignment.core.geometry import GATING_PLATE
     from quickalignment.ui.photo_dialog import NAME, PhotoImportDialog
     from quickalignment.ui.plate_choice import PlateChoiceDialog
 
@@ -293,10 +300,10 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
 
 
 def calibration_shots(app, store: CalibrationStore) -> None:
-    from quickalignment.ui.initial_calibration_window import (
-        T_FOUND, T_OPTIC, T_ST, T_SZ, InitialCalibrationWindow, ModeDialog,
+    from quickalignment.ui.real_sample_window import (
+        T_FOUND, T_OPTIC, T_ST, T_SZ, RealSampleCalibrationWindow, ModeDialog,
     )
-    from quickalignment.initial_calibration import on_beam
+    from quickalignment.realsample.fit import on_beam
 
     dlg = ModeDialog(store)
     dlg.show()
@@ -310,7 +317,7 @@ def calibration_shots(app, store: CalibrationStore) -> None:
     uvw, focus = (1.2, -0.8, STANDARD_PLATE.total_thickness + 0.6), 60.1
     rng = np.random.default_rng(1)
 
-    win = InitialCalibrationWindow(store, "full")
+    win = RealSampleCalibrationWindow(store, "full")
     win.resize(1500, 1000)
     win.show()
     win.ref_x.setValue(uvw[0])
@@ -347,7 +354,7 @@ def calibration_shots(app, store: CalibrationStore) -> None:
     win.feature_dialog.close()
     win.close()
 
-    win = InitialCalibrationWindow(store, "optics")
+    win = RealSampleCalibrationWindow(store, "optics")
     win.resize(1500, 1000)
     win.show()
     win.ref_x.setValue(uvw[0])
@@ -360,7 +367,8 @@ def calibration_shots(app, store: CalibrationStore) -> None:
 
 
 def main() -> int:
-    OUT.mkdir(parents=True, exist_ok=True)
+    USER_OUT.mkdir(parents=True, exist_ok=True)
+    STAFF_OUT.mkdir(parents=True, exist_ok=True)
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp) / "configs"

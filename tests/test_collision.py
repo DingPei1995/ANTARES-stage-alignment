@@ -3,13 +3,13 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from quickalignment.calibration import CalibrationRecord
-from quickalignment.collision import (
+from quickalignment.core.calibration import CalibrationRecord
+from quickalignment.core.collision import (
     SAMPLING_ALLOWANCE, CollisionGeometry, SheetBody, SolidBody, collisions, default_geometry, in_acceptance,
     motor_limits, placed_bodies, surface_points,
 )
-from quickalignment.geometry import GATING_PLATE, STANDARD_PLATE, Sample, SampleLayout
-from quickalignment.stage import MotorPositions, StageConfig, StageModel
+from quickalignment.core.geometry import GATING_PLATE, STANDARD_PLATE, Sample, SampleLayout
+from quickalignment.core.stage import MotorPositions, StageConfig, StageModel
 
 TRAVEL = {"st": (-6.0, 6.0), "sn": (-30.0, 65.0), "sz": (35.0, 45.0)}
 CAP = default_geometry("capillary")

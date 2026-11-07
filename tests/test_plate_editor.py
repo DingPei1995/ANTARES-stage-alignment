@@ -6,9 +6,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 qt = pytest.importorskip("quickalignment.ui._qt")
 from dataclasses import replace  # noqa: E402
 
-from quickalignment.geometry import Device, Sample, SampleLayout  # noqa: E402
-from quickalignment.session import Session  # noqa: E402
-from quickalignment.app import MainWindow  # noqa: E402
+from quickalignment.core.geometry import Device, Sample, SampleLayout  # noqa: E402
+from quickalignment.core.session import Session  # noqa: E402
+from quickalignment.ui.main_window import MainWindow  # noqa: E402
 
 QtCore, QtGui, QtWidgets = qt.QtCore, qt.QtGui, qt.QtWidgets
 
@@ -17,9 +17,9 @@ Qt = QtCore.Qt
 
 @pytest.fixture
 def window(monkeypatch, tmp_path):
-    import quickalignment.app as app_module
-    from quickalignment.calibration import CalibrationStore
-    from quickalignment.geometry import STANDARD_PLATE
+    import quickalignment.ui.main_window as app_module
+    from quickalignment.core.calibration import CalibrationStore
+    from quickalignment.core.geometry import STANDARD_PLATE
 
     monkeypatch.setattr(app_module, "ask_plate", lambda *a, **k: STANDARD_PLATE)
     monkeypatch.setattr(app_module, "ask_setup", lambda *a, **k: (STANDARD_PLATE, "zone plate + OSA"))
@@ -172,8 +172,8 @@ def test_stage_panel_bring_to_focus_and_optics(window):
     # measured optics reference: optic position follows with the chosen sign
     from dataclasses import replace
 
-    from quickalignment.calibration import CalibrationRecord
-    from quickalignment.stage import OpticsCalibration
+    from quickalignment.core.calibration import CalibrationRecord
+    from quickalignment.core.stage import OpticsCalibration
 
     cal = OpticsCalibration(enabled=True, motors=st.motors.value(), surface_w=5.5, optic_position=10.0, optic_sign=-1)
     window._on_record(replace(CalibrationRecord(), optics=cal))
@@ -253,7 +253,7 @@ def test_stage_results_use_absolute_coordinates(window):
 
 
 def test_gating_plate(window):
-    from quickalignment.geometry import GATING_PLATE
+    from quickalignment.core.geometry import GATING_PLATE
 
     window.set_session(Session(layout=SampleLayout(plate=GATING_PLATE)))
     ed, st = window.editor, window.stage
@@ -270,8 +270,8 @@ def test_gating_plate(window):
 
 
 def test_change_plate_keeps_samples(window):
-    from quickalignment.geometry import GATING_PLATE
-    import quickalignment.app as app_module
+    from quickalignment.core.geometry import GATING_PLATE
+    import quickalignment.ui.main_window as app_module
 
     window.editor.add_sample(Sample("A", u=0, v=-5, length=2, width=2))
     app_module.ask_plate = lambda *a, **k: GATING_PLATE
@@ -284,14 +284,14 @@ def test_change_plate_keeps_samples(window):
 def test_configuration_dialog_is_read_only(window):
     from datetime import datetime
 
-    from quickalignment.calibration import CalibrationRecord
-    from quickalignment.stage import StageConfig
+    from quickalignment.core.calibration import CalibrationRecord
+    from quickalignment.core.stage import StageConfig
 
     st, dlg = window.stage, window.cal_dialog
     old = window.store.save(CalibrationRecord(comment="old", config=StageConfig(st0=0.1)), now=datetime(2026, 1, 1))
     new = window.store.save(CalibrationRecord(comment="new", config=StageConfig(st0=0.2)), now=datetime(2026, 2, 1))
     window.open_calibration()
-    assert dlg.isVisible() and "InitialCalibration" in dlg.findChildren(QtWidgets.QLabel)[-2].text()
+    assert dlg.isVisible() and "RealSampleCalibration" in dlg.findChildren(QtWidgets.QLabel)[-2].text()
     # the constants cannot be edited in QuickAlignment: the only input fields are the motor limits
     limit_boxes = {b for pair in dlg.limit_boxes.values() for b in pair}
     assert set(dlg.findChildren(QtWidgets.QDoubleSpinBox)) == limit_boxes
@@ -304,16 +304,16 @@ def test_configuration_dialog_is_read_only(window):
     assert len(window.store.records()) == 2 and new.path.exists()
 
 
-def test_initial_calibration_window(tmp_path):
-    from quickalignment.calibration import CalibrationStore
-    from quickalignment.geometry import STANDARD_PLATE
-    from quickalignment.initial_calibration import on_beam
-    from quickalignment.stage import StageConfig, StageModel
-    from quickalignment.ui.initial_calibration_window import T_FOUND, T_OPTIC, T_ST, T_SZ, InitialCalibrationWindow
+def test_real_sample_calibration_window(tmp_path):
+    from quickalignment.core.calibration import CalibrationStore
+    from quickalignment.core.geometry import STANDARD_PLATE
+    from quickalignment.realsample.fit import on_beam
+    from quickalignment.core.stage import StageConfig, StageModel
+    from quickalignment.ui.real_sample_window import T_FOUND, T_OPTIC, T_ST, T_SZ, RealSampleCalibrationWindow
 
     QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     store = CalibrationStore(tmp_path / "configs")
-    win = InitialCalibrationWindow(store)
+    win = RealSampleCalibrationWindow(store)
     assert win.table.rowCount() == 5 and win.test_table.rowCount() == 0
     assert not hasattr(win, "optic_dir") and not hasattr(win, "fit_mode") and not hasattr(win, "base_combo")
 
@@ -410,27 +410,27 @@ def test_initial_calibration_window(tmp_path):
     assert not store.latest("zone plate + OSA").optics.enabled
 
     # the main program puts the optic in focus where the staff found it
-    from quickalignment.initial_calibration import optic_focus_of
+    from quickalignment.realsample.fit import optic_focus_of
     assert optic_focus_of(rec, STANDARD_PLATE) == pytest.approx(focus, abs=0.01)
     win.close()
 
 
-def test_main_window_loads_initial_calibration(monkeypatch, tmp_path):
-    """A configuration written by InitialCalibration is the one QuickAlignment starts with, for its optic."""
-    import quickalignment.app as app_module
-    from quickalignment.calibration import CalibrationStore
-    from quickalignment.geometry import STANDARD_PLATE
-    from quickalignment.initial_calibration import fit_initial_calibration, initial_record, protocol_sets
-    from quickalignment.stage import StageConfig, StageModel
+def test_main_window_loads_real_sample_calibration(monkeypatch, tmp_path):
+    """A configuration written by RealSampleCalibration is the one QuickAlignment starts with, for its optic."""
+    import quickalignment.ui.main_window as app_module
+    from quickalignment.core.calibration import CalibrationStore
+    from quickalignment.core.geometry import STANDARD_PLATE
+    from quickalignment.realsample.fit import fit_real_sample_calibration, real_sample_record, protocol_sets
+    from quickalignment.core.stage import StageConfig, StageModel
 
     truth = StageModel(StageConfig(st0=0.2, sz0=40.3, sn_f=-0.1, srn_axis_u=0.5, srz_offset_n=-0.3), STANDARD_PLATE)
     sets = protocol_sets()[:3]
     for s in sets:
         m = truth.motors_for_target(0.0, 0.0, 5.0, srn=s.srn, srz=s.srz)
         s.st, s.sz, s.sn, s.optic = m.st, m.sz, m.sn, 7.5
-    res = fit_initial_calibration(sets, STANDARD_PLATE, (0.0, 0.0, 5.0))
+    res = fit_real_sample_calibration(sets, STANDARD_PLATE, (0.0, 0.0, 5.0))
     store = CalibrationStore(tmp_path / "configs")
-    saved = store.save(initial_record(res, STANDARD_PLATE, (0.0, 0.0, 5.0), optic_type="capillary"))
+    saved = store.save(real_sample_record(res, STANDARD_PLATE, (0.0, 0.0, 5.0), optic_type="capillary"))
 
     monkeypatch.setattr(app_module, "ask_setup", lambda *a, **k: (STANDARD_PLATE, "capillary"))
     QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -487,9 +487,9 @@ def test_rotation_tab(window):
 
 
 def test_custom_plate_dialog_and_focus(window, monkeypatch):
-    from quickalignment.geometry import custom_plate
+    from quickalignment.core.geometry import custom_plate
     from quickalignment.ui.plate_choice import PlateChoiceDialog
-    import quickalignment.app as app_module
+    import quickalignment.ui.main_window as app_module
 
     dlg = PlateChoiceDialog("standard")
     assert dlg.plate().key == "standard"
@@ -539,8 +539,8 @@ def test_samples_placed_goes_to_stage(window, monkeypatch):
 def test_optic_choice_loads_its_configuration(tmp_path, monkeypatch):
     from datetime import datetime
 
-    from quickalignment.calibration import CalibrationRecord, CalibrationStore
-    from quickalignment.stage import OpticsCalibration, StageConfig
+    from quickalignment.core.calibration import CalibrationRecord, CalibrationStore
+    from quickalignment.core.stage import OpticsCalibration, StageConfig
     from quickalignment.ui.plate_choice import PlateChoiceDialog
 
     QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -572,7 +572,7 @@ def test_optic_choice_loads_its_configuration(tmp_path, monkeypatch):
 
 
 def test_motor_ranges(window, monkeypatch):
-    from quickalignment.stage import MotorPositions
+    from quickalignment.core.stage import MotorPositions
     from quickalignment.ui.stage_panel import out_of_range
 
     assert out_of_range(MotorPositions()) == []
@@ -607,8 +607,8 @@ def test_motor_ranges(window, monkeypatch):
 
 
 def test_anti_collision_in_stage_and_rotate_tabs(window, monkeypatch):
-    from quickalignment.collision import CollisionGeometry, SolidBody
-    from quickalignment.stage import MotorPositions
+    from quickalignment.core.collision import CollisionGeometry, SolidBody
+    from quickalignment.core.stage import MotorPositions
 
     ed, st = window.editor, window.stage
     # a small OSA 1.5 mm before the focus (fixed) and a zone plate holder, from the configuration
@@ -703,14 +703,14 @@ def test_found_device_corrects_its_sample(window, monkeypatch):
     assert (m.st, m.sz, m.sn) == pytest.approx((found.st, found.sz, found.sn), abs=1e-4)
 
 
-def test_initial_calibration_asks_what_was_recalibrated(tmp_path):
+def test_real_sample_calibration_asks_what_was_recalibrated(tmp_path):
     """Start-up dialog: optics only by default (mechanics kept from the newest configuration of the optic),
     optics + motors when there is no configuration yet."""
-    from quickalignment.calibration import CalibrationRecord, CalibrationStore
-    from quickalignment.geometry import STANDARD_PLATE
-    from quickalignment.initial_calibration import on_beam
-    from quickalignment.stage import OpticsCalibration, StageConfig, StageModel
-    from quickalignment.ui.initial_calibration_window import InitialCalibrationWindow, ModeDialog
+    from quickalignment.core.calibration import CalibrationRecord, CalibrationStore
+    from quickalignment.core.geometry import STANDARD_PLATE
+    from quickalignment.realsample.fit import on_beam
+    from quickalignment.core.stage import OpticsCalibration, StageConfig, StageModel
+    from quickalignment.ui.real_sample_window import RealSampleCalibrationWindow, ModeDialog
 
     QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     store = CalibrationStore(tmp_path / "configs")
@@ -723,7 +723,7 @@ def test_initial_calibration_asks_what_was_recalibrated(tmp_path):
     dialog = ModeDialog(store)
     assert dialog.optics.isEnabled() and dialog.mode() == "optics"
 
-    win = InitialCalibrationWindow(store, dialog.mode())
+    win = RealSampleCalibrationWindow(store, dialog.mode())
     assert win.table.rowCount() == 3 and "optics recalibration" in win.windowTitle()
     win.optic_type.setCurrentIndex(1)  # capillary
     assert "Mechanics kept" in win.previous_label.text() and "2.6000" in win.previous_label.text()
@@ -765,7 +765,7 @@ def test_stage_schematic_cursor_readout(window):
 
 
 def test_motor_limits_set_in_the_configuration_window(window, tmp_path):
-    from quickalignment.calibration import CalibrationStore
+    from quickalignment.core.calibration import CalibrationStore
     from quickalignment.ui import stage_panel as sp
 
     dlg = window.cal_dialog

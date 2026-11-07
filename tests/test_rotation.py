@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from quickalignment.geometry import Sample, SampleLayout
-from quickalignment.rotation import (
+from quickalignment.core.geometry import Sample, SampleLayout
+from quickalignment.alignment.rotation import (
     AnalyzerGeometry, align_direction, analyzer_angles, emission_in_plate, fit_srn_axis, onto_line, plate_to_lab_dir,
     relocate, to_center,
 )
-from quickalignment.stage import MotorPositions, OpticsCalibration, StageConfig, StageModel
+from quickalignment.core.stage import MotorPositions, OpticsCalibration, StageConfig, StageModel
 
 GEOMETRIES = [AnalyzerGeometry(), AnalyzerGeometry("horizontal", -1, 1), AnalyzerGeometry("vertical", 1, -1)]
 
@@ -175,7 +175,7 @@ def test_starting_configuration_zone_plate_reference():
     """configs/calibration_2026-10-24_170000_zone_plate.json: ZP_ZS 53.21985 focuses on the first WWS2 Map (+ = towards the sample)."""
     from pathlib import Path
 
-    from quickalignment.calibration import CalibrationStore
+    from quickalignment.core.calibration import CalibrationStore
 
     root = Path(__file__).resolve().parent.parent
     record = next(r for r in CalibrationStore(root / "configs").records() if r.created == "2026-10-24 17:00:00")

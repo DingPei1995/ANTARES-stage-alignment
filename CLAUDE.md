@@ -10,7 +10,7 @@ for the system format.
 Whenever code shows, reads, parses or writes numbers, check whether it follows
 the standard format or the system settings, and default to the standard one:
 
-- Qt: `quickalignment/ui/_qt.py` sets `QLocale.c()` as the default locale on
+- Qt: `src/quickalignment/ui/_qt.py` sets `QLocale.c()` as the default locale on
   import (`use_standard_numbers()`). New windows/entry points must import Qt via
   `._qt`, and never call `setLocale(QLocale.system())` or a language locale on
   spin boxes, validators or `QLocale().toString()`.

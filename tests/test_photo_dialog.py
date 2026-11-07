@@ -6,11 +6,11 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 qt = pytest.importorskip("quickalignment.ui._qt")
-from quickalignment.geometry import GATING_PLATE, STANDARD_PLATE, Sample, SampleLayout  # noqa: E402
+from quickalignment.core.geometry import GATING_PLATE, STANDARD_PLATE, Sample, SampleLayout  # noqa: E402
 from quickalignment.ui.photo_dialog import BY_PLATE, BY_SAMPLE, PhotoImportDialog  # noqa: E402
 from quickalignment.ui.plate_editor import PlateEditor  # noqa: E402
 
-from quickalignment.photo import apply_homography  # noqa: E402
+from quickalignment.alignment.photo import apply_homography  # noqa: E402
 from test_photo import PHOTO_CORNERS, SAMPLES, synthetic_photo  # noqa: E402
 
 QtCore, QtWidgets = qt.QtCore, qt.QtWidgets

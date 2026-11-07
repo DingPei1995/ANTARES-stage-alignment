@@ -1,7 +1,8 @@
-"""Build the PDF guides in ``docs/pdf/``: user guide, beamline staff guide and the gold-frame report, in English,
-Chinese and French.
+"""Build the PDF guides: user guide (QuickAlignment/docs), beamline staff guide (RealSampleCalibration/docs), the
+gold-frame report (GoldFrameCalibration/docs) in English, Chinese and French, and the gold-frame experiment plan
+(GoldFrameCalibration/docs, English). Each PDF goes to the ``pdf/`` folder beside its source.
 
-Each ``docs/<GUIDE>_<lang>.md`` is turned into HTML by pandoc (GitHub flavour,
+Each ``<tool>/docs/<GUIDE>_<lang>.md`` is turned into HTML by pandoc (GitHub flavour,
 so the section links work as on GitHub), styled for A4 print and printed to
 PDF by headless Chromium through Playwright, with page numbers and a bookmark
 outline. Internal links are checked: a link to a missing section stops the
@@ -14,7 +15,7 @@ Needs:  pandoc, and ``pip install playwright`` with a Chromium it can use
         (``playwright install chromium``, or set ``CHROMIUM`` to a Chrome or
         Chromium executable).
 
-Usage:  python devtools/build_guides.py [user|staff|gold] [en|zh|fr] ...   (default: all)
+Usage:  python devtools/build_guides.py [user|staff|gold|plan] [en|zh|fr] ...   (default: all)
 """
 
 from __future__ import annotations
@@ -28,24 +29,25 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
-DOCS = HERE / "docs"
-OUT = DOCS / "pdf"
 
-GUIDES = {
-    "user": ("USER_GUIDE", "QuickAlignment_user_guide", {
+GUIDES = {  # key: (folder, source stem, PDF stem, titles)
+    "user": ("QuickAlignment", "USER_GUIDE", "QuickAlignment_user_guide", {
         "en": "QuickAlignment — User Guide",
         "zh": "QuickAlignment 用户指南",
         "fr": "QuickAlignment — Guide de l'utilisateur",
     }),
-    "staff": ("STAFF_GUIDE", "QuickAlignment_staff_guide", {
-        "en": "QuickAlignment — Beamline Staff Guide",
-        "zh": "QuickAlignment 线站人员指南",
-        "fr": "QuickAlignment — Guide du personnel de la ligne",
+    "staff": ("RealSampleCalibration", "STAFF_GUIDE", "RealSampleCalibration_staff_guide", {
+        "en": "RealSampleCalibration — Beamline Staff Guide",
+        "zh": "RealSampleCalibration 线站人员指南",
+        "fr": "RealSampleCalibration — Guide du personnel de la ligne",
     }),
-    "gold": ("GOLD_FRAME_REPORT", "GoldFrame_calibration_report", {
+    "gold": ("GoldFrameCalibration", "GOLD_FRAME_REPORT", "GoldFrame_calibration_report", {
         "en": "Gold-frame calibration — Report",
         "zh": "金框标定 — 报告",
         "fr": "Étalonnage par le cadre en or — Rapport",
+    }),
+    "plan": ("GoldFrameCalibration", "EXPERIMENT_PLAN", "GoldFrame_experiment_plan", {
+        "en": "Gold-frame calibration — Experiment plan",
     }),
 }
 HTML_LANG = {"en": "en", "zh": "zh-CN", "fr": "fr"}
@@ -92,12 +94,12 @@ def _png_width(path: Path) -> int:
         return struct.unpack(">II", f.read(24)[16:24])[0]
 
 
-def _small_images(body: str) -> str:
+def _small_images(body: str, docs: Path) -> str:
     """Narrow screenshots (dialogs) are not blown up to the full page width."""
     def mark(match):
         tag, src = match.group(0), match.group(1)
         try:
-            width = _png_width(DOCS / src)
+            width = _png_width(docs / src)
         except (OSError, struct.error):
             return tag
         if width >= 1100:
@@ -107,18 +109,19 @@ def _small_images(body: str) -> str:
 
 
 def to_html(guide: str, lang: str) -> str:
-    stem, _, titles = GUIDES[guide]
-    source = DOCS / f"{stem}_{lang}.md"
+    folder, stem, _, titles = GUIDES[guide]
+    docs = HERE / folder / "docs"
+    source = docs / f"{stem}_{lang}.md"
     body = subprocess.run(["pandoc", "-f", "gfm", "-t", "html5", str(source)],
                           check=True, capture_output=True, text=True).stdout
     ids = set(re.findall(r'id="([^"]+)"', body))
     broken = [html.unescape(h) for h in re.findall(r'href="#([^"]+)"', body) if h not in ids]
     if broken:
         raise SystemExit(f"{source.name}: links to missing sections: {broken}")
-    missing = [s for s in re.findall(r'src="(images/[^"]+)"', body) if not (DOCS / s).exists()]
+    missing = [s for s in re.findall(r'src="(images/[^"]+)"', body) if not (docs / s).exists()]
     if missing:
         raise SystemExit(f"{source.name}: missing images: {missing}")
-    body = _small_images(body).replace('src="images/', 'src="../images/')
+    body = _small_images(body, docs).replace('src="images/', 'src="../images/')
     return (f"<!doctype html><html lang='{HTML_LANG[lang]}'><head><meta charset='utf-8'>"
             f"<title>{titles[lang]}</title><style>{CSS}</style></head><body>{body}</body></html>")
 
@@ -126,20 +129,23 @@ def to_html(guide: str, lang: str) -> str:
 def build(guides, langs) -> list[Path]:
     from playwright.sync_api import sync_playwright
 
-    OUT.mkdir(parents=True, exist_ok=True)
     launch = {"executable_path": os.environ["CHROMIUM"]} if os.environ.get("CHROMIUM") else {}
     written = []
     with sync_playwright() as p:
         browser = p.chromium.launch(**launch)
         page = browser.new_page()
         for guide in guides:
-            _, name, titles = GUIDES[guide]
+            folder, _, name, titles = GUIDES[guide]
+            out = HERE / folder / "docs" / "pdf"
+            out.mkdir(parents=True, exist_ok=True)
             for lang in langs:
-                html_path = OUT / f"_build_{guide}_{lang}.html"  # beside the PDFs: relative image paths resolve
+                if lang not in titles:
+                    continue
+                html_path = out / f"_build_{guide}_{lang}.html"  # beside the PDFs: relative image paths resolve
                 html_path.write_text(to_html(guide, lang), encoding="utf-8")
                 try:
                     page.goto(html_path.as_uri(), wait_until="networkidle")
-                    pdf = OUT / f"{name}_{lang}.pdf"
+                    pdf = out / f"{name}_{lang}.pdf"
                     page.pdf(path=str(pdf), format="A4", print_background=True, prefer_css_page_size=True,
                              outline=True, tagged=True, display_header_footer=True,
                              header_template="<div></div>", footer_template=FOOTER.format(title=titles[lang]))

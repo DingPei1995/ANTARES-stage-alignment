@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from quickalignment.geometry import GATING_PLATE, STANDARD_PLATE
-from quickalignment.photo import (
+from quickalignment.core.geometry import GATING_PLATE, STANDARD_PLATE
+from quickalignment.alignment.photo import (
     apply_homography, check_corners, corner_points, detect_samples, homography, label_regions, plate_view_bounds,
     rectify, rgb_to_lab,
 )
@@ -97,7 +97,7 @@ def test_label_regions():
 
 
 def test_pair_transform():
-    from quickalignment.photo import pair_transform
+    from quickalignment.alignment.photo import pair_transform
 
     # device photo: scaled 80 px/mm, rotated 30°, shifted, image y down
     c, s = np.cos(np.radians(30)), np.sin(np.radians(30))

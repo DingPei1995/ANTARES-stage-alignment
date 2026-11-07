@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from quickalignment.calibration import CalibrationRecord, CalibrationStore
-from quickalignment.stage import StageConfig
+from quickalignment.core.calibration import CalibrationRecord, CalibrationStore
+from quickalignment.core.stage import StageConfig
 
 
 def test_store_latest_and_roundtrip(tmp_path):
@@ -18,14 +18,14 @@ def test_store_latest_and_roundtrip(tmp_path):
 
 
 def test_found_here_absorbs_a_small_configuration_error():
-    """Why QuickAlignment needs no calibration of its own: with a configuration from InitialCalibration
+    """Why QuickAlignment needs no calibration of its own: with a configuration from RealSampleCalibration
     (test points found within 0.05 mm), correcting the first found sample with "Found here" leaves
     errors of a few 10 um at the other rotations (an offset in the lab frame, taken as a position on
     the rotating plate, is off by 2 * error * sin(rotation / 2))."""
     import numpy as np
 
-    from quickalignment.geometry import STANDARD_PLATE
-    from quickalignment.stage import StageModel, found_offset
+    from quickalignment.core.geometry import STANDARD_PLATE
+    from quickalignment.core.stage import StageModel, found_offset
 
     truth = StageModel(StageConfig(st0=0.2, sz0=40.1, sn_f=0.3, srn_axis_u=1.2, srn_axis_v=-1.0,
                                    srz_offset_t=0.1, srz_offset_n=-0.2), STANDARD_PLATE)
@@ -50,9 +50,9 @@ def test_gating_capillary_configuration_reproduces_its_measurements():
     from the photos, layout of the former Data for config/RG_GMC_gating_session.json) and Cav (position fitted)."""
     import pytest
 
-    from quickalignment.geometry import GATING_PLATE, Device, Sample, SampleLayout
-    from quickalignment.rotation import relocate
-    from quickalignment.stage import MotorPositions, StageModel
+    from quickalignment.core.geometry import GATING_PLATE, Device, Sample, SampleLayout
+    from quickalignment.alignment.rotation import relocate
+    from quickalignment.core.stage import MotorPositions, StageModel
 
     record = CalibrationStore().latest("capillary")
     assert record.path.name == "calibration_2026-10-24_235500_capillary.json"

@@ -1,6 +1,6 @@
 import pytest
 
-from quickalignment.geometry import PlateGeometry, Sample, SampleLayout
+from quickalignment.core.geometry import PlateGeometry, Sample, SampleLayout
 
 
 def test_plate_dimensions():
@@ -35,7 +35,7 @@ def test_roundtrip(tmp_path):
 
 
 def test_plate_types_roundtrip(tmp_path):
-    from quickalignment.geometry import GATING_PLATE, PLATES
+    from quickalignment.core.geometry import GATING_PLATE, PLATES
 
     assert set(PLATES) == {"standard", "gating"}
     assert GATING_PLATE.riser_bounds() == (-5.5, -2.75, 5.5, 7.75)
@@ -47,7 +47,7 @@ def test_plate_types_roundtrip(tmp_path):
 
 
 def test_custom_plate(tmp_path):
-    from quickalignment.geometry import custom_plate
+    from quickalignment.core.geometry import custom_plate
 
     plate = custom_plate(6.0, 4.0, 8.2)
     assert plate.riser_bounds() == (-3.0, -2.0, 3.0, 2.0)  # centred on the plate

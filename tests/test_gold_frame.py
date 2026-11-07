@@ -5,12 +5,12 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from quickalignment.calibration import CalibrationRecord, CalibrationStore
-from quickalignment.gold_frame import (
+from quickalignment.core.calibration import CalibrationRecord, CalibrationStore
+from quickalignment.goldframe.model import (
     GoldFrame, Instrument, Scan, Setup, SNPoint, fit_global, plan_scan, profile_edges, record_for,
     simulated_measurement, sn_focus_error, sn_point_plan, survey_plan,
 )
-from quickalignment.stage import OpticsCalibration, StageConfig
+from quickalignment.core.stage import OpticsCalibration, StageConfig
 
 TRUE = StageConfig(st0=-0.95, sz0=40.63, sn_f=-0.525, srn_axis_u=-0.26, srn_axis_v=-0.05,
                    srz_offset_t=-0.23, srz_offset_n=2.59)
@@ -171,7 +171,7 @@ def test_the_record_is_a_valid_configuration(tmp_path):
 
 def test_spem_files_round_trip(tmp_path):
     pytest.importorskip("h5py")
-    from quickalignment.spem_nxs import read_scan, stage_of, write_scan
+    from quickalignment.goldframe.spem_nxs import read_scan, stage_of, write_scan
 
     assert stage_of("i12-m-cx1/ex/sample-mt_srn/position") == "srn"
     assert stage_of("i12-m-cx1/ex/pi/x") == "pix"
@@ -199,7 +199,7 @@ def test_spem_files_round_trip(tmp_path):
 
 def test_a_second_motor_that_does_not_move_on_a_line_is_read_as_fixed(tmp_path):
     pytest.importorskip("h5py")
-    from quickalignment.spem_nxs import read_scan, write_scan
+    from quickalignment.goldframe.spem_nxs import read_scan, write_scan
 
     y = np.linspace(-1, 1, 51)
     base = {k: np.zeros(2) for k in ("st", "sn", "sz", "srn", "srz", "pix", "piy")}
@@ -216,7 +216,7 @@ def test_a_second_motor_that_does_not_move_on_a_line_is_read_as_fixed(tmp_path):
 
 def test_image32_is_summed_when_there_is_no_total_intensity(tmp_path):
     h5py = pytest.importorskip("h5py")
-    from quickalignment.spem_nxs import read_scan
+    from quickalignment.goldframe.spem_nxs import read_scan
 
     n2, n1 = 3, 4
     with h5py.File(tmp_path / "map.nxs", "w") as f:  # the real layout: (outer, inner, slices, energy)
@@ -237,7 +237,7 @@ def test_image32_is_summed_when_there_is_no_total_intensity(tmp_path):
 
 def test_command_line_plan_and_fit(tmp_path, capsys):
     pytest.importorskip("h5py")
-    from quickalignment.gold_frame_cli import main, read_sn_points, save_scan
+    from quickalignment.goldframe.cli import main, read_sn_points, save_scan
 
     configs = tmp_path / "configs"
     configs.mkdir()

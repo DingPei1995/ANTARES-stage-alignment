@@ -55,7 +55,7 @@ def rounded(value, digits: int = 4):
     if isinstance(value, float):
         if not math.isfinite(value):
             return None
-        r = round(value, digits)
+        r = round(float(value), digits)
         return 0.0 if r == 0 else r
     if isinstance(value, dict):
         return {k: rounded(v, digits) for k, v in value.items()}

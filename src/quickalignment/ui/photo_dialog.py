@@ -77,6 +77,13 @@ class PhotoImportDialog(QtWidgets.QDialog):
         reset_btn = QtWidgets.QPushButton("Clear points")
         reset_btn.setToolTip("Remove the points clicked on the photo and start again")
         reset_btn.clicked.connect(self.reg.clear_corners)
+        self.use_3d = QtWidgets.QCheckBox("3D correction")
+        self.use_3d.setChecked(False)
+        self.use_3d.setToolTip("For a photo not taken from straight above: click 8 points at two heights (the 4 "
+                               "sample-area corners on the riser, 2 top corners of the back plate, 2 top corners of "
+                               "the tab).\nA camera model then corrects the perspective at every height. Off: the 4 "
+                               "sample-area corners only (enough for a photo from about straight above).")
+        self.use_3d.toggled.connect(self._on_3d)
         self.file_label = QtWidgets.QLabel("no photo")
         self.file_label.setStyleSheet("color: #555;")
         self.instruction = QtWidgets.QLabel()
@@ -189,6 +196,7 @@ class PhotoImportDialog(QtWidgets.QDialog):
         top = QtWidgets.QHBoxLayout()
         top.addWidget(open_btn)
         top.addWidget(reset_btn)
+        top.addWidget(self.use_3d)
         top.addWidget(self.file_label, 1)
         params = QtWidgets.QHBoxLayout()
         params.addWidget(QtWidgets.QLabel("find samples by"))
@@ -280,6 +288,10 @@ class PhotoImportDialog(QtWidgets.QDialog):
     def set_corners(self, points) -> None:
         self.reg.set_corners(points)
 
+    def _on_3d(self, on: bool) -> None:
+        self.reg.set_3d(on)
+        self._update_instruction()
+
     def _on_registration(self) -> None:
         self.devices_panel.set_source(self.reg.photo, self.reg.h)
         if self.rectified is not None:
@@ -307,6 +319,8 @@ class PhotoImportDialog(QtWidgets.QDialog):
         elif text is None:
             text = ("Check that the plate model (blue) lies on the plate; drag the points to refine. Adjust the ΔE "
                     "threshold; draw missing boxes, delete wrong ones (click a box to select it).")
+            if self.reg.camera is not None:
+                text += f" 3D correction: the points fit the camera model within {self.reg.camera_rms:.1f} px (rms)."
         color = "#c00000" if error and text == error else "#00609a"
         self.instruction.setStyleSheet(f"font-weight: bold; color: {color};")
         self.instruction.setText(text)

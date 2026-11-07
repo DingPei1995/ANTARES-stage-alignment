@@ -17,7 +17,10 @@ import numpy as np
 from ._qt import QtCore, QtGui, QtWidgets, Signal
 from .plate_editor import cosmetic_pen, draw_plate_items
 from ..core.geometry import PlateGeometry, Rect
-from ..alignment.photo import Rectified, apply_homography, check_corners, homography, plate_view_bounds, rect_corners, rectify
+from ..alignment.photo import (
+    GUI_POINTS_3D, Rectified, apply_homography, camera_matrix, check_corners, homography, plane_homography,
+    plate_view_bounds, rect_corners, rectify, reference_points_3d,
+)
 
 Qt = QtCore.Qt
 
@@ -242,7 +245,11 @@ class PhotoRegistration(QtWidgets.QWidget):
         self.photo: np.ndarray | None = None
         self.corners: list[CornerItem] = []
         self.rectified: Rectified | None = None
-        self.h: np.ndarray | None = None  # plate -> photo
+        self.h: np.ndarray | None = None  # plate -> photo (the plane of the reference points)
+        self.camera: np.ndarray | None = None  # 3 x 4 camera matrix (3D correction), None: one plane only
+        self.camera_rms = 0.0  # px, residual of the clicked points with the camera model
+        self.use_3d = False  # 3D correction: points at several heights (optional, sample area of the plate only)
+        self.ref_heights: list[float] = []
         self.error = ""
         self.cursor_text: Callable[[float, float], str] | None = None  # extra text for the cursor read-out
         self._photo_overlay: list[QtWidgets.QGraphicsItem] = []
@@ -275,9 +282,7 @@ class PhotoRegistration(QtWidgets.QWidget):
             min(x0, x1), -max(y0, y1), max(x0, x1), -min(y0, y1)))
         self.plate_view.hovered.connect(lambda x, y: self._show_cursor(x, -y))
         self.plate_view.left.connect(lambda: self.cursor_label.setText(self._idle_cursor_text()))
-        self.ref_markers = [RefMarker(i) for i in range(4)]
-        for m in self.ref_markers:
-            self.plate_scene.addItem(m)
+        self.ref_markers: list[RefMarker] = []
         self.set_reference(ref_rect, ref_label, view_bounds, px_per_mm)
 
         self.photo_title = QtWidgets.QLabel()
@@ -321,9 +326,7 @@ class PhotoRegistration(QtWidgets.QWidget):
         """Reference rectangle whose corners are clicked, and the plate rectangle the photo is mapped on
         (view_bounds, at px_per_mm); clears the clicked points."""
         self.ref_rect, self.ref_label, self.view_bounds, self.px_per_mm = ref_rect, ref_label, view_bounds, px_per_mm
-        self.ref_points = rect_corners(ref_rect)
-        for marker, (_, (u, v)) in zip(self.ref_markers, self.ref_points):
-            marker.setPos(u, -v)
+        self._make_ref_points()
         for it in self._model_items:
             self.plate_scene.removeItem(it)
         pen = cosmetic_pen(COLOR_MODEL, 1.2)
@@ -336,6 +339,31 @@ class PhotoRegistration(QtWidgets.QWidget):
             it.setAcceptedMouseButtons(Qt.NoButton)
         if self.corners:
             self.clear_corners()
+
+    def set_3d(self, enabled: bool) -> None:
+        """3D correction on / off: with it the photo is registered by eight points at two heights (sample-area
+        corners, back plate and tab top corners), for photos not taken from straight above. Clears the points."""
+        self.use_3d = bool(enabled)
+        self._make_ref_points()
+        self.clear_corners()
+
+    def _make_ref_points(self) -> None:
+        top = self.plate.total_thickness
+        if self.use_3d:
+            pts = reference_points_3d(self.plate)[:GUI_POINTS_3D]
+            self.ref_points = [(name, (u, v)) for name, (u, v, _) in pts]
+            self.ref_heights = [w for _, (_, _, w) in pts]
+        else:
+            self.ref_points = rect_corners(self.ref_rect)
+            self.ref_heights = [top] * len(self.ref_points)
+        for m in self.ref_markers:
+            self.plate_scene.removeItem(m)
+        self.ref_markers = [RefMarker(i) for i in range(len(self.ref_points))]
+        for marker, (_, (u, v)) in zip(self.ref_markers, self.ref_points):
+            marker.setPos(u, -v)
+            self.plate_scene.addItem(marker)
+        if hasattr(self, "cursor_label"):
+            self._update_markers()
 
     def zoom_to(self, rect: Rect) -> None:
         """Show this plate rectangle in the right view."""
@@ -357,11 +385,12 @@ class PhotoRegistration(QtWidgets.QWidget):
         if self.photo is None:
             return None
         n = len(self.corners)
-        if n >= 4:
+        if n >= len(self.ref_points):
             return None
         name, (u, v) = self.ref_points[n]
-        return (f"Click on the photo the point {n + 1} shown in red in the right view: {name} corner of "
-                f"{self.ref_label} (x = {u:g}, y = {v:g} mm). Wheel = zoom, middle drag = pan, right click = "
+        what = (f"{name} (x = {u:g}, y = {v:g} mm, {self.ref_heights[n]:g} mm above the back face)" if self.use_3d
+                else f"{name} corner of {self.ref_label} (x = {u:g}, y = {v:g} mm)")
+        return (f"Click on the photo the point {n + 1} shown in red in the right view: {what}. Wheel = zoom, middle drag = pan, right click = "
                 "whole view; markers can be dragged afterwards.")
 
     # -- photo and points ----------------------------------------------------------
@@ -406,13 +435,13 @@ class PhotoRegistration(QtWidgets.QWidget):
         item.setPos(x, y)
 
     def _on_corner_moved(self) -> None:
-        if len(self.corners) == 4:
+        if len(self.corners) == len(self.ref_points):
             self._registration_changed()
 
     def _on_photo_click(self, x: float, y: float) -> None:
         if self.photo is None:
             return
-        if len(self.corners) < 4:
+        if len(self.corners) < len(self.ref_points):
             self._add_corner(x, y)
             self._registration_changed()
         elif self.h is not None:
@@ -421,13 +450,18 @@ class PhotoRegistration(QtWidgets.QWidget):
 
     # -- registration --------------------------------------------------------------
     def _registration_changed(self) -> None:
-        self.rectified, self.h, self.error = None, None, ""
-        if self.photo is not None and len(self.corners) == 4:
+        self.rectified, self.h, self.camera, self.error = None, None, None, ""
+        if self.photo is not None and len(self.corners) == len(self.ref_points):
             pts = self.corner_positions()
             ref = [p for _, p in self.ref_points]
             try:
-                check_corners(ref, pts)
-                self.h = homography(ref, pts)
+                check_corners(ref[:4], pts[:4])
+                if self.use_3d:
+                    xyz = [(u, v, w) for (u, v), w in zip(ref, self.ref_heights)]
+                    self.camera, self.camera_rms, _ = camera_matrix(xyz, pts)
+                    self.h = plane_homography(self.camera, self.ref_heights[0])  # the sample-area plane
+                else:
+                    self.h = homography(ref, pts)
                 self.rectified = rectify(self.photo, self.h, self.view_bounds, self.px_per_mm)
             except ValueError as exc:
                 self.h, self.error = None, str(exc)
@@ -465,10 +499,13 @@ class PhotoRegistration(QtWidgets.QWidget):
         self._photo_overlay = []
         if self.h is None:
             return
-        model = [(self.plate.outline(), COLOR_MODEL, 1.5)]
-        model += [([(u0, v0), (u1, v0), (u1, v1), (u0, v1)], COLOR_MODEL, 1.5) for u0, v0, u1, v1 in self.model_rects()]
-        for points, color, width in model + self._overlay_shapes:
-            q = apply_homography(self.h, points)
+        # with the 3D correction the back plate outline is drawn at its own height (its top face)
+        base = (plane_homography(self.camera, self.plate.base_thickness) if self.camera is not None else self.h)
+        model = [(self.plate.outline(), COLOR_MODEL, 1.5, base)]
+        model += [([(u0, v0), (u1, v0), (u1, v1), (u0, v1)], COLOR_MODEL, 1.5, self.h)
+                  for u0, v0, u1, v1 in self.model_rects()]
+        for points, color, width, h in model + [(*s, self.h) for s in self._overlay_shapes]:
+            q = apply_homography(h, points)
             item = self.photo_scene.addPolygon(QtGui.QPolygonF([QtCore.QPointF(x, y) for x, y in q]),
                                                cosmetic_pen(color, width))
             item.setZValue(10)

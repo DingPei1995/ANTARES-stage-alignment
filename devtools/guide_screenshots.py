@@ -2,8 +2,8 @@
 ``RealSampleCalibration/docs/images/guide/``, the ``ic_*`` ones).
 
 Drives QuickAlignment and RealSampleCalibration off-screen. The user guide follows
-one real example: the gating plate photo of the tests (substrate RG_GMC, device
-R7G on the microscope photo), found, then turned to SRn 92 / SRz -24 as on the
+one real example: the gating plate photo of the tests (substrate SampleA, device
+D1 on the microscope photo), found, then turned to SRn 92 / SRz -24 as on the
 beamtime, with the newest capillary configuration of ``configs/``;
 RealSampleCalibration works on a temporary copy of the configurations, so nothing
 is written to ``configs/``.
@@ -75,7 +75,7 @@ def top_view(stage, half: float = 6.0) -> QtGui.QImage:
     hit = stage.last_result.hit
     ax.annotate("analyzer focus", (0, 0), (-1.0, -2.2), color="#1f77b4", fontsize=9, ha="right",
                 arrowprops=dict(arrowstyle="-", color="#1f77b4", lw=0.8))
-    ax.annotate("beam spot on R7G", (hit[0], hit[1]), (2.0, hit[1] + 2.5), color="#d62728", fontsize=9,
+    ax.annotate("beam spot on D1", (hit[0], hit[1]), (2.0, hit[1] + 2.5), color="#d62728", fontsize=9,
                 arrowprops=dict(arrowstyle="-", color="#d62728", lw=0.8))
     for text in ax.texts:
         text.set_clip_on(True)
@@ -129,8 +129,8 @@ def refuse_warning(parent, title, text, *args, **kwargs):
 
 
 def quickalignment_shots(app, store: CalibrationStore) -> None:
-    """One example all along: the gating plate of the tests (RG_GMC, device R7G; capillary), samples from the
-    photo, start positions, R7G found, then turned to SRn 92 / SRz -24 as on the beamtime (2026-10-24)."""
+    """One example all along: the gating plate of the tests (SampleA, device D1; capillary), samples from the
+    photo, start positions, D1 found, then turned to SRn 92 / SRz -24 as on the beamtime (2026-10-24)."""
     from quickalignment.ui.main_window import MainWindow
     from quickalignment.core.geometry import GATING_PLATE
     from quickalignment.ui.photo_dialog import NAME, PhotoImportDialog
@@ -159,7 +159,7 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     photo.file_label.setText(REAL_PHOTO.name)
     photo.set_corners(REAL_CORNERS)
     photo.pick_sample_color(3.65, 6.15)
-    photo.table.item(0, NAME).setText("RG_GMC")
+    photo.table.item(0, NAME).setText("SampleA")
     photo.table.clearSelection()
     for row in range(1, photo.table.rowCount()):
         photo.table.selectionModel().select(photo.table.model().index(row, 0),
@@ -174,17 +174,17 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
 
     # tab 2, devices from a second photo: the microscope photo of the substrate centre. Matched points: the
     # silver paint dot above the centre and the centre circle (black blob and round purple pad under the
-    # microscope); device R7G clicked on the flake of the channel between them
+    # microscope); device D1 clicked on the flake of the channel between them
     panel = photo.devices_panel
     photo.tabs.setCurrentIndex(1)
-    panel.select_substrate("RG_GMC")
+    panel.select_substrate("SampleA")
     device_photo = HERE / "tests" / "data" / "gating_device_photo.jpg"
     panel.load_photo(str(device_photo))
     panel.file_label.setText(device_photo.name)
     panel.set_pairs([(1.51, 3.66), (1.73, 2.49)], [(235.5, 103.9), (279.1, 328.1)])
     panel.device_radio.setChecked(True)
     panel._on_right_click(275.0, 213.0)
-    panel.devices[0].name = "R7G"
+    panel.devices[0].name = "D1"
     panel._fill_table()
     photo._on_devices_changed()
     settle(app)
@@ -199,11 +199,11 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     editor._on_dev_table_selection()
     save(win, "samples_tab", app)
 
-    # samples placed -> start positions in the Stage & Optics tab; R7G brought onto the beam at SRn 120, SRz 0
+    # samples placed -> start positions in the Stage & Optics tab; D1 brought onto the beam at SRn 120, SRz 0
     win.resize(1450, 1000)
     win.go_to_stage()
     st = win.stage
-    target = "RG_GMC/R7G"
+    target = "SampleA/D1"
     st.target_combo.setCurrentText(target)
     st.found_combo.setCurrentText(target)
     st.motors.set_value(MotorPositions(st=0.0, sn=0.0, sz=40.0, srn=120, srz=0))
@@ -213,8 +213,8 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     st.update_view()
     save(win, "stage_tab", app)
 
-    # R7G found a little off the listed position (the photo is good to 0.1-0.3 mm): Found here. The found
-    # position is where the beamtime configuration puts R7G (the device position it was fitted with)
+    # D1 found a little off the listed position (the photo is good to 0.1-0.3 mm): Found here. The found
+    # position is where the beamtime configuration puts D1 (the device position it was fitted with)
     W = GATING_PLATE.total_thickness + 0.525
     f_st, f_sz, f_sn = st.model().reference_motors(1.51, 2.82, W)
     st.motors.set_value(MotorPositions(st=round(f_st, 4), sn=round(f_sn, 4), sz=round(f_sz, 4), srn=120, srz=0))
@@ -237,7 +237,7 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     rp.correct_sn.setChecked(True)
     save(win, "rotate_tab", app)
 
-    # the SN-kept solution (2.0 mm from the analyzer focus) and the corrected one sent to the Stage tab: R7G on
+    # the SN-kept solution (2.0 mm from the analyzer focus) and the corrected one sent to the Stage tab: D1 on
     # the beam again (the beamtime found it at ST -6.048, SZ 38.988 with SN kept); the corrected one is shown
     win.resize(1450, 1000)
     rp.correct_sn.setChecked(False)

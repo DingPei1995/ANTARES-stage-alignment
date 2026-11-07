@@ -32,10 +32,10 @@ sample plate is 18 × 15.5 mm. QuickAlignment turns the plate and sample geometr
 
 The program never moves a motor. It computes numbers; you enter them on the beamline control system.
 
-**The example of this guide.** All pictures follow one real case: a **gating plate** with the substrate **RG_GMC**
-(Si, H = 0.525 mm) and its device **R7G**, measured with the **capillary** in October 2026. Its samples are found on a
-phone photo of the plate, R7G on a microscope photo; R7G is brought onto the beam at the start orientation, its
-position is corrected once found, and the plate is then turned to SRn = 92°, SRz = −24°, where R7G was found again
+**The example of this guide.** All pictures follow one real case: a **gating plate** with the substrate **SampleA**
+(Si, H = 0.525 mm) and its device **D1**, measured with the **capillary** in October 2026. Its samples are found on a
+phone photo of the plate, D1 on a microscope photo; D1 is brought onto the beam at the start orientation, its
+position is corrected once found, and the plate is then turned to SRn = 92°, SRz = −24°, where D1 was found again
 on the beamline at the predicted position.
 
 ## Starting the program
@@ -75,8 +75,8 @@ refuse values outside the travel ranges.
 
 ![Samples tab](images/guide/samples_tab.png)
 
-The picture shows the plate of the example after *From photo…* (next section): the substrate RG_GMC with its device
-R7G (selected, blue marker), and a small chip S2. The red cross is the plate centre (x = y = 0); the grey frame is the
+The picture shows the plate of the example after *From photo…* (next section): the substrate SampleA with its device
+D1 (selected, blue marker), and a small chip S2. The red cross is the plate centre (x = y = 0); the grey frame is the
 sample area (gating plate: 11 × 10.5 mm above the contact block).
 
 - **Draw a sample**: drag on an empty part of the plate. **Move** it by dragging it, **resize** it by dragging an edge
@@ -87,7 +87,7 @@ sample area (gating plate: 11 × 10.5 mm above the contact block).
 - **Devices on a substrate**: select the substrate, press *Add device*, choose the two reference edges (*X ref*
   left/right, *Y ref* bottom/top) and the distances dx, dy to the device centre, or drag the blue marker. The table
   and the line under it also give the device position x, y on the plate. Devices move with their substrate. A
-  substrate with devices is listed by its devices only in the target lists (e.g. *RG_GMC/R7G*).
+  substrate with devices is listed by its devices only in the target lists (e.g. *SampleA/D1*).
 - **Status**: `ok`, or what is wrong (outside the sample area, overlapping, device outside its substrate). Red items
   on the drawing have a problem.
 - Wheel = zoom, middle drag = pan, right click = whole plate, Del = delete the selection (*Delete selected*). The
@@ -107,6 +107,13 @@ photo is fine). Press **From photo…**:
    markers afterwards to refine. *Clear points* starts again.
 2. The photo is mapped onto the plate model (right view, blue outlines). Check that the outlines lie on the plate.
    The cursor shows plate coordinates (x, y in mm) in the right view and on the photo.
+   **3D correction (optional, off by default).** Four corners map the plane of the sample area exactly, from any
+   angle. On a photo that is clearly not taken from straight above, things at other heights (a thick sample, the back
+   plate) appear shifted. Tick **3D correction** before clicking: the program then asks for eight points at two
+   heights (the four sample-area corners on the riser, then the two top corners of the back plate and the two top
+   corners of the tab, 1.1 mm above the back face), fits a camera model to them and corrects the perspective at every
+   height; the back plate outline is then drawn at its own height, and the instruction line gives how well the points
+   fit (rms in pixels). For a photo from about straight above leave it off.
 3. Samples are found by their colour (green boxes, magenta = what is taken):
    - *colour of picked samples* (default): click on a sample, on the photo or in the right view, to pick its colour
      (*Pick sample colour* for another kind of sample); only regions close to these colours are taken, silver paint
@@ -123,7 +130,7 @@ photo is fine). Press **From photo…**:
    found. These edits are kept when the threshold is changed; *Undo hand edits* forgets them. In the example the
    small chip on the left is broken up by its silver paint into five pieces: they are selected together and merged
    into S2 (ΔE "9 (merged)").
-   **Names** are typed in the table (here S1 → RG_GMC); the *Devices* column counts the devices marked in tab 2.
+   **Names** are typed in the table (here S1 → SampleA); the *Devices* column counts the devices marked in tab 2.
 5. Enter the **height H** (it cannot be seen from above; default: *Default H*), per sample in the table or with *Set H
    of all*.
 6. Optionally locate the devices on a second photo (tab 2, below), then press **Add to plate**. *Remove the samples
@@ -158,9 +165,9 @@ devices but often not the substrate edges. The two photos are matched by points 
 4. Another device photo (for another substrate, or another part) can be opened: the devices already marked keep their
    positions. *Add to plate* adds each device to the sample it lies on (devices on no sample are left out).
 
-In the example the device photo is a microscope picture of the centre of RG_GMC. Two features are seen on both
+In the example the device photo is a microscope picture of the centre of SampleA. Two features are seen on both
 photos: point **1**, the silver paint dot above the centre (a black blob under the microscope), and point **2**, the
-round hole of the electrode pattern (the purple disc). R7G is then clicked on the flake of the channel between them:
+round hole of the electrode pattern (the purple disc). D1 is then clicked on the flake of the channel between them:
 x = 1.712, y = 3.090 mm. With only two pairs the mismatch is always 0 µm; a third pair, when one is visible, checks
 the match.
 
@@ -173,7 +180,7 @@ When all samples are drawn, press **Samples placed → Stage**.
 ![Stage & Optics tab](images/guide/stage_tab.png)
 
 The green box lists, for every sample and device, the **ST / SZ / SN at the start orientation** (SRn = 120°,
-SRz = 0°, PIX = PIY = 150 µm) that put its centre on the beam in the analyzer focus. In the example R7G is listed at
+SRz = 0°, PIX = PIY = 150 µm) that put its centre on the beam in the analyzer focus. In the example D1 is listed at
 ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back plate, for reference).
 
 1. Enter the current motor positions (absolute values, as on the control system). PIX, PIY are the piezo stage: the
@@ -183,7 +190,7 @@ ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back
    analyzer focus along the beam (red above 50 µm: the spectra would be distorted) and the ΔSN that would remove it.
    Only if you judge it too far, press **Correct SN**: SN, ST, SZ that put the target on the analyzer focus (see
    [Correct SN](#correct-sn-putting-the-point-back-on-the-analyzer-focus)). If a motor would leave its range, or
-   the plate would touch the optic or the analyzer, nothing is changed and you are told why. In the picture, R7G is
+   the plate would touch the optic or the analyzer, nothing is changed and you are told why. In the picture, D1 is
    brought onto the beam at SRn = 120°, SRz = 0°: with SN = 0 kept it is on the analyzer focus.
 3. **Focusing optic**: *Type* is the optic in use (zone plate + OSA, or capillary); enter the optic position; press
    **Update schematic & optics**. The schematic shows the beam, the analyzer focus, the optic and the position
@@ -212,7 +219,7 @@ position. Once it is really **on the beam and in the analyzer focus**, enter the
 drawing (Δx, Δy on the plate, ΔH in height); *Yes* moves the sample with all its devices; the other samples stay.
 All predictions then use the corrected position (saved with the session); the list of start positions is updated.
 
-In the example R7G is found at ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°): it was drawn 0.20 mm too
+In the example D1 is found at ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°): it was drawn 0.20 mm too
 far right and 0.27 mm too high. A correction above 0.3 mm, or the same shift for every sample, suggests that the
 configuration is outdated: tell the beamline staff. Use *Found here* at SRz = 0° when you can: there SN kept means
 "in the analyzer focus"; after an SRz turn with SN kept the point is usually not in the analyzer focus, and ΔH would
@@ -249,19 +256,19 @@ watch the camera.
 5. **Send to Stage & Optics tab** takes the shown solution (ticked: the corrected one), refused if it is out of range
    or the plate would touch something.
 
-**Example.** R7G is on the beam at SRn = 120°, SRz = 0° (ST = −2.4601, SZ = 37.8095, SN = 0, capillary 59.6926);
-wanted: SRn = 92°, SRz = −24°. With SN kept, ST = −6.0561, SZ = 38.9759 and the capillary at 61.7277 put R7G back on
+**Example.** D1 is on the beam at SRn = 120°, SRz = 0° (ST = −2.4601, SZ = 37.8095, SN = 0, capillary 59.6926);
+wanted: SRn = 92°, SRz = −24°. With SN kept, ST = −6.0561, SZ = 38.9759 and the capillary at 61.7277 put D1 back on
 the beam, but 2035 µm downstream of the analyzer focus (red: the spectra would be distorted). With *Correct SN*:
-ST = −4.6171, SZ = 38.9759, SN = −1.4390, the capillary unchanged: R7G on the analyzer focus. Ticked, *Send to Stage
+ST = −4.6171, SZ = 38.9759, SN = −1.4390, the capillary unchanged: D1 on the analyzer focus. Ticked, *Send to Stage
 & Optics tab*:
 
-![R7G found again after the rotation](images/guide/rotate_found.png)
+![D1 found again after the rotation](images/guide/rotate_found.png)
 
-The Stage tab now shows R7G **found again** at the new angles: in the sample plane view the plate is turned by
-SRn = 92° (28° from the start orientation) and the beam spot (×) is on R7G, on the analyzer focus (+); the top view
+The Stage tab now shows D1 **found again** at the new angles: in the sample plane view the plate is turned by
+SRn = 92° (28° from the start orientation) and the beam spot (×) is on D1, on the analyzer focus (+); the top view
 shows the plate turned by SRz = −24°. *Bring target onto the beam* / *Correct SN* there give the same positions.
 
-**Checked on the beamline**: at SRn = 92°, SRz = −24° with SN kept at 0, R7G was found at ST = −6.0479,
+**Checked on the beamline**: at SRn = 92°, SRz = −24° with SN kept at 0, D1 was found at ST = −6.0479,
 SZ = 38.9880, capillary 61.74, within 8 µm, 12 µm and 0.01 of the SN-kept prediction above.
 
 ## Correct SN: putting the point back on the analyzer focus
@@ -283,7 +290,7 @@ plane is the "SN = 0" line of the camera). The measured point has to be on the b
 - **Correct SN** moves SN, with ST compensating (SN is not along the beam), so that the point is back **on** the
   analyzer focus. The optic then goes back to where it focuses on the analyzer focus.
 
-In the example (left: SN kept, right: Correct SN, both at SRn = 92°, SRz = −24°) the beam spot on R7G is 2.0 mm
+In the example (left: SN kept, right: Correct SN, both at SRn = 92°, SRz = −24°) the beam spot on D1 is 2.0 mm
 downstream of the analyzer focus with SN kept; SN = −1.439 with ST = −4.617 puts it back, the capillary at 59.6926
 as before the turn.
 

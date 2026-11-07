@@ -33,10 +33,10 @@ traduit la géométrie de la plaquette et des échantillons en **positions moteu
 Le programme ne déplace jamais de moteur : il calcule des nombres, que vous entrez dans le contrôle-commande de la ligne.
 
 **L'exemple de ce guide.** Toutes les images suivent un cas réel : une **plaquette gating** portant le substrat
-**RG_GMC** (Si, H = 0,525 mm) et son dispositif **R7G**, mesurés avec le **capillaire** en octobre 2026. Les
-échantillons sont trouvés sur une photo de téléphone de la plaquette, R7G sur une photo au microscope ; R7G est amené
+**SampleA** (Si, H = 0,525 mm) et son dispositif **D1**, mesurés avec le **capillaire** en octobre 2026. Les
+échantillons sont trouvés sur une photo de téléphone de la plaquette, D1 sur une photo au microscope ; D1 est amené
 sous le faisceau à l'orientation de départ, sa position est corrigée une fois trouvé, puis la plaquette est tournée à
-SRn = 92°, SRz = −24°, où R7G a été retrouvé sur la ligne à la position prédite.
+SRn = 92°, SRz = −24°, où D1 a été retrouvé sur la ligne à la position prédite.
 
 ## Démarrer le programme
 
@@ -77,8 +77,8 @@ configuration). Les champs moteurs refusent les valeurs hors course.
 
 ![Onglet Samples](images/guide/samples_tab.png)
 
-L'image montre la plaquette de l'exemple après *From photo…* (section suivante) : le substrat RG_GMC avec son
-dispositif R7G (sélectionné, repère bleu), et une petite puce S2. La croix rouge est le centre de la plaquette
+L'image montre la plaquette de l'exemple après *From photo…* (section suivante) : le substrat SampleA avec son
+dispositif D1 (sélectionné, repère bleu), et une petite puce S2. La croix rouge est le centre de la plaquette
 (x = y = 0) ; le cadre gris est la zone d'échantillons (plaquette gating : 11 × 10,5 mm au-dessus du bloc de contact).
 
 - **Dessiner un échantillon** : glisser sur une partie vide de la plaquette. Le **déplacer** en le faisant glisser,
@@ -90,7 +90,7 @@ dispositif R7G (sélectionné, repère bleu), et une petite puce S2. La croix ro
   (*X ref* left/right, *Y ref* bottom/top) et les distances dx, dy au centre du dispositif, ou faire glisser le repère
   bleu. Le tableau et la ligne en dessous donnent aussi la position x, y du dispositif sur la plaquette. Les
   dispositifs suivent leur substrat ; un substrat avec dispositifs n'apparaît que par ses dispositifs dans les listes
-  de cibles (par ex. *RG_GMC/R7G*).
+  de cibles (par ex. *SampleA/D1*).
 - **Status** : `ok`, ou le problème (hors de la zone, chevauchement, dispositif hors du substrat). Les éléments rouges
   du dessin ont un problème.
 - Molette = zoom, bouton du milieu = déplacer, clic droit = plaquette entière, Suppr = effacer la sélection (*Delete
@@ -110,6 +110,14 @@ Au lieu de les dessiner, les échantillons peuvent être trouvés sur une photo 
    = déplacer, clic droit = photo entière ; faire glisser les repères ensuite pour affiner. *Clear points* recommence.
 2. La photo est projetée sur le modèle de la plaquette (vue de droite, contours bleus). Vérifier que les contours sont
    sur la plaquette. Le curseur donne les coordonnées plaquette (x, y en mm) dans la vue de droite et sur la photo.
+   **Correction 3D (optionnelle, désactivée par défaut).** Quatre coins projettent exactement le plan de la zone
+   d'échantillons, quel que soit l'angle. Sur une photo nettement prise de biais, ce qui est à une autre hauteur (un
+   échantillon épais, la plaque de base) apparaît décalé. Cocher **3D correction** avant de cliquer : le programme
+   demande alors huit points à deux hauteurs (les quatre coins de la zone sur la rehausse, puis les deux coins hauts de
+   la plaque de base et les deux coins hauts de la languette, à 1,1 mm de la face arrière), ajuste un modèle de caméra
+   et corrige la perspective à toutes les hauteurs ; le contour de la plaque de base est alors dessiné à sa hauteur et
+   la ligne d'instructions indique l'accord des points (rms en pixels). Pour une photo prise à peu près à la verticale,
+   la laisser désactivée.
 3. Les échantillons sont trouvés par leur couleur (cadres verts, magenta = ce qui est retenu) :
    - *colour of picked samples* (par défaut) : cliquer sur un échantillon, sur la photo ou dans la vue de droite, pour
      prendre sa couleur (*Pick sample colour* pour une autre sorte d'échantillon) ; seules les régions proches de ces
@@ -126,7 +134,7 @@ Au lieu de les dessiner, les échantillons peuvent être trouvés sur une photo 
    **Draw box** puis glisser dans la vue de droite ajoute un échantillon non trouvé. Ces corrections restent quand le
    seuil change ; *Undo hand edits* les oublie. Dans l'exemple, la petite puce de gauche est coupée en cinq morceaux
    par sa laque d'argent : ils sont sélectionnés ensemble et réunis en S2 (ΔE « 9 (merged) »).
-   Les **noms** se tapent dans le tableau (ici S1 → RG_GMC) ; la colonne *Devices* compte les dispositifs marqués dans
+   Les **noms** se tapent dans le tableau (ici S1 → SampleA) ; la colonne *Devices* compte les dispositifs marqués dans
    l'onglet 2.
 5. Entrer la **hauteur H** (invisible d'en haut ; par défaut *Default H*), par échantillon dans le tableau ou avec
    *Set H of all*.
@@ -165,9 +173,9 @@ par des points que vous marquez sur les deux :
    gardent leur position. *Add to plate* ajoute chaque dispositif à l'échantillon sur lequel il se trouve (ceux hors de
    tout échantillon sont écartés).
 
-Dans l'exemple, la photo des dispositifs est une image au microscope du centre de RG_GMC. Deux détails se voient sur
+Dans l'exemple, la photo des dispositifs est une image au microscope du centre de SampleA. Deux détails se voient sur
 les deux photos : le point **1**, la goutte de laque d'argent au-dessus du centre (une tache noire au microscope), et
-le point **2**, le trou rond du motif d'électrodes (le disque violet). R7G est ensuite cliqué sur le flocon du canal
+le point **2**, le trou rond du motif d'électrodes (le disque violet). D1 est ensuite cliqué sur le flocon du canal
 entre les deux : x = 1,712, y = 3,090 mm. Avec deux paires seulement l'écart vaut toujours 0 µm ; une troisième paire,
 quand un détail s'y prête, vérifie la correspondance.
 
@@ -182,7 +190,7 @@ Une fois les échantillons dessinés, appuyer sur **Samples placed → Stage**.
 
 Le cadre vert donne, pour chaque échantillon et dispositif, les **ST / SZ / SN à l'orientation de départ**
 (SRn = 120°, SRz = 0°, PIX = PIY = 150 µm) qui mettent son centre sous le faisceau, au foyer de l'analyseur. Dans
-l'exemple R7G est listé à ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* est le centre de la plaque de fond,
+l'exemple D1 est listé à ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* est le centre de la plaque de fond,
 pour repère).
 
 1. Entrer les positions moteurs actuelles (valeurs absolues, comme dans le contrôle-commande). PIX, PIY sont la
@@ -193,7 +201,7 @@ pour repère).
    l'analyseur le long du faisceau (en rouge au-delà de 50 µm : les spectres seraient déformés) et le ΔSN qui
    l'annulerait. Seulement si elle est jugée trop grande, **Correct SN** donne SN, ST, SZ qui mettent la cible au
    foyer de l'analyseur (voir [Correct SN](#correct-sn--remettre-le-point-au-foyer-de-lanalyseur)). Si un moteur sortait de sa course, ou si la plaquette touchait
-   l'optique ou l'analyseur, rien n'est changé et la raison est donnée. Sur l'image, R7G est amené sous le faisceau à
+   l'optique ou l'analyseur, rien n'est changé et la raison est donnée. Sur l'image, D1 est amené sous le faisceau à
    SRn = 120°, SRz = 0° : avec SN = 0 gardé, il est au foyer de l'analyseur.
 3. **Optique** : *Type* est l'optique utilisée (zone plate + OSA, ou capillaire) ; entrer sa position et appuyer sur
    **Update schematic & optics**. Le schéma montre le faisceau, le foyer de l'analyseur, l'optique et la position
@@ -224,7 +232,7 @@ et donne l'erreur du dessin (Δx, Δy sur la plaquette, ΔH en hauteur) ; *Yes* 
 dispositifs, les autres restent. Toutes les prédictions utilisent ensuite la position corrigée (enregistrée avec la
 session) ; la liste des positions de départ est mise à jour.
 
-Dans l'exemple R7G est trouvé à ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°) : il était dessiné
+Dans l'exemple D1 est trouvé à ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°) : il était dessiné
 0,20 mm trop à droite et 0,27 mm trop haut. Une correction de plus de 0,3 mm, ou le même décalage pour tous les
 échantillons, suggère une configuration périmée : prévenir le personnel de la ligne. Utiliser *Found here* à
 SRz = 0° quand c'est possible : là, SN gardé veut dire « au foyer de l'analyseur » ; après une rotation SRz avec SN
@@ -262,20 +270,20 @@ Garder une distance de sécurité et surveiller la caméra.
 5. **Send to Stage & Optics tab** reprend la solution affichée (cochée : la solution corrigée), refusé si hors course
    ou si la plaquette touchait quelque chose.
 
-**Exemple.** R7G est sous le faisceau à SRn = 120°, SRz = 0° (ST = −2.4601, SZ = 37.8095, SN = 0, capillaire
+**Exemple.** D1 est sous le faisceau à SRn = 120°, SRz = 0° (ST = −2.4601, SZ = 37.8095, SN = 0, capillaire
 59.6926) ; voulu : SRn = 92°, SRz = −24°. Avec SN gardé, ST = −6.0561, SZ = 38.9759 et le capillaire à 61.7277
-remettent R7G sous le faisceau, mais à 2035 µm en aval du foyer de l'analyseur (rouge : les spectres seraient
-déformés). Avec *Correct SN* : ST = −4.6171, SZ = 38.9759, SN = −1.4390, capillaire inchangé : R7G au foyer de
+remettent D1 sous le faisceau, mais à 2035 µm en aval du foyer de l'analyseur (rouge : les spectres seraient
+déformés). Avec *Correct SN* : ST = −4.6171, SZ = 38.9759, SN = −1.4390, capillaire inchangé : D1 au foyer de
 l'analyseur. Case cochée, *Send to Stage & Optics tab* :
 
-![R7G retrouvé après la rotation](images/guide/rotate_found.png)
+![D1 retrouvé après la rotation](images/guide/rotate_found.png)
 
-L'onglet Stage montre maintenant R7G **retrouvé** aux nouveaux angles : dans la vue du plan de l'échantillon la
-plaquette est tournée à SRn = 92° (28° depuis l'orientation de départ) et la tache du faisceau (×) est sur R7G, au
+L'onglet Stage montre maintenant D1 **retrouvé** aux nouveaux angles : dans la vue du plan de l'échantillon la
+plaquette est tournée à SRn = 92° (28° depuis l'orientation de départ) et la tache du faisceau (×) est sur D1, au
 foyer de l'analyseur (+) ; la vue de dessus montre la plaquette tournée de SRz = −24°. *Bring target onto the beam* /
 *Correct SN* y donnent les mêmes positions.
 
-**Vérifié sur la ligne** : à SRn = 92°, SRz = −24° avec SN gardé à 0, R7G a été trouvé à ST = −6.0479,
+**Vérifié sur la ligne** : à SRn = 92°, SRz = −24° avec SN gardé à 0, D1 a été trouvé à ST = −6.0479,
 SZ = 38.9880, capillaire 61.74, à 8 µm, 12 µm et 0.01 de la prédiction avec SN gardé ci-dessus.
 
 ## Correct SN : remettre le point au foyer de l'analyseur
@@ -299,7 +307,7 @@ point.
 - **Correct SN** déplace SN, avec ST qui compense (SN n'est pas le long du faisceau), pour remettre le point **au**
   foyer de l'analyseur. L'optique revient alors là où elle focalise sur le foyer de l'analyseur.
 
-Dans l'exemple (à gauche : SN gardé, à droite : Correct SN, tous deux à SRn = 92°, SRz = −24°), la tache sur R7G est à
+Dans l'exemple (à gauche : SN gardé, à droite : Correct SN, tous deux à SRn = 92°, SRz = −24°), la tache sur D1 est à
 2,0 mm en aval du foyer de l'analyseur avec SN gardé ; SN = −1.439 avec ST = −4.617 l'y remet, le capillaire à 59.6926
 comme avant la rotation.
 

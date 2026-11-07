@@ -57,7 +57,9 @@ y up, front view (sample side) with the tab up), not motor positions; the plate 
   from above). Tab 2 (`src/quickalignment/ui/device_match.py`): devices located on a second photo
   (microscope) matched to a crop of the plate photo around a substrate by point pairs the user marks on both (2 pairs:
   similarity, 3: affine, ≥ 4: perspective, with the residual); devices have no height and are added to the sample they
-  lie on. Only numpy + Qt, everything local. Test photo: `tests/data/gating_plate_photo.jpg` (repository root) (RG_GMC, gating plate).
+  lie on. Optional **3D correction** (off by default) for oblique photos: 8 points at two heights (sample-area
+  corners, back plate and tab top corners) give a camera model (`camera_matrix` in `alignment/photo.py`) that corrects
+  the perspective at every height. Only numpy + Qt, everything local. Test photo: `tests/data/gating_plate_photo.jpg` (repository root) (SampleA, gating plate).
 - **Samples placed → Stage**: asks whether all samples are marked on the plate; *Yes* opens the Stage & Optics tab
   with a list of the ST / SZ / SN that put each sample on the analyzer focus at the initial rotation
   (SRn = 120, SRz = 0, PIX = PIY = 150 µm). A substrate carrying devices is listed by its devices only (also in
@@ -156,7 +158,7 @@ is checked against simple solids:
   long; (3) bent upstream on the analyzer side, 20° off the beam axis, so that it stays out of
   the analyzer acceptance cone (30° from the beam axis seen from the focus), 4.4 mm; (4) bent again, 15°, 2.7 mm
   (lengths estimated). The zone plate moves with its motor (ZP_ZS); the **OSA is not moved when the
-  zone plate refocuses** (OSA_S stays at ≈ 80.00 in the WWS2 / S2 metadata while ZP_ZS changes): it is placed
+  zone plate refocuses** (OSA_S stays at ≈ 80.00 in the SampleC / S2 metadata while ZP_ZS changes): it is placed
   before the focus at the configuration's optics reference (≈ the analyzer focus);
 - **capillary** (Sigray): working distance 7.2 mm. Shape from the design top and side views, sizes from the chamber
   top view (scale from the plate, ±10 %), from the focus: a round nose 3.7 mm wide (front at 7.2 mm, 0.7 mm long),
@@ -197,19 +199,19 @@ Not modelled: the sample holder below the plate, the cryostat and shields, the O
 beam, and the zone plate against the OSA when it refocuses.
 
 The SRn axis position on the plate comes from the configuration (`configs/calibration_2026-10-24_170000_zone_plate.json`:
-standard plate, zone plate data WWS2 2025-10-01/02, 2.38 mm from the axis). The SRz axis is not calibrated yet for
+standard plate, zone plate data SampleC 2025-10-01/02, 2.38 mm from the axis). The SRz axis is not calibrated yet for
 the standard plate.
 
-Capillary: `configs/calibration_2026-10-24_235500_capillary.json` (gating plate, data in `Data for config/`), a joint
+Capillary: `configs/calibration_2026-10-24_235500_capillary.json` (gating plate), a joint
 fit of two devices on Si (H = 0.525 mm), each measured at two rotations with SN kept at ≈ 0 and the capillary refocused:
-RG_GMC (x 1.51, y 2.82 mm from the photos, `RG_GMC_position_on_plate.png`, session `RG_GMC_gating_session.json`) at
-SRn 120 / SRz −12 (CPS 60.30) and SRn 92 / SRz −24 (CPS 61.74); Cav (another gating plate, no photo: its position is
+SampleA (x 1.51, y 2.82 mm from the photos) at
+SRn 120 / SRz −12 (CPS 60.30) and SRn 92 / SRz −24 (CPS 61.74); SampleB (another gating plate, no photo: its position is
 fitted) at SRn 120 / SRz −24 (CPS 58.75) and SRn 142 / SRz −24 (CPS 58.48). 12 equations for 9 unknowns, rms 22 µm.
 SRz axis 2.59 ± 0.39 mm behind the standard riser top and −0.23 ± 0.23 mm along ST; SRn axis (−0.26, −0.05);
 ST0 −0.950, SZ0 40.630; capillary CPS 59.69 on the analyzer focus. ST0 and SN_f cannot be told apart by these data
 (no measurement on the analyzer focus): SN_f = −0.525 is taken so that the measured surfaces (SN ≈ 0) were in the
-analyzer focal plane. The first configuration from RG_GMC alone (`…_234000_capillary.json`, ST0 fixed at 0) is
-1.3 mm off in ST for Cav. ST0 agrees with experience (plate centre at ST ≈ −1 without rotation). SZ0 and the
+analyzer focal plane. The first configuration from SampleA alone (`…_234000_capillary.json`, ST0 fixed at 0) is
+1.3 mm off in ST for SampleB. ST0 agrees with experience (plate centre at ST ≈ −1 without rotation). SZ0 and the
 CPS reference probably depend on the capillary alignment (pitch): all four measurements were made after the same
 alignment. After realigning the capillary, run RealSampleCalibration with *optics only* (one set at SRn 120 / SRz 0;
 SN_f and the axes are kept).

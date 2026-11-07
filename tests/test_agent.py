@@ -268,3 +268,81 @@ def test_mcp_server_over_stdio(configs):
     assert replies[0]["result"]["protocolVersion"] == "2024-11-05"
     plates = json.loads(replies[1]["result"]["content"][0]["text"])["plates"]
     assert [p["key"] for p in plates] == ["standard", "gating", "custom"]
+
+
+# -- oblique photos (optional 3D correction) ------------------------------------------------------------------
+@pytest.fixture(scope="module")
+def qapp():
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from quickalignment.ui._qt import QtWidgets
+    return QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+
+
+def oblique_camera(tilt_deg=25.0):
+    k = np.array([[1500, 0, 400], [0, 1500, 450], [0, 0, 1.0]])
+    a = np.radians(tilt_deg)
+    r = np.array([[1, 0, 0], [0, np.cos(a), -np.sin(a)], [0, np.sin(a), np.cos(a)]]) @ np.diag([1, -1, -1])
+    return k @ np.c_[r, [0, 0, 60.0]]
+
+
+def test_3d_correction_of_an_oblique_photo(api):
+    from quickalignment.alignment.photo import project, reference_points_3d
+    a = api.alignment
+    a.start("gating", "capillary")
+    cam = oblique_camera()
+    pts = a.photo_points_3d()["points"]
+    assert len(pts) >= 8 and {p["plate_mm"][2] for p in pts[:8]} == {5.0, 1.1}
+    with pytest.raises(APIError, match="different heights"):
+        a.register_photo_3d([{"number": i + 1, "px": project(cam, [p["plate_mm"]])[0].tolist()} for i, p in
+                             enumerate(pts[:4])] * 2, image_size=[800, 900])
+    given = [{"name": p["name"], "px": project(cam, [p["plate_mm"]])[0].tolist()} for p in pts[:8]]
+    reg = a.register_photo_3d(given, image_size=[800, 900], photo_id="oblique")
+    assert reg["rms_px"] < 0.01 and not reg["warnings"]
+    # a 1 mm thick sample, its top corners as seen on the photo
+    top = [(1.0, 2.0, 6.0), (3.0, 2.0, 6.0), (3.0, 4.0, 6.0), (1.0, 4.0, 6.0)]
+    out = a.add_sample_from_photo(project(cam, top).tolist(), height=1.0, name="thick", photo_id="oblique")["added"]
+    assert [out["x"], out["y"], out["length"], out["width"]] == pytest.approx([2.0, 3.0, 2.0, 2.0], abs=1e-3)
+    # the four-corner registration alone puts it off by a few tenths of a mm
+    corners = [project(cam, [xyz])[0].tolist() for _, xyz in reference_points_3d(a.layout.plate)[:4]]
+    a.register_photo(corners, image_size=[800, 900], photo_id="flat")
+    flat = a.add_sample_from_photo(project(cam, top).tolist(), height=1.0, name="thick2", photo_id="flat")["added"]
+    assert abs(flat["y"] - 3.0) > 0.2
+
+
+def test_photo_window_3d_mode(qapp):
+    from quickalignment.ui.photo_dialog import PhotoImportDialog
+    from quickalignment.core.geometry import GATING_PLATE
+    dlg = PhotoImportDialog(GATING_PLATE, 0.525)
+    assert not dlg.use_3d.isChecked() and len(dlg.reg.ref_points) == 4  # off by default
+    assert dlg.load_photo(str(PHOTO))
+    dlg.use_3d.setChecked(True)
+    assert len(dlg.reg.ref_points) == 8
+    dlg.set_corners(CORNERS + [(92, 203), (617, 333), (330, 68), (455, 80)])
+    assert dlg.reg.camera is not None and dlg.reg.camera_rms < 15 and dlg.reg.h is not None
+    dlg.use_3d.setChecked(False)
+    assert dlg.reg.camera is None and len(dlg.reg.ref_points) == 4
+
+
+def test_manual_annotation_round_trip(api, tmp_path, monkeypatch, qapp):
+    from quickalignment.core.fileio import write_json
+    from quickalignment.ui import annotate
+    from quickalignment.ui.photo_dialog import PhotoImportDialog
+    a = started(api)
+    a.add_sample(1.0, 1.0, 1.0, 1.0, name="wrong")
+    # the window: the user draws one box and presses OK
+    def accept(self):
+        self.add_box(0.5, 2.5, 4.5, 6.5)
+        return 1
+    monkeypatch.setattr(PhotoImportDialog, "exec", accept, raising=False)
+    monkeypatch.setattr(PhotoImportDialog, "exec_", accept, raising=False)
+    layout_file, out = tmp_path / "layout.json", tmp_path / "result.json"
+    a.layout.save(layout_file)
+    assert annotate.main(["--photo", str(PHOTO), "--layout", str(layout_file), "--out", str(out),
+                          "--corners", ";".join(f"{x},{y}" for x, y in CORNERS)]) == 0
+    res = a.load_annotation(str(out))
+    names = [s["name"] for s in res["samples"]]
+    assert res["accepted"] and "wrong" in names and len(names) == 2
+    write_json(out, {"accepted": True, "replace": True, "samples": [{"name": "only", "u": 2.5, "v": 4.5,
+                                                                     "length": 4, "width": 4, "height": 0.5}]})
+    assert [s["name"] for s in a.load_annotation(str(out))["samples"]] == ["only"]

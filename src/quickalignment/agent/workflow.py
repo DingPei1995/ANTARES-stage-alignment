@@ -25,6 +25,10 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    If the photo is rotated, the order follows the plate (tab = top), not the image edges.
    (No file at all: read the corners on the image you see and pass image_size=[width, height] instead of path;
    say that this is less precise and that detect_samples / overlays are not available.)
+   OPTIONAL 3D correction (off by default; only when the photo is clearly oblique, or the user asks): read also
+   corners at another height (back plate top corners, tab top corners: align_photo_points_3d) and use
+   align_register_photo_3d with >= 6 points instead of align_register_photo. It corrects the perspective for thick
+   samples and devices; check its rms_px and residuals.
 3. align_register_photo(corners_px, path). Then align_photo_overlay and LOOK at it: the green outline must lie on
    the sample-area edges. Show it to the user and ask them to confirm; fix the corners if it is off.
 4. Samples: align_detect_samples (colour; pick a pixel on a sample with sample_colors_px to leave out silver paint)
@@ -34,6 +38,11 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
 5. Devices (small structures on a substrate): read them on the plate photo (align_add_device with photo_px), or on a
    microscope photo of the substrate registered with align_register_device_photo (2-4 point pairs: the same
    substrate corners / marks on the microscope photo and on the plate photo). Show align_photo_overlay again.
+5b. ALWAYS ASK whether the user is satisfied with the samples found (show the overlay). If not, offer:
+   (i) they tell you what to change (which sample, where, its size or height) -> align_update_sample /
+   align_remove_sample / align_add_sample; (ii) MANUAL ANNOTATION: align_manual_annotation opens the photo window on
+   their screen with the photo already registered; they draw the samples / devices themselves and press OK; then
+   align_load_annotation. Use only what the user confirms; mark only the samples they want.
 6. align_sample_positions: ST / SZ / SN of every sample and device at the start rotation (SRn 120, SRz 0, piezo
    150 / 150). Give the user this table.
 7. Feedback from the beamline:
@@ -84,8 +93,8 @@ PROMPTS = {
                       {"name": "plate", "description": "standard, gating or custom", "required": False},
                       {"name": "optic", "description": "capillary or zone plate", "required": False}],
         "text": ("Find the samples on the plate photo {photo} (plate: {plate}, optic: {optic}; ask me if unknown), "
-                 "locate the four corners of the sample area, check the overlay with me, ask me the sample heights, "
-                 "and give me the ST / SZ / SN of every sample."),
+                 "locate the four corners of the sample area, check the overlay with me, ask me the sample heights "
+                 "and whether I am satisfied (else let me annotate by hand), then give me the ST / SZ / SN of every sample."),
     },
     "calibrate": {
         "description": "Calibrate the stage step by step (real sample or gold frame).",

@@ -23,6 +23,9 @@ quickalignment = "quickalignment.ui.main_window:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"quickalignment.agent" = ["API.md"]  # the agent's reference, read in place (as ARPES viewer)
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

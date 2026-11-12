@@ -18,3 +18,13 @@ the standard format or the system settings, and default to the standard one:
   `locale.format_string`, `locale.setlocale` or the `"n"` format spec.
 - matplotlib: keep `axes.formatter.use_locale` False (the default).
 - Files (sessions, configs, CSV): write and read with "." only.
+
+## Agent interface: ARPES viewer is the reference
+
+The MCP server (`src/quickalignment/agent/mcp_server.py`) follows the conventions of ARPES viewer's
+`arpes_viewer/agent/protocol.py` (protocol versions, `readOnlyHint`, tool errors, error texts). After changing a
+tool, the agent API or the workflow text:
+
+1. put a new tool that changes anything in `ACTING` (mcp_server.py);
+2. run `python -m quickalignment.agent.catalog --write` (with `src/` on the path) to regenerate
+   `src/quickalignment/agent/API.md`; `tests/test_catalog.py` fails while it is out of date.

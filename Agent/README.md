@@ -55,6 +55,16 @@ Check from a console:
 python Agent/quickalignment_mcp.py --list-tools
 ```
 
+Also `python -m quickalignment.agent` (with `src/` on the Python path), as `python -m arpes_viewer.agent`.
+
+**Same conventions as the MCP server of ARPES viewer** (the reference for Ding's programs): protocol versions
+2025-06-18 / 2025-03-26 / 2024-11-05, `readOnlyHint` on every tool (false for the tools that change the session,
+a file or a window: `ACT` in `--list-tools`), every error inside a tool returned as a tool error with its text, a
+protocol error only for a bad request (`no tool called 'x'`, `method not found: x`, `parse error: ...`), results as
+JSON text. **The agent's reference** is generated from the program: `src/quickalignment/agent/API.md`
+(`python -m quickalignment.agent.catalog --write` after every change to the tools, the API or the workflow;
+`tests/test_catalog.py` fails while it is out of date).
+
 ## Python API
 
 ```python

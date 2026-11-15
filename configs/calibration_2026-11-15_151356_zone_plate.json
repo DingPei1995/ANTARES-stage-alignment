@@ -1,0 +1,128 @@
+{
+  "created": "2026-11-15 15:13:56",
+  "comment": "Gating plate + zone plate (OSA position not reliable), 2026-11-15, sample Cav (graphene). Optics: ST0 -0.8127, SZ0 +41.2059 from the point found at SRn 120 / SRz 0, ST -3.4982, SZ 36.538, SN -0.0517, PIX 138, PIY 142 (SPEM map Cav_2026-11-15_11-13-55), taken as the Cav position of 2026-11-14 (plate x 2.687 / y 4.666, H 0.748); ZPS 53.7502 in focus there, taken as the analyzer focus (SN_f kept). The zone-plate spot is +0.80 mm in ST0 and +0.19 mm in SZ0 from the capillary spot. Mechanics updated 2026-11-15 from zone-plate SPEM tracking of one point of sample Cav (same gating plate, not touched since 2026-11-14): SRn axis from the point at SRn 120 (PIX 138 / PIY 142) and SRn 140 (PIX 132 / PIY 84, +-4 um): u -0.0321 / v -0.0566 (was -0.1663 / -0.1068). SRz axis from the zone-plate foci at SRz -5, -10, -15, -20 with SN kept (ZPS 54.10 / 54.53 / 54.96 / 55.46; a rigid rotation about a vertical axis fits all four within 31 um): offset_t -0.145 (was -0.924), offset_n +2.775 (was +2.188), i.e. the axis ~0.97 mm further along +x (horizontal, across the beam) than the capillary fit had it; that direction is seen almost only in the focus, which the capillary CPS did not resolve. Checked at SRn 140 / SRz -15: ZPS predicted 54.31, found 54.33 (old axis: 54.57). ZPS / SN-slide checks at SRz 0: ZPS 51.16 for -2.552 mm (1.015), 54.46 / 54.90 / 55.40 for +0.75 / +1.20 / +1.70 mm (0.95-0.97). Open: SRz -25 with SN moved (ST -4.3935, SN -1.856) focused at ZPS 53.17, new axis gives 53.32 (0.15 mm); the capillary CPS of 2026-11-14 at SRz -10 / SRn 100 SRz -5 (+0.60 / +0.31) disagree with the new axis (+0.43 / +0.22). ZPS increasing moves the zone plate towards the sample.",
+  "stage_config": {
+    "st0": -0.8127,
+    "sz0": 41.2059,
+    "sn_f": -0.798260207455943,
+    "srn_ref": 120.0,
+    "pi_center": 150.0,
+    "srn_axis_u": -0.0321,
+    "srn_axis_v": -0.0566,
+    "srz_offset_t": -0.145,
+    "srz_offset_n": 2.775
+  },
+  "optics": {
+    "enabled": true,
+    "motors": {
+      "st": -3.4982,
+      "sn": -0.05173,
+      "sz": 36.538,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 138.0,
+      "piy": 142.0
+    },
+    "surface_w": 5.746505506549614,
+    "optic_position": 53.7502,
+    "optic_sign": 1,
+    "optic_type": "zone plate + OSA",
+    "last_position": null
+  },
+  "check": {
+    "type": "zone-plate SPEM point tracking",
+    "plate": "gating",
+    "point_plate_uvw": [
+      2.6975802057399307,
+      4.659871540778488,
+      5.746505506549614
+    ],
+    "zps_per_mm": {
+      "towards ZP (SRz 0, SN slide -2.552 mm)": 1.015,
+      "away (+0.75..+1.70 mm)": "0.95-0.97"
+    },
+    "measurements": [
+      {
+        "name": "SRn 140 map",
+        "st": -1.6931,
+        "sz": 35.841,
+        "sn": -0.05163,
+        "srn": 140.0003,
+        "srz": 0.0004,
+        "pix": 132,
+        "piy": 84,
+        "zps": 53.7502
+      },
+      {
+        "name": "SRz -5",
+        "st": -4.066,
+        "sz": 36.54,
+        "sn": -0.05,
+        "srn": 120.0,
+        "srz": -5,
+        "pix": 138,
+        "piy": 142,
+        "zps": 54.1
+      },
+      {
+        "name": "SRz -10",
+        "st": -4.6255,
+        "sz": 36.539,
+        "sn": -0.048,
+        "srn": 120.0,
+        "srz": -10,
+        "pix": 138,
+        "piy": 142,
+        "zps": 54.53
+      },
+      {
+        "name": "SRz -15",
+        "st": -5.1703,
+        "sz": 36.54,
+        "sn": -0.05,
+        "srn": 120.0,
+        "srz": -15,
+        "pix": 138,
+        "piy": 142,
+        "zps": 54.96
+      },
+      {
+        "name": "SRz -20",
+        "st": -5.6966,
+        "sz": 36.54,
+        "sn": -0.05,
+        "srn": 120.0,
+        "srz": -20,
+        "pix": 138,
+        "piy": 142,
+        "zps": 55.46
+      },
+      {
+        "name": "SRz -25 SN moved",
+        "st": -4.3935,
+        "sz": 36.548,
+        "sn": -1.856,
+        "srn": 120.0,
+        "srz": -25,
+        "pix": 110,
+        "piy": 150,
+        "zps": 53.17
+      },
+      {
+        "name": "SRn 140 SRz -15 test",
+        "st": -2.9839,
+        "sz": 35.886,
+        "sn": -0.052,
+        "srn": 140,
+        "srz": -15,
+        "pix": 138,
+        "piy": 142,
+        "zps": 54.33
+      }
+    ],
+    "previous": [
+      "2026-11-14 17:37:43 capillary",
+      "2026-10-24 17:00:00 zone plate"
+    ]
+  }
+}

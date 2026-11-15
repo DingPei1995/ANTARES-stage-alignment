@@ -206,9 +206,14 @@ TOOLS = [
           "plate": d("'standard' or 'gating'", **STR), "feature_x": d("plate x (mm)", **NUM),
           "feature_y": d("plate y (mm)", **NUM), "feature_height": d("H above the plate surface (mm)", **NUM),
           "sn_kept": d("full mode: rotated sets keep the SN of set 1 and refocus the optic (default true); "
-                       "false: every set moved to the analyzer focus with SN", **BOOL)},
+                       "false: every set moved to the analyzer focus with SN", **BOOL),
+          "configuration": d("keep the mechanics (SN_f, SRn / SRz axes) from this configuration, label or file name, "
+                             "may be of the other optic (default: newest of the optic)", **STR)},
          ["mode", "optic", "plate", "feature_x", "feature_y", "feature_height"]),
     tool("rsc_status", "real_sample", "status", "The sets, what is measured, where the feature is expected."),
+    tool("rsc_read_spem", "real_sample", "read_spem",
+         "Motor and optic positions (ST, SZ, SN, SRn, SRz, ZPS, CPS, hv, scanned axes) recorded in a SPEM map file.",
+         {"path": STR}, ["path"]),
     tool("rsc_add_set", "real_sample", "add_set", "Another measurement set at other angles.",
          {"name": STR, "srn": NUM, "srz": NUM, "sn_kept": d("SN kept as in set 1 (default: as the session)", **BOOL)},
          ["name", "srn", "srz"]),

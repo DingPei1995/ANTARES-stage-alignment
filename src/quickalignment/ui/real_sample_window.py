@@ -25,7 +25,7 @@ from ..core.geometry import PLATES
 from ..realsample.fit import (
     FIT_PARAMS, FOUND_TOLERANCE, MODE_PARAMS, OPTIC_PARAM, PARAM_LABELS, MeasurementSet, NotEnoughData,
     TestPoint, fit_real_sample_calibration,
-    real_sample_record, optic_focus_of, predict_test_point, protocol_sets, verification_angles,
+    measurement_sigmas, real_sample_record, optic_focus_of, predict_test_point, protocol_sets, verification_angles,
 )
 from ..core.schematic import draw_reference_feature, feature_warnings
 from ..core.stage import OPTIC_TYPES, MotorPositions, StageModel
@@ -597,7 +597,7 @@ class RealSampleCalibrationWindow(QtWidgets.QMainWindow):
         prev = self.previous()
         try:
             res = fit_real_sample_calibration(sets, self.plate(), self.ref_uvw(), base=prev.config, tests=self.tests,
-                                          mode=self.mode)
+                                              mode=self.mode, sigmas=measurement_sigmas(self.optic()))
         except NotEnoughData as exc:
             hint = ("One set is enough (e.g. SRn = 120 / SRz = 0)." if self.mode == "optics" else
                     "The minimum is 3 sets: SRn = 120 / SRz = 0, one SRn rotation, one SRz rotation.")

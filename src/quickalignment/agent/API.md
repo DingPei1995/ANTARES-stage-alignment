@@ -89,6 +89,15 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
   SRz axis. Always ask for the optic position. Each measured set updates the expected positions of the others
   (expected_from): give the user the new ones. If they want other angles (e.g. no positive SRz), rsc_add_set
   (it returns the expected position; a planned set left unmeasured is not fitted) instead of predicting by hand.
+  Optics mode after changing the optic (capillary <-> zone plate): the newest configuration of the new optic may be
+  old; keep the mechanics of a recent one of the other optic with rsc_start(configuration=...).
+  SPEM maps: rsc_read_spem(path) gives the motor and optic values in the file; ask the user at which PIX / PIY the
+  tracked point is on the map (the file's PIX / PIY are where the scan ended) and pass them to rsc_measure_set.
+  The fit weights positions and optic positions by their reading errors (rsc_fit: reading_errors_mm). The SRz axis
+  across the beam shows almost only in the optic positions (least_determined): a capillary focus does not fix it;
+  use the zone plate and SRz down to -20 / -25. When readings contradict the model (chi2_per_dof large, a focus far
+  from the prediction), list the mismatches and possible causes for the user to judge; do not free more constants
+  to absorb them.
 - Gold frame (GoldFrameCalibration, SPEM total-intensity SZ lines over the 2 x 2 mm gold frame): gfc_start(optic,
   gold_height, frame position), give the protocol step by step (gfc_guide), gfc_plan (33 SZ lines, CSV), then
   gfc_add_files(paths of the .nxs files), gfc_fit, show gfc_plot and the quality checks, gfc_save after the user
@@ -105,7 +114,7 @@ RULES
 
 Prompts: `start`, `find_samples`, `calibrate`
 
-## 2. MCP tools (61)
+## 2. MCP tools (62)
 
 `*` = required. **acts**: changes the session, a file or a window; the others only read.
 
@@ -152,8 +161,9 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `align_save_session` | **acts** | `path*` (string) | Save the plate (samples, devices, stage) as a session file. |
 | `align_load_session` | **acts** | `path*` (string), `optic` (string) | Load a QuickAlignment session file. |
 | `rsc_guide` | reads | - | Real-sample calibration: where it stands and what to do next. |
-| `rsc_start` | **acts** | `mode*` (string), `optic*` (string), `plate*` (string), `feature_x*` (number), `feature_y*` (number), `feature_height*` (number), `sn_kept` (boolean) | Start a real-sample calibration with one reference feature. |
+| `rsc_start` | **acts** | `mode*` (string), `optic*` (string), `plate*` (string), `feature_x*` (number), `feature_y*` (number), `feature_height*` (number), `sn_kept` (boolean), `configuration` (string) | Start a real-sample calibration with one reference feature. |
 | `rsc_status` | reads | - | The sets, what is measured, where the feature is expected. |
+| `rsc_read_spem` | reads | `path*` (string) | Motor and optic positions (ST, SZ, SN, SRn, SRz, ZPS, CPS, hv, scanned axes) recorded in a SPEM map file. |
 | `rsc_add_set` | **acts** | `name*` (string), `srn*` (number), `srz*` (number), `sn_kept` (boolean) | Another measurement set at other angles. |
 | `rsc_measure_set` | **acts** | `name*` (string), `st*` (number), `sz*` (number), `sn*` (number), `optic` (number), `pix` (number), `piy` (number), `srn` (number), `srz` (number), `use` (boolean), `sn_kept` (boolean) | The values read for a set. |
 | `rsc_fit` | **acts** | - | Fit the constants; predicts a round of test points. |
@@ -229,10 +239,11 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `fit() -> 'dict'` | Fit the sets and the measured test points; predict a new round of test points. |
 | `guide() -> 'dict'` | Where the calibration stands and the next thing to do. |
 | `measure_set(name: 'str', st: 'float', sz: 'float', sn: 'float', optic: 'float \| None' = None, pix: 'float' = 150.0, piy: 'float' = 150.0, srn: 'float \| None' = None, srz: 'float \| None' = None, use: 'bool' = True, sn_kept: 'bool \| None' = None) -> 'dict'` | The values read for a set (the feature on the beam; in mode 'full' at the analyzer focus, or with SN kept and the optic refocused when the set is sn_kept). `sn_kept` overrides how this set was measured. |
-| `previous()` | - |
+| `previous()` | The configuration giving the start values and the kept mechanics (chosen at start, else the newest). |
+| `read_spem(path: 'str') -> 'dict'` | Motor values of a SPEM map file (.nxs): what to enter in measure_set / answer_test, with the PIX / PIY of the tracked point read on the map by the user (the file's PIX / PIY are where the scan ended). |
 | `save(comment: 'str' = '') -> 'dict'` | Save the fitted configuration in configs/ (only after the user agreed). |
 | `sets_table() -> 'list[dict]'` | The sets with where the feature is expected (a start for the search): from the newest configuration, from set 1 once it is measured, from the fit once there is one. |
-| `start(mode: 'str' = 'optics', optic: 'str \| None' = None, plate: 'str' = 'standard', feature_x: 'float' = 0.0, feature_y: 'float' = 0.0, feature_height: 'float' = 0.0, sn_kept: 'bool' = True) -> 'dict'` | Begin a calibration: mode "optics" (optic realigned: ST0, SZ0, optic reference; the mechanics are kept from the newest configuration) or "full" (optics + motors: all constants), the optic, the plate and the reference feature (plate x, y in mm and its height H above the plate surface). `sn_kept` (full mode): the rotated sets keep the SN of set 1 and refocus the optic (usual); false: every set is moved to the analyzer focus with SN. |
+| `start(mode: 'str' = 'optics', optic: 'str \| None' = None, plate: 'str' = 'standard', feature_x: 'float' = 0.0, feature_y: 'float' = 0.0, feature_height: 'float' = 0.0, sn_kept: 'bool' = True, configuration: 'str \| None' = None) -> 'dict'` | Begin a calibration: mode "optics" (optic realigned: ST0, SZ0, optic reference; the mechanics are kept from the newest configuration) or "full" (optics + motors: all constants), the optic, the plate and the reference feature (plate x, y in mm and its height H above the plate surface). `sn_kept` (full mode): the rotated sets keep the SN of set 1 and refocus the optic (usual); false: every set is moved to the analyzer focus with SN. `configuration` (label or file name): keep the mechanics from this configuration instead of the newest of the optic; it may be one of the other optic (e.g. the zone plate calibrated with the axes of a recent capillary calibration). The optic reference is still compared with the newest of the chosen optic. |
 | `status() -> 'dict'` | - |
 | `test_points() -> 'dict'` | The test points of the open round: where to go (SRn, SRz, ST, SZ, SN, optic). |
 

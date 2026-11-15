@@ -76,6 +76,15 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
   SRz axis. Always ask for the optic position. Each measured set updates the expected positions of the others
   (expected_from): give the user the new ones. If they want other angles (e.g. no positive SRz), rsc_add_set
   (it returns the expected position; a planned set left unmeasured is not fitted) instead of predicting by hand.
+  Optics mode after changing the optic (capillary <-> zone plate): the newest configuration of the new optic may be
+  old; keep the mechanics of a recent one of the other optic with rsc_start(configuration=...).
+  SPEM maps: rsc_read_spem(path) gives the motor and optic values in the file; ask the user at which PIX / PIY the
+  tracked point is on the map (the file's PIX / PIY are where the scan ended) and pass them to rsc_measure_set.
+  The fit weights positions and optic positions by their reading errors (rsc_fit: reading_errors_mm). The SRz axis
+  across the beam shows almost only in the optic positions (least_determined): a capillary focus does not fix it;
+  use the zone plate and SRz down to -20 / -25. When readings contradict the model (chi2_per_dof large, a focus far
+  from the prediction), list the mismatches and possible causes for the user to judge; do not free more constants
+  to absorb them.
 - Gold frame (GoldFrameCalibration, SPEM total-intensity SZ lines over the 2 x 2 mm gold frame): gfc_start(optic,
   gold_height, frame position), give the protocol step by step (gfc_guide), gfc_plan (33 SZ lines, CSV), then
   gfc_add_files(paths of the .nxs files), gfc_fit, show gfc_plot and the quality checks, gfc_save after the user

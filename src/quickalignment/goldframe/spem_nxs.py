@@ -97,6 +97,44 @@ def _fixed_motors(f, entry) -> dict:
     return out
 
 
+OPTIC_POSITIONS = {"zps": ("i12-m-cx1-op-zp-mt_zs/position",), "cps": ("i12-m-cx1-op-cap-mt-ts/value",
+                                                                         "i12-m-cx1-op-cap-mt-ts/position")}
+
+
+def read_positions(path, entry: str | None = None) -> dict:
+    """Motor values recorded in a SPEM file (the stage when the map was taken): ST, SN, SZ, SRn, SRz, the piezo
+    (PIX, PIY at the end of the scan, not the map centre), the optic motors (ZPS, CPS), the photon energy and the
+    scanned axes (Tango name, from, to, step). OSA positions are not read (not reliable at ANTARES)."""
+    h5py = _h5py()
+    with h5py.File(path, "r") as f:
+        entry = entry or next((k for k in f.keys() if isinstance(f[k], h5py.Group) and "scan_data" in f[k]), None)
+        if entry is None:
+            raise KeyError(f"{Path(path).name}: no scan entry")
+        out = {"file": Path(path).name, "entry": entry, **_fixed_motors(f, entry)}
+        for key, names in OPTIC_POSITIONS.items():
+            for name in names:
+                if f"{entry}/ANTARES/{name}" in f:
+                    out[key] = float(np.asarray(f[f"{entry}/ANTARES/{name}"][()]).reshape(-1)[0])
+                    break
+        if f"{entry}/ANTARES/i12-m-c04-op-mono1/energy" in f:
+            out["hv"] = float(np.asarray(f[f"{entry}/ANTARES/i12-m-c04-op-mono1/energy"][()]).reshape(-1)[0])
+        if f"{entry}/start_time" in f:
+            out["start_time"] = _text(f[f"{entry}/start_time"][()])
+        axes = []
+        traj = f.get(f"{entry}/scan_config/trajectory")
+        if traj is not None:
+            for name in sorted(traj.keys()):
+                g = traj[name]
+                try:
+                    axes.append({"motor": stage_of(_text(g["name"][()])) or _text(g["name"][()]),
+                                 "from": float(_text(g["from"][()])), "to": float(_text(g["to"][()])),
+                                 "step": float(_text(g["delta"][()]))})
+                except (KeyError, ValueError):
+                    continue
+        out["scanned"] = axes
+    return out
+
+
 def _intensity(dsets, shape, channel: str | None):
     """(values with the spatial shape, long_name used) from the chosen or the best channel."""
     wanted = [channel] if channel else list(INTENSITY_CHANNELS)

@@ -66,6 +66,13 @@ FIT_PARAMS = ("st0", "sz0", "sn_f", "srn_axis_u", "srn_axis_v", "srz_offset_t", 
 # what was recalibrated: "optics" = only the focusing optic (the usual case), "full" = optics + motors (re-homing)
 MODE_PARAMS = {"optics": ("st0", "sz0"), "full": FIT_PARAMS}
 FOUND_TOLERANCE = 0.05  # mm: the feature is "found" within this of the prediction
+# 1-sigma reading errors used to weight the fit (mm). Positions: motor values with the feature on the beam (SPEM maps
+# give better, but +-0.02 is what is usually noted). Optic: best focus judged by eye; the capillary's depth of focus is
+# large (its CPS readings were off by ~0.1-0.2 mm on 2026-11-14), the zone plate's is small (ZPS to ~0.02 mm). The
+# SRz axis across the beam is seen almost only in the optic positions, so their weight matters.
+POSITION_SIGMA = 0.02
+OPTIC_SIGMA = {"capillary": 0.10, "zone plate": 0.02}
+WEAK_SIGMA = 0.05  # mm: a combination of constants less determined than this is reported
 OPTIC_PARAM = "optic_focus"  # fitted as well when any optic position was noted
 PARAM_LABELS = {
     "st0": "ST0",
@@ -127,7 +134,8 @@ def protocol_sets(srn_ref: float = 120.0, mode: str = "full", sn_kept: bool = Fa
         MeasurementSet("2 SRn rotated", srn_ref + 20.0, 0.0, sn_kept=sn_kept),
         MeasurementSet("3 SRz rotated", srn_ref, -10.0, sn_kept=sn_kept),
         MeasurementSet("4 SRn rotated (check)", srn_ref - 20.0, 0.0, sn_kept=sn_kept),
-        MeasurementSet("5 SRz rotated (check)", srn_ref, 10.0, sn_kept=sn_kept),
+        # SRz kept <= 0 (as the stage is run at ANTARES); a larger SRz shows the SRz axis across the beam better
+        MeasurementSet("5 SRn + SRz rotated (check)", srn_ref - 20.0, -20.0, sn_kept=sn_kept),
     ]
 
 
@@ -185,14 +193,15 @@ class TestPoint:
 
 
 def verification_angles(srn_ref: float = 120.0) -> list[tuple[str, float, float]]:
-    """Rotations of the test points: other than the sets, and SRn and SRz combined."""
+    """Rotations of the test points: other than the sets, and SRn and SRz combined. SRz <= 0 only (positive SRz is
+    not used at the beamline); SRz -25 shows the SRz axis across the beam, which small angles hardly see."""
     return [
         ("SRn +30", srn_ref + 30.0, 0.0),
         ("SRn −30", srn_ref - 30.0, 0.0),
         ("SRz −15", srn_ref, -15.0),
-        ("SRz +15", srn_ref, 15.0),
-        ("SRn +20, SRz −10", srn_ref + 20.0, -10.0),
-        ("SRn −20, SRz +10", srn_ref - 20.0, 10.0),
+        ("SRz −25", srn_ref, -25.0),
+        ("SRn +20, SRz −15", srn_ref + 20.0, -15.0),
+        ("SRn −20, SRz −10", srn_ref - 20.0, -10.0),
     ]
 
 
@@ -244,32 +253,43 @@ class FitResult:
     tests: list[TestPoint] = field(default_factory=list)  # test points with real positions, fitted
     test_residuals: list[tuple[str, float, float, float | None]] = field(default_factory=list)  # ST, SZ, optic
     mode: str = "full"  # optics only: SN residual None (SN kept as measured)
+    # the least determined combination of the fitted constants: (1-sigma in mm, {param: coefficient}), with redundancy
+    weakest: tuple[float, dict[str, float]] | None = None
+    chi2_dof: float | None = None  # weighted residuals: ~1 when the readings are as good as the sigmas say
 
 
-def _residual_vector(config, optic_focus, plate, uvw, sets, tests, keep_sn=False) -> np.ndarray:
+def _residual_vector(config, optic_focus, plate, uvw, sets, tests, keep_sn=False,
+                     position_sigma: float = 1.0, optic_sigma: float = 1.0) -> np.ndarray:
     """keep_sn: the sets were measured with SN as it was (feature on the beam, optic refocused), not at the
-    analyzer focus: ST, SZ (and optic) per set, like an answered test point."""
+    analyzer focus: ST, SZ (and optic) per set, like an answered test point. Position residuals are divided by
+    `position_sigma`, optic residuals by `optic_sigma` (1, 1: in mm)."""
     model = StageModel(config, plate)
     out = []
     for s in sets:
         if keep_sn or s.sn_kept:
             st, sz, _ = on_beam(model, uvw, s.srn, s.srz, s.sn, s.pix, s.piy, None)
-            out += [st - s.st, sz - s.sz]
+            out += [(st - s.st) / position_sigma, (sz - s.sz) / position_sigma]
         else:
             m = model.motors_for_target(*uvw, srn=s.srn, srz=s.srz, pix=s.pix, piy=s.piy)
-            out += [m.st - s.st, m.sz - s.sz, m.sn - s.sn]
+            out += [(m.st - s.st) / position_sigma, (m.sz - s.sz) / position_sigma, (m.sn - s.sn) / position_sigma]
     for s in sets:
         if optic_focus is not None and s.optic is not None:
             optic = (on_beam(model, uvw, s.srn, s.srz, s.sn, s.pix, s.piy, optic_focus)[2] if keep_sn or s.sn_kept
                      else optic_focus)
-            out.append(optic - s.optic)
+            out.append((optic - s.optic) / optic_sigma)
     for t in tests:
         st, sz, optic = on_beam(model, uvw, t.srn, t.srz, t.sn, t.pix, t.piy, optic_focus)
         real_st, real_sz, real_optic = t.real()
-        out += [st - real_st, sz - real_sz]
+        out += [(st - real_st) / position_sigma, (sz - real_sz) / position_sigma]
         if optic is not None and real_optic is not None:
-            out.append(optic - real_optic)
+            out.append((optic - real_optic) / optic_sigma)
     return np.array(out)
+
+
+def measurement_sigmas(optic_type: str | None) -> tuple[float, float]:
+    """(position, optic) 1-sigma reading errors in mm for the optic in use (POSITION_SIGMA, OPTIC_SIGMA)."""
+    name = "capillary" if optic_type and "capillary" in optic_type else "zone plate"
+    return POSITION_SIGMA, OPTIC_SIGMA[name]
 
 
 def fit_real_sample_calibration(
@@ -280,14 +300,18 @@ def fit_real_sample_calibration(
     tests: list[TestPoint] | None = None,
     mode: str = "full",
     params: tuple[str, ...] | None = None,
+    sigmas: tuple[float, float] | None = None,
 ) -> FitResult:
     """Least-squares fit of the stage constants of `mode` (full: all 7; optics: ST0, SZ0, with the
     sets measured at the SN they had) and the optic focus position, if any optic position was
     noted, to the sets and the answered test points (Gauss-Newton, numerical Jacobian); `base`
     gives the start values and the constants that are not fitted (optics: from the newest
     configuration). Sets with `sn_kept` give ST, SZ, optic like in mode optics. `params`: fit only these
-    constants (e.g. ST0, SZ0, SN_f from set 1 alone, to update the expected positions of the other sets)."""
+    constants (e.g. ST0, SZ0, SN_f from set 1 alone, to update the expected positions of the other sets).
+    `sigmas`: (position, optic) reading errors in mm to weight the fit (`measurement_sigmas(optic)`); None: every
+    residual weighted the same (an optic position counts like a motor position)."""
     base = base or StageConfig()
+    ps, osg = (1.0, 1.0) if sigmas is None else (float(sigmas[0]), float(sigmas[1]))
     fit_params, keep_sn = tuple(params) if params else MODE_PARAMS[mode], mode == "optics"
     sets = [s for s in sets if s.use]
     tests = [t for t in tests or [] if t.measured]  # found points only confirm
@@ -301,7 +325,7 @@ def fit_real_sample_calibration(
         return config, (float(xv[len(fit_params)]) if with_optic else None)
 
     def res(xv):
-        return _residual_vector(*unpack(xv), plate, ref_uvw, sets, tests, keep_sn)
+        return _residual_vector(*unpack(xv), plate, ref_uvw, sets, tests, keep_sn, ps, osg)
 
     def jacobian(xv):
         r0 = res(xv)
@@ -329,13 +353,20 @@ def fit_real_sample_calibration(
         if np.max(np.abs(dx)) < 1e-12:
             break
 
-    r, jac = res(x), jacobian(x)
-    dof = len(r) - len(params)
-    sigma = None
+    rw, jac = res(x), jacobian(x)
+    dof = len(rw) - len(params)
+    sigma = weakest = chi2_dof = None
     if dof > 0:
-        cov = np.linalg.pinv(jac.T @ jac) * float(r @ r) / dof
+        chi2_dof = float(rw @ rw) / dof
+        # weighted: the reading errors set the scale; unweighted: the scatter of the residuals does
+        cov = np.linalg.pinv(jac.T @ jac) * (max(chi2_dof, 1.0) if sigmas is not None else chi2_dof)
         sigma = {p: float(np.sqrt(max(cov[i, i], 0.0))) for i, p in enumerate(params)}
+        values, vectors = np.linalg.eigh(cov)
+        v = vectors[:, -1] * np.sign(vectors[np.argmax(np.abs(vectors[:, -1])), -1])
+        weakest = (float(np.sqrt(max(values[-1], 0.0))),
+                   {p: float(c) for p, c in zip(params, v) if abs(c) >= 0.1})
     config, optic_focus = unpack(x)
+    r = _residual_vector(config, optic_focus, plate, ref_uvw, sets, tests, keep_sn)  # in mm
 
     # per-measurement residuals, in the order of _residual_vector (SN None: SN kept as measured)
     per_set, k = [], 0
@@ -361,7 +392,8 @@ def fit_real_sample_calibration(
             k += 1
         test_res.append((t.name, d_st, d_sz, d_optic))
     rms = float(np.sqrt(np.mean(r**2))) if len(r) else 0.0
-    return FitResult(config, optic_focus, params, sigma, per_set, rms, dof, sets, optic_res, tests, test_res, mode)
+    return FitResult(config, optic_focus, params, sigma, per_set, rms, dof, sets, optic_res, tests, test_res, mode,
+                     weakest, chi2_dof)
 
 
 def optics_calibration(result: FitResult, plate: PlateGeometry, ref_uvw, optic_type: str = OPTIC_TYPES[0]) -> OpticsCalibration:

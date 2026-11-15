@@ -27,9 +27,9 @@ from ..core.motors import out_of_range
 from ..core.schematic import feature_warnings
 from ..core.stage import MotorPositions, StageModel
 from ..realsample.fit import (
-    FIT_PARAMS, FOUND_TOLERANCE, OPTIC_PARAM, PARAM_LABELS, MeasurementSet, NotEnoughData, TestPoint,
-    fit_real_sample_calibration, on_beam, optic_focus_of, predict_test_point, protocol_sets, real_sample_record,
-    verification_angles,
+    FIT_PARAMS, FOUND_TOLERANCE, OPTIC_PARAM, PARAM_LABELS, WEAK_SIGMA, MeasurementSet, NotEnoughData, TestPoint,
+    fit_real_sample_calibration, measurement_sigmas, on_beam, optic_focus_of, predict_test_point, protocol_sets,
+    real_sample_record, verification_angles,
 )
 from .common import APIError, number, optic_short, optic_type, rounded
 
@@ -61,16 +61,19 @@ class RealSampleCalibrationSession:
         self.measured: set[str] = set()  # names of the sets with entered values
         self.sn_kept = True  # full mode: rotated sets measured with SN as in set 1 and the optic refocused
         self.last_fit = None  # the newest fit, kept for the expected positions when sets change afterwards
+        self.base = None  # configuration chosen at start for the kept mechanics (None: the newest of the optic)
 
     # --------------------------------------------------------------------------------------------- setup
     def start(self, mode: str = "optics", optic: str | None = None, plate: str = "standard",
               feature_x: float = 0.0, feature_y: float = 0.0, feature_height: float = 0.0,
-              sn_kept: bool = True) -> dict:
+              sn_kept: bool = True, configuration: str | None = None) -> dict:
         """Begin a calibration: mode "optics" (optic realigned: ST0, SZ0, optic reference; the mechanics are kept
         from the newest configuration) or "full" (optics + motors: all constants), the optic, the plate and the
         reference feature (plate x, y in mm and its height H above the plate surface). `sn_kept` (full mode): the
         rotated sets keep the SN of set 1 and refocus the optic (usual); false: every set is moved to the analyzer
-        focus with SN."""
+        focus with SN. `configuration` (label or file name): keep the mechanics from this configuration instead of
+        the newest of the optic; it may be one of the other optic (e.g. the zone plate calibrated with the axes of a
+        recent capillary calibration). The optic reference is still compared with the newest of the chosen optic."""
         mode = str(mode).strip().lower()
         mode = "optics" if mode.startswith("opt") else "full" if mode in ("full", "all", "motors", "optics + motors") \
             else mode
@@ -81,10 +84,12 @@ class RealSampleCalibrationSession:
         key = "gating" if key.startswith("gat") else "standard" if key.startswith("st") else key
         if key not in PLATES:
             raise APIError("plate: 'standard' or 'gating' (a custom plate cannot be used for the calibration).")
-        prev = self.store.latest(self.optic)
-        if mode == "optics" and (prev.path is None or prev.optic_name != optic_short(self.optic)):
+        self.base = self._find_record(configuration) if configuration else None
+        prev = self.previous()
+        if mode == "optics" and (prev.path is None or (self.base is None
+                                                        and prev.optic_name != optic_short(self.optic))):
             raise APIError(f"There is no {optic_short(self.optic)} configuration to keep the mechanics from: use "
-                           "mode 'full' (optics + motors).")
+                           "mode 'full' (optics + motors), or name one with configuration=...")
         self.mode, self.plate = mode, PLATES[key]
         x, y, h = number(feature_x, "x"), number(feature_y, "y"), number(feature_height, "H")
         self.uvw = (x, y, self.plate.total_thickness + h)
@@ -95,6 +100,7 @@ class RealSampleCalibrationSession:
                "sn_kept": self.sn_kept,
                "feature_warnings": feature_warnings(self.plate, x, y),
                "previous_configuration": prev.label,
+               "optic_reference_compared_with": self._optic_record().label,
                "kept_from_previous": ([PARAM_LABELS[p] for p in FIT_PARAMS if p not in ("st0", "sz0")]
                                       if mode == "optics" else []),
                "sets": self.sets_table()}
@@ -106,7 +112,24 @@ class RealSampleCalibrationSession:
             raise APIError("Call start(mode, optic, plate, feature_x, feature_y, feature_height) first.")
 
     def previous(self):
+        """The configuration giving the start values and the kept mechanics (chosen at start, else the newest)."""
+        return self.base if self.base is not None else self.store.latest(self.optic)
+
+    def _optic_record(self):
+        """The newest configuration of the chosen optic: its optic reference and collision geometry."""
         return self.store.latest(self.optic)
+
+    def _optic_focus(self):
+        """The optic position focusing on the analyzer focus in the newest configuration of the optic (None: none)."""
+        rec = self._optic_record()
+        return optic_focus_of(rec, self.plate) if rec.optic_name == optic_short(self.optic) else None
+
+    def _find_record(self, configuration: str):
+        text = str(configuration).strip()
+        for r in self.store.records():
+            if text in (r.label, r.created, r.path.name if r.path else None, r.path.stem if r.path else None):
+                return r
+        raise APIError(f"No configuration {configuration!r} in {self.store.folder}; see align_configurations.")
 
     def _reference_set(self) -> MeasurementSet | None:
         """The measured set 1 (SRn = ref, SRz = 0), if any."""
@@ -121,7 +144,7 @@ class RealSampleCalibrationSession:
         configuration moved onto the measured set 1 (ST0, SZ0, SN_f and the optic from it, mechanics kept), else
         the newest configuration."""
         prev = self.previous()
-        focus = optic_focus_of(prev, self.plate) if prev.optic_name == optic_short(self.optic) else None
+        focus = self._optic_focus()
         fitted = self.result or self.last_fit  # the last fit stays the best guess after a set is added / changed
         if fitted is not None:
             return StageModel(fitted.config, self.plate), fitted.optic_focus, "fit"
@@ -257,7 +280,7 @@ class RealSampleCalibrationSession:
         prev = self.previous()
         try:
             res = fit_real_sample_calibration(sets, self.plate, self.uvw, base=prev.config, tests=self.tests,
-                                              mode=self.mode)
+                                              mode=self.mode, sigmas=measurement_sigmas(self.optic))
         except NotEnoughData as exc:
             raise APIError(str(exc) + (" One set is enough (SRn 120 / SRz 0)." if self.mode == "optics" else
                                        " The minimum is 3 sets: SRn 120 / SRz 0, one SRn rotation, one SRz rotation.")) \
@@ -265,7 +288,7 @@ class RealSampleCalibrationSession:
         except (np.linalg.LinAlgError, FloatingPointError, ValueError) as exc:
             raise APIError(f"The fit failed ({exc}): check the entered numbers.") from None
         self.result = self.last_fit = res
-        prev_focus = optic_focus_of(prev, self.plate) if prev.optic_name == optic_short(self.optic) else None
+        prev_focus = self._optic_focus()
         constants = []
         for p in res.params:
             value = res.optic_focus if p == OPTIC_PARAM else getattr(res.config, p)
@@ -284,6 +307,16 @@ class RealSampleCalibrationSession:
             warnings.append("One set: the kept SRn / SRz axes are not checked (sets 2-3 recommended).")
         if self.mode == "full" and res.dof <= 2 and not res.tests:
             warnings.append("Minimum data set: a mistake in a set cannot be seen (sets 4-5 recommended).")
+        if res.weakest is not None and res.weakest[0] > WEAK_SIGMA:
+            combo = " + ".join(f"{c:+.2f} {PARAM_LABELS[p]}" for p, c in res.weakest[1].items())
+            warnings.append(f"Poorly determined: {combo} (+-{res.weakest[0]:.3f} mm). The SRz axis across the beam is "
+                            "seen almost only in the optic positions: add a larger SRz rotation (e.g. -20 / -25) with the "
+                            "optic refocused carefully (a zone plate fixes it far better than a capillary).")
+        if res.chi2_dof is not None and res.chi2_dof > 4:
+            warnings.append(f"The residuals are {np.sqrt(res.chi2_dof):.1f} x the reading errors (positions "
+                            f"{measurement_sigmas(self.optic)[0]:g} mm, optic {measurement_sigmas(self.optic)[1]:g} mm): "
+                            "a reading is wrong, or the model misses something. List the largest residuals for the user to "
+                            "judge before fitting further.")
         summary = self._round_summary()
         self._new_round()
         out = {"constants": constants,
@@ -292,6 +325,11 @@ class RealSampleCalibrationSession:
                                     for n, a, b, c in res.residuals],
                "test_residuals_mm": [rounded({"test": n, "ST": a, "SZ": b, "optic": c}) for n, a, b, c in res.test_residuals],
                "rms_mm": rounded(res.rms, 4), "redundant_equations": res.dof, "warnings": warnings,
+               "reading_errors_mm": dict(zip(("positions", "optic"), measurement_sigmas(self.optic))),
+               "chi2_per_dof": None if res.chi2_dof is None else rounded(res.chi2_dof, 2),
+               "least_determined": None if res.weakest is None else {
+                   "sigma_mm": rounded(res.weakest[0], 4),
+                   "combination": {PARAM_LABELS[p]: rounded(c, 2) for p, c in res.weakest[1].items()}},
                "rounds_so_far": summary, "test_points": self.test_points()["test_points"]}
         out.update(self.guide())
         return out
@@ -306,9 +344,9 @@ class RealSampleCalibrationSession:
             self.tests.append(predict_test_point(model, self.uvw, t, self.result.optic_focus, sn=sn))
 
     def _test_sn(self, model: StageModel) -> float | None:
-        """SN of the test points: kept as in set 1 when the sets were measured that way (full mode, SN kept),
-        else None (moved to the analyzer focus)."""
-        if self.mode == "full" and any(s.sn_kept for s in self.sets if s.use and self._measured(s)):
+        """SN of the test points: kept as in set 1 when the sets were measured that way (mode optics, or full mode
+        with SN kept), else None (moved to the analyzer focus)."""
+        if self.mode == "optics" or any(s.sn_kept for s in self.sets if s.use and self._measured(s)):
             return self._kept_sn(model)
         return None
 
@@ -375,17 +413,33 @@ class RealSampleCalibrationSession:
         self._need_start()
         if self.result is None:
             raise APIError("Nothing to save: fit() first.")
-        prev = self.previous()
+        prev, optic_rec = self.previous(), self._optic_record()
+        label = prev.label if optic_rec.label == prev.label else f"{prev.label} (mechanics); {optic_rec.label} (optic)"
         record = real_sample_record(self.result, self.plate, self.uvw, self.optic, str(comment or "").strip(),
-                                    tests=[t for t in self.tests if t.answered], previous=prev.label)
-        if prev.optic_name == record.optic_name:
-            record = replace(record, collision=prev.collision)
+                                    tests=[t for t in self.tests if t.answered], previous=label)
+        if optic_rec.optic_name == record.optic_name:
+            record = replace(record, collision=optic_rec.collision)
         try:
             saved = self.store.save(record)
         except OSError as exc:
             raise APIError(f"Could not write to {self.store.folder}: {exc}") from None
         self.saved = saved.path.name
         return {"saved": str(saved.path), "comment": saved.comment, **self.guide()}
+
+    def read_spem(self, path: str) -> dict:
+        """Motor values of a SPEM map file (.nxs): what to enter in measure_set / answer_test, with the PIX / PIY of
+        the tracked point read on the map by the user (the file's PIX / PIY are where the scan ended)."""
+        from ..goldframe.spem_nxs import read_positions
+        try:
+            pos = read_positions(str(path))
+        except ImportError as exc:
+            raise APIError(str(exc)) from None
+        except (OSError, KeyError) as exc:
+            raise APIError(f"Could not read {path}: {exc}") from None
+        optic = pos.get("zps") if self.optic is None or "zone" in self.optic else pos.get("cps")
+        return {**rounded(pos), "optic_for_this_calibration": rounded(optic),
+                "note": "PIX / PIY in the file are the piezo at the end of the scan: ask the user at which PIX / PIY "
+                        "the tracked point is on the map, and give those to measure_set (pix, piy)."}
 
     def status(self) -> dict:
         if self.mode is None:

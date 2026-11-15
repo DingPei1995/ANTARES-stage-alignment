@@ -92,7 +92,8 @@ class StageModel:
 
     def _piezo(self, m: MotorPositions) -> np.ndarray:
         """Plate shift (u, v) in mm from the piezo. +PIY moves the plate DOWN (-v), against +SZ: checked at the
-        beamline 2026-11-14 (to see a feature at a larger PIY, SZ has to be increased)."""
+        beamline 2026-11-14 (to see a feature at a larger PIY, SZ has to be increased). +PIX moves the plate along
+        +u, like -ST: checked 2026-11-15 (to see a feature at a larger PIX, ST has to be decreased)."""
         c = self.config
         return np.array([m.pix - c.pi_center, -(m.piy - c.pi_center)]) / 1000.0
 

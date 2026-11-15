@@ -155,10 +155,10 @@ arrow(ax, (cx + 15 * np.cos(np.radians(98)), cz + 15 * np.sin(np.radians(98))),
 # piezo stage (rides on SRn, sample frame)
 po = np.array([S_OFF[0] + S_L / 2 + 0.6, S_OFF[1] - S_W / 2 - 0.2])
 arrow(ax, po, po + [3, 0], color="tab:brown", ms=10, lw=1.3)
-arrow(ax, po, po + [0, 3], color="tab:brown", ms=10, lw=1.3)
+arrow(ax, po, po + [0, -3], color="tab:brown", ms=10, lw=1.3)
 ax.text(po[0] + 3.1, po[1] - 0.4, "PIX", color="tab:brown", fontsize=9)
-ax.text(po[0] - 0.3, po[1] + 3.2, "PIY", color="tab:brown", fontsize=9)
-ax.text(-6.0, -12.9, "Piezo (rides on SRn/SRz, sample frame):\nPIX 0→300 µm = left→right, PIY 0→300 µm = down→up\ncentre 150,150",
+ax.text(po[0] - 0.3, po[1] - 3.8, "PIY", color="tab:brown", fontsize=9)
+ax.text(-6.0, -12.9, "Piezo (rides on SRn/SRz, sample frame):\nPIX 0→300 µm = left→right, PIY 0→300 µm = up→down\ncentre 150,150",
         color="tab:brown", fontsize=8)
 ax.text(-13.0, 11.0, "SRn 120→130\nCCW (about sample normal)", color="tab:purple", fontsize=10)
 ax.set_xlim(-14.5, 15)

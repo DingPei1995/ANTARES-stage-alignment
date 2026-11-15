@@ -42,7 +42,16 @@ def test_piezo_directions():
     p0 = model.plate_to_lab(MotorPositions(), 0, 0, 5)
     # PIX 0 -> 300 moves the sample left -> right (seen from the analyzer)
     assert close(model.plate_to_lab(MotorPositions(pix=250), 0, 0, 5) - p0, 0.1 * T_HAT)
-    assert close(model.plate_to_lab(MotorPositions(piy=50), 0, 0, 5) - p0, [0, 0, -0.1])
+    # PIY 0 -> 300 moves the sample DOWN (beamline 2026-11-14: a feature seen at a larger PIY needs a larger SZ)
+    assert close(model.plate_to_lab(MotorPositions(piy=50), 0, 0, 5) - p0, [0, 0, 0.1])
+
+
+def test_larger_piy_needs_larger_sz():
+    """The beamline check: the same feature on the beam at a larger PIY needs a larger SZ."""
+    model = StageModel()
+    a = model.motors_for_target(0.5, 1.0, 5.5, srn=120, srz=0, piy=100)
+    b = model.motors_for_target(0.5, 1.0, 5.5, srn=120, srz=0, piy=200)
+    assert b.sz - a.sz == pytest.approx(0.1)
 
 
 def test_srn_rotation_ccw_from_analyzer_about_offset_axis():

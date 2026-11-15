@@ -148,6 +148,48 @@ def test_bz_angles(api):
     assert out["check"]["from_lattice"] == pytest.approx(4 * np.pi / (3 * 3.282), abs=1e-3)
 
 
+def test_bz_point_to_keep_srn(api):
+    """2026-11-14, graphene with the slit along Γ–K: K read at θ 1, φ -0.86 at 115 eV (SRn 120 / SRz -24), wanted at
+    φ -1 at 95 eV with the in-plane orientation kept: only SRz turns."""
+    a = api.alignment
+    a.start("gating", "capillary", configuration="calibration_2026-11-14_173743_capillary.json")
+    a.add_sample(2.687, 4.666, 0.2, 0.2, 0.748, name="Cav")
+    out = a.bz_point_to(2.46, 115.0, [1.0, -0.86], 120, -24, hv=95.0, target_angles=[0, -1], keep_srn=True,
+                        sample="Cav")
+    best = out["solutions"][0]
+    assert best["SRn"] == 120 and best["SRz"] == pytest.approx(-25.88, abs=0.05)
+    assert best["phi"] == pytest.approx(-1.0, abs=1e-3) and best["theta"] == pytest.approx(1.08, abs=0.05)
+    assert not out["frame"]["gamma_given"] and out["frame"]["surface_tilt_from_plate_deg"] == pytest.approx(6.45, abs=0.05)
+    assert out["positions_at_focus"]["stage"]["srz"] == pytest.approx(best["SRz"], abs=0.01)
+    # same hv, same angles: the map position itself
+    same = a.bz_point_to(2.46, 115.0, [1.0, -0.86], 120, -24, target_angles=[1.0, -0.86])["solutions"][0]
+    assert same["SRn"] == pytest.approx(120, abs=0.01) and same["SRz"] == pytest.approx(-24, abs=0.01)
+    # free SRn reaches θ = 0 as well
+    free = a.bz_point_to(2.46, 115.0, [1.0, -0.86], 120, -24, hv=95.0, target_angles=[0, -1])["solutions"][0]
+    assert free["theta"] == pytest.approx(0, abs=1e-3) and free["SRn"] != pytest.approx(120, abs=0.5)
+
+
+def test_found_here_not_in_focus_and_old_configuration(api):
+    """2026-11-14: a position noted with the 2026-10-24 configuration, SN not at the analyzer focus: x, y follow from
+    that configuration, H is kept (found_here used to turn the SN offset into a 1.9 mm height)."""
+    a = api.alignment
+    a.start("gating", "capillary", configuration="calibration_2026-11-14_173743_capillary.json")
+    a.add_sample(-2.0, 2.0, 11.0, 10.0, 0.748, name="Cav")
+    old = {"srn": 120, "srz": -24, "st": -6, "sz": 35.2, "sn": 0}
+    out = a.found_here("Cav", old, configuration="calibration_2026-10-24_235500_capillary.json")
+    s = out["sample"]
+    assert s["height"] == pytest.approx(0.748) and out["shift_mm"]["dH"] == 0
+    # H 0.748 kept: x 2.693 (found at the beamline: x 2.687); with the old frame's 0.525 it was 2.607
+    assert s["x"] == pytest.approx(2.693, abs=0.01) and s["y"] == pytest.approx(5.429, abs=0.01)
+    assert a.motors is None  # an old position is not the stage now
+    # at_focus=false with the configuration in use: H kept, the sample put where the beam crosses it
+    m = {"srn": 120, "srz": -10, "st": -4.0, "sz": 36.0, "sn": 0.5}
+    out = a.found_here("Cav", m, at_focus=False)
+    assert out["sample"]["height"] == pytest.approx(0.748)
+    hit = a.beam_on(m)["plate_mm"]
+    assert hit == pytest.approx([out["sample"]["x"], out["sample"]["y"]], abs=2e-3)
+
+
 def test_device_photo_from_point_pairs(api):
     a = started(api)
     a.add_sample(0.0, 2.0, 4.0, 4.0, 0.5, name="sub")
@@ -378,3 +420,29 @@ def test_manual_annotation_round_trip(api, tmp_path, monkeypatch, qapp):
     write_json(out, {"accepted": True, "replace": True, "samples": [{"name": "only", "u": 2.5, "v": 4.5,
                                                                      "length": 4, "width": 4, "height": 0.5}]})
     assert [s["name"] for s in a.load_annotation(str(out))["samples"]] == ["only"]
+
+
+def test_manual_annotation_keeps_user_corners(api, tmp_path, monkeypatch, qapp):
+    """Corners the user moves in the window replace the assistant's registration of that photo."""
+    from quickalignment.ui import annotate
+    from quickalignment.ui.photo_dialog import PhotoImportDialog
+    a = started(api)
+    pid = next(iter(a.photos))
+    moved = [(x + 6.0, y - 4.0) for x, y in CORNERS]
+
+    def accept(self):
+        self.set_corners(moved)
+        self.add_box(0.5, 2.5, 4.5, 6.5)
+        return 1
+    monkeypatch.setattr(PhotoImportDialog, "exec", accept, raising=False)
+    monkeypatch.setattr(PhotoImportDialog, "exec_", accept, raising=False)
+    layout_file, out = tmp_path / "layout.json", tmp_path / "result.json"
+    a.layout.save(layout_file)
+    assert annotate.main(["--photo", str(PHOTO), "--layout", str(layout_file), "--out", str(out),
+                          "--corners", ";".join(f"{x},{y}" for x, y in CORNERS)]) == 0
+    a._annotation_photo = pid  # as manual_annotation sets it
+    res = a.load_annotation(str(out))
+    assert res["registration"]["changed"]
+    assert np.allclose(a.photos[pid].corners, moved, atol=1e-6)
+    # unchanged corners: nothing re-registered
+    assert not a.load_annotation(str(out))["registration"]["changed"]

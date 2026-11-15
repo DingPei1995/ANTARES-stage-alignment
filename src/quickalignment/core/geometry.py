@@ -6,7 +6,8 @@ types), front view (sample side) with the tab up:
 * origin: centre of the 18 x 15.5 mm back plate
 * +u: to the right (at SRn = 120, SRz = 0: the direction +ST and PIX 0 -> 300
   move the plate)
-* +v: up (likewise for +SZ and PIY 0 -> 300)
+* +v: up (likewise for +SZ; PIY 0 -> 300 moves the plate DOWN, checked at the
+  beamline 2026-11-14)
 
 Heights w are measured along the plate normal, from the back face towards
 the sample surface.

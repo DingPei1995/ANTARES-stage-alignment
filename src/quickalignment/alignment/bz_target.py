@@ -556,7 +556,131 @@ def _rect(x, y, w, h, color):
     return Rectangle((x, y), w, h, fill=False, ls="--", lw=1.2, color=color)
 
 
+# -- move a point read on a map to chosen analyzer angles ----------------------------------------------------
+@dataclass
+class PointFrame:
+    """Surface normal n and the in-plane direction e1 towards the point read on the map (plate frame)."""
+
+    n: np.ndarray
+    e1: np.ndarray
+    gamma_given: bool
+    tilt: float  # deg, surface normal from the plate normal
+    measured_angle: float  # deg, point from the normal on the map
+    expected_angle: float  # deg, from the lattice at the map's photon energy
+
+
+@dataclass
+class PointMove:
+    srn: float
+    srz: float
+    theta: float  # where the point appears (deflector, slit) at these angles
+    phi: float
+    gamma: tuple[float, float]  # where Gamma appears there
+
+
+def point_frame(model: StageModel, geo: AnalyzerGeometry, measured: MotorPositions, ref: tuple[float, float],
+                ref_k: float, hv_map: float, gamma: tuple[float, float] | None = None, binding: float = 0.0,
+                work_function: float = WORK_FUNCTION) -> PointFrame:
+    """The sample frame from the point read on a map. Without Gamma the surface normal is the plate normal tilted
+    towards the point by just enough to put the point at its lattice angle from Gamma (the smallest tilt that agrees
+    with the map; a tilt across that direction cannot be seen with one point)."""
+    d = emission_in_plate(model, geo, measured, *ref)
+    s = ref_k / k0(hv_map, binding, work_function)
+    if s >= 1:
+        raise ValueError("The point is outside the photoemission horizon at the map's photon energy.")
+    expected = float(np.degrees(np.arcsin(s)))
+    if gamma is not None:
+        n = emission_in_plate(model, geo, measured, *gamma)
+        given = True
+    else:
+        z = np.array([0.0, 0.0, 1.0])
+        perp = d - (d @ z) * z
+        if np.linalg.norm(perp) < 1e-9:
+            raise ValueError("The point is along the plate normal: give Γ as well.")
+        perp /= np.linalg.norm(perp)
+        tilt = np.arccos(np.clip(d @ z, -1, 1)) - np.radians(expected)
+        n = np.cos(tilt) * z + np.sin(tilt) * perp
+        given = False
+    inplane = d - (d @ n) * n
+    if np.linalg.norm(inplane) < 1e-9:
+        raise ValueError("The point and Γ are at the same angles.")
+    e1 = inplane / np.linalg.norm(inplane)
+    measured_angle = float(np.degrees(np.arccos(np.clip(d @ n, -1, 1))))
+    tilt_deg = float(np.degrees(np.arccos(np.clip(n[2], -1, 1))))
+    return PointFrame(n, e1, given, tilt_deg, measured_angle, expected)
+
+
+def _newton(f, x0, tol=1e-9, steps=40, h=1e-4):
+    x = np.asarray(x0, float)
+    for _ in range(steps):
+        r = np.asarray(f(x), float)
+        if np.max(np.abs(r)) < tol:
+            return x
+        jac = np.column_stack([(np.asarray(f(x + h * e), float) - r) / h for e in np.eye(len(x))])
+        try:
+            dx = np.linalg.lstsq(jac, -r, rcond=None)[0]
+        except np.linalg.LinAlgError:
+            return None
+        x = x + np.clip(dx, -10, 10)
+    return x if np.max(np.abs(np.asarray(f(x), float))) < 1e-6 else None
+
+
+def move_point(model: StageModel, geo: AnalyzerGeometry, measured: MotorPositions, frame: PointFrame, ref_k: float,
+               hv: float, target: tuple[float, float] = (0.0, 0.0), keep_srn: bool = False, binding: float = 0.0,
+               work_function: float = WORK_FUNCTION) -> list[PointMove]:
+    """SRn / SRz putting the point at analyzer angles `target` (theta = deflector, phi = slit) at photon energy hv.
+
+    keep_srn: SRn stays (the in-plane orientation is kept, e.g. the slit already along Γ–K) and only SRz turns; it
+    then sets phi (along the horizontal slit) and theta is whatever it is. Otherwise SRn and SRz both, nearest first."""
+    s = ref_k / k0(hv, binding, work_function)
+    if s >= 1:
+        raise ValueError(f"The point is outside the photoemission horizon at hν = {hv:g} eV.")
+    d = np.sqrt(1 - s * s) * frame.n + s * frame.e1
+
+    def angles(srn, srz):
+        return analyzer_angles(geo, plate_to_lab_dir(model, srn, srz) @ d)
+
+    def result(srn, srz):
+        th, ph = angles(srn, srz)
+        g = analyzer_angles(geo, plate_to_lab_dir(model, srn, srz) @ frame.n)
+        return PointMove(float(srn), float(srz), th, ph, (g[0], g[1]))
+
+    out: list[PointMove] = []
+    if keep_srn:
+        srn = measured.srn
+        grid = np.arange(measured.srz - 90.0, measured.srz + 90.0001, 0.5)
+        vals = [angles(srn, z)[1] - target[1] for z in grid]
+        for z0, z1, f0, f1 in zip(grid[:-1], grid[1:], vals[:-1], vals[1:]):
+            if f0 == 0 or f0 * f1 < 0:
+                lo, hi = z0, z1
+                for _ in range(60):  # bisection
+                    mid = 0.5 * (lo + hi)
+                    if (angles(srn, lo)[1] - target[1]) * (angles(srn, mid)[1] - target[1]) <= 0:
+                        hi = mid
+                    else:
+                        lo = mid
+                r = result(srn, 0.5 * (lo + hi))
+                if abs(r.theta) < 90:
+                    out.append(r)
+        return sorted(out, key=lambda r: abs(r.srz - measured.srz))
+    seen = []
+    for dn in (0.0, -30.0, 30.0, -60.0, 60.0, 180.0):
+        for dz in (0.0, -15.0, 15.0):
+            x = _newton(lambda x: np.subtract(angles(*x), target), [measured.srn + dn, measured.srz + dz])
+            if x is None:
+                continue
+            x = np.array([measured.srn + wrap180(x[0] - measured.srn), wrap180(x[1])])
+            if any(np.allclose(x, y, atol=1e-3) for y in seen):
+                continue
+            r = result(*x)
+            if abs(r.theta - target[0]) < 1e-4 and abs(r.phi - target[1]) < 1e-4:
+                seen.append(x)
+                out.append(r)
+    return sorted(out, key=lambda r: abs(r.srn - measured.srn) + abs(r.srz - measured.srz))
+
+
 __all__ = [
+    "PointFrame", "PointMove", "move_point", "point_frame",
     "Advice", "Candidate", "DEFLECTOR_GAP", "DEFLECTOR_MAX", "DEFLECTOR_OK", "FEATURES", "HV_RANGE", "HexTarget",
     "LINES", "MATERIALS", "SLIT_OK", "SRN_RANGE", "SRZ_RANGE", "SampleFrame", "WORK_FUNCTION", "ZONE_PLATE_HV",
     "advise", "angles_to_k", "candidates", "draw_preview", "feature_kind", "gamma_k", "gamma_m", "k0", "k_to_angles",

@@ -438,6 +438,7 @@ class AlignmentSession:
             proc = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err,
                                     close_fds=True, creationflags=flags)
         self._annotation = (proc, out)
+        self._annotation_photo = photo.id
         try:  # a window that fails to start (missing module, bad photo...) usually exits within a few seconds
             code = proc.wait(timeout=3)
         except subprocess.TimeoutExpired:
@@ -481,7 +482,34 @@ class AlignmentSession:
                 s.name = self.layout.unique_name()
             self.layout.samples.append(s)
         self._annotation = (None, None)
-        return {"done": True, "accepted": True, "replaced": bool(data.get("replace")), **self.samples()}
+        out_dict = {"done": True, "accepted": True, "replaced": bool(data.get("replace"))}
+        reg = self._adopt_annotation_registration(data)
+        if reg:
+            out_dict["registration"] = reg
+        return {**out_dict, **self.samples()}
+
+    def _adopt_annotation_registration(self, data: dict) -> dict | None:
+        """The user's registration from the window replaces the session's (the user's points win over the
+        assistant's): the samples were measured with it."""
+        pid = getattr(self, "_annotation_photo", None)
+        photo = self.photos.get(pid) if pid else None
+        if photo is None:
+            return None
+        if data.get("points_3d"):
+            new = [tuple(p["px"]) for p in data["points_3d"]]
+            old = [tuple(px) for _, _, px in photo.points_3d] if photo.camera is not None else []
+            if len(old) == len(new) and np.allclose(old, new, atol=0.5):
+                return {"changed": False}
+            res = self.register_photo_3d(data["points_3d"], path=photo.path, photo_id=photo.id)
+        elif data.get("corners_px"):
+            new = [tuple(p) for p in data["corners_px"]]
+            if photo.camera is None and np.allclose(photo.corners, new, atol=0.5):
+                return {"changed": False}
+            res = self.register_photo(new, path=photo.path, photo_id=photo.id)
+        else:
+            return None
+        return {"changed": True, "note": "The user moved the registration points in the window: the photo is now "
+                "registered with THEIR points (they win over the assistant's).", **res}
 
     # ----------------------------------------------------------------------------------------------- samples
     def detect_samples(self, photo_id: str | None = None, threshold: float = 12.0, min_area_mm2: float = 0.2,
@@ -752,17 +780,35 @@ class AlignmentSession:
             out["surface_from_optic_focus_mm"] = rounded(res.delta)
         return out
 
-    def found_here(self, target: str, motors: dict, apply: bool = True) -> dict:
-        """The target was found on the beam, in the analyzer focus, at these stage positions: its sample (with its
-        devices) is moved on the plate to where that puts it; the other samples and the configuration stay."""
+    def found_here(self, target: str, motors: dict, apply: bool = True, at_focus: bool = True,
+                   configuration: str | None = None) -> dict:
+        """The target was found on the beam at these stage positions: its sample (with its devices) is moved on the
+        plate to where that puts it; the other samples and the configuration in use stay.
+
+        at_focus: SN was set so that the target is in the analyzer focus (then its height H follows from SN too).
+        false: SN was not corrected (only on the beam): x, y follow and H is kept.
+        configuration: the motor values were read with another (older) configuration, e.g. a position noted months
+        ago; x, y follow from that configuration and H is kept (heights do not carry over between configurations)."""
         self._need_start()
         label, uvw = self._target(target)
         if label == "plate centre":
             raise APIError("Choose a sample or device, not the plate centre.")
         sample = self.layout.sample_of(label)
         m = motors_from(motors, self._base_motors())
-        du, dv, dw = found_offset(self.model, m, *uvw)
+        model = self.model if configuration is None else StageModel(self._find_record(configuration).config,
+                                                                   self.layout.plate)
+        if at_focus and configuration is None:
+            du, dv, dw = found_offset(model, m, *uvw)
+        else:
+            hit = model.beam_hit(m, uvw[2])
+            if hit is None:
+                raise APIError("The beam runs along the sample surface at these angles.")
+            u, v, _ = model.lab_to_plate(m, hit)
+            du, dv, dw = u - uvw[0], v - uvw[1], 0.0
         out = {"target": label, "stage": motors_dict(m), "shift_mm": rounded({"dx": du, "dy": dv, "dH": dw})}
+        if configuration is not None or not at_focus:
+            out["height_kept"] = (f"H kept at {sample.height:.3f} mm; x, y from where the beam crosses the surface"
+                                  + (f" with configuration {configuration!r}." if configuration else "."))
         if max(abs(du), abs(dv), abs(dw)) > LARGE_FOUND_OFFSET:
             out["warning"] = (f"More than {LARGE_FOUND_OFFSET:g} mm. If other samples show the same shift the "
                               "configuration may be outdated (motors re-homed?): run a calibration "
@@ -771,7 +817,8 @@ class AlignmentSession:
             sample.u += du
             sample.v += dv
             sample.height = max(sample.height + dw, 0.0)
-            self.motors = m
+            if configuration is None:  # positions read with another configuration are not the stage now
+                self.motors = m
             out["applied"] = f"{sample.name} moved; positions recomputed."
             out["sample"] = self._sample_info(sample)
             out["positions"] = self.sample_positions()["positions"]
@@ -894,6 +941,71 @@ class AlignmentSession:
                 "check": {"gamma_to_ref_measured": rounded(adv.frame.ref_k), "from_lattice": rounded(adv.frame.ref_k_expected),
                           "gamma_from_normal_deg": rounded(adv.frame.tilt, 2)},
                 "next": "rotate(srn=..., srz=...) gives the stage positions for the chosen angles."}
+
+    def bz_point_to(self, lattice_a: float, hv_map: float, ref_point: list, map_srn: float, map_srz: float,
+                    ref_label: str = "K", hv: float | None = None, target_angles: list | None = None,
+                    gamma: list | None = None, keep_srn: bool = False, binding: float = 0.0,
+                    sample: str | None = None) -> dict:
+        """SRn / SRz putting a K or M point read on a map (θ = deflector, φ = slit, ARPES viewer) at chosen analyzer
+        angles at another photon energy. Γ is optional: without it the surface tilt is estimated from |Γ–point|.
+        keep_srn: keep the in-plane orientation (slit already along Γ–K / Γ–M) and turn SRz only. With `sample`, also
+        the ST / SZ / SN putting it at the analyzer focus there."""
+        self._need_start()
+        from ..alignment import bz_target as bt
+        from ..alignment.rotation import AnalyzerGeometry
+
+        label = str(ref_label).strip().upper()[:1]
+        if label not in ("K", "M"):
+            raise APIError("ref_label: 'K' or 'M'.")
+        a = number(lattice_a, "lattice constant")
+        ref_k = bt.gamma_k(a) if label == "K" else bt.gamma_m(a)
+        measured = MotorPositions(srn=number(map_srn, "map SRn"), srz=number(map_srz, "map SRz"))
+        ref = (number(ref_point[0], "θ"), number(ref_point[1], "φ"))
+        tgt = (0.0, 0.0) if target_angles is None else (number(target_angles[0], "target θ"),
+                                                         number(target_angles[1], "target φ"))
+        g = None if gamma is None else (number(gamma[0], "Γ θ"), number(gamma[1], "Γ φ"))
+        hv_map_v = number(hv_map, "hv of the map")
+        hv_v = hv_map_v if hv is None else number(hv, "hv")
+        geo = AnalyzerGeometry()
+        try:
+            frame = bt.point_frame(self.model, geo, measured, ref, ref_k, hv_map_v, g, number(binding, "binding"))
+            moves = bt.move_point(self.model, geo, measured, frame, ref_k, hv_v, tgt, bool(keep_srn),
+                                  number(binding, "binding"))
+        except ValueError as exc:
+            raise APIError(str(exc)) from None
+        gamma_map = bt.analyzer_angles(geo, bt.plate_to_lab_dir(self.model, measured.srn, measured.srz) @ frame.n)
+        out = {"point": label, "hv": hv_v, "target_angles": {"theta": tgt[0], "phi": tgt[1]},
+               "frame": {"gamma_given": frame.gamma_given,
+                         "gamma_on_map": {"theta": rounded(gamma_map[0], 2), "phi": rounded(gamma_map[1], 2)},
+                         "surface_tilt_from_plate_deg": rounded(frame.tilt, 2),
+                         "point_from_gamma_on_map_deg": rounded(frame.measured_angle, 2),
+                         "expected_from_lattice_deg": rounded(frame.expected_angle, 2)},
+               "solutions": [{"SRn": rounded(m.srn, 2), "SRz": rounded(m.srz, 2), "theta": rounded(m.theta, 2),
+                              "phi": rounded(m.phi, 2),
+                              "gamma_at": {"theta": rounded(m.gamma[0], 2), "phi": rounded(m.gamma[1], 2)}}
+                             for m in moves[:4]]}
+        notes = []
+        if not frame.gamma_given:
+            notes.append(f"Γ was not given: the surface is taken as tilted {frame.tilt:.1f}° from the plate towards the "
+                         f"{label} point (the smallest tilt that puts it at its lattice angle). A tilt across that "
+                         "direction is not seen with one point; give Γ when it is on a map.")
+        elif abs(frame.measured_angle - frame.expected_angle) > 1.0:
+            notes.append(f"The {label} point is {frame.measured_angle:.1f}° from Γ on the map but {frame.expected_angle:.1f}° "
+                         "is expected from the lattice and hv: check the angles, hv_map or lattice_a.")
+        if keep_srn and moves:
+            notes.append(f"SRn kept: SRz sets φ; θ stays at {moves[0].theta:.2f}° (use the deflector for it).")
+        if not moves:
+            notes.append("No solution: the point cannot reach these angles" + (" with SRn kept." if keep_srn else "."))
+        else:
+            best = moves[0]
+            if not (bt.SRZ_RANGE[0] <= best.srz <= bt.SRZ_RANGE[1]):
+                notes.append(f"SRz {best.srz:.1f}° is outside the usual range {bt.SRZ_RANGE[0]:g} … {bt.SRZ_RANGE[1]:g}°: "
+                             "check collisions (the positions below do).")
+            if sample:
+                out["positions_at_focus"] = self.bring_to_beam(sample, {"srn": best.srn, "srz": best.srz}, correct_sn=True)
+        out["notes"] = notes
+        out["next"] = "rotate(srn, srz, motors=...) from a measured position gives ST / SZ / SN for SN kept and corrected."
+        return out
 
     @staticmethod
     def _candidate(c) -> dict:

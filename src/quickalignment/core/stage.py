@@ -91,8 +91,10 @@ class StageModel:
         return np.array([c.srz_offset_t, 0.0, SN_REFERENCE_W - c.srz_offset_n])  # fixed to the stage
 
     def _piezo(self, m: MotorPositions) -> np.ndarray:
+        """Plate shift (u, v) in mm from the piezo. +PIY moves the plate DOWN (-v), against +SZ: checked at the
+        beamline 2026-11-14 (to see a feature at a larger PIY, SZ has to be increased)."""
         c = self.config
-        return np.array([m.pix - c.pi_center, m.piy - c.pi_center]) / 1000.0
+        return np.array([m.pix - c.pi_center, -(m.piy - c.pi_center)]) / 1000.0
 
     def _srn_angle(self, m: MotorPositions) -> float:
         """CCW seen from the analyzer."""

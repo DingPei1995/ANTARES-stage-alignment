@@ -67,7 +67,12 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    - The user says a sample is elsewhere / bigger / has another height: align_update_sample.
    - Rotation: align_rotate(srn, srz, motors=position with the point on the beam) gives ST, SZ, SN and the optic
      position (two answers: SN kept, and SN corrected; follow "recommended"). To turn an edge seen on the photo
-     along the slit: align_align_edge(p1, p2) then align_rotate. For a Brillouin-zone point: align_bz_angles.
+     along the slit: align_align_edge(p1, p2) then align_rotate. For a Brillouin-zone point: align_bz_angles (Γ and a
+     K / M point on the map, point to the slit centre). To move a K / M point read on a map to chosen angles at another
+     hv: align_bz_point_to (Γ optional; ask whether the slit is already along Γ–K / Γ–M: then keep_srn=true, only
+     SRz turns, θ is left to the deflector). Ask the map's SRn / SRz and hv; do not assume them.
+   - Not in focus, or old positions: align_found_here(at_focus=false) when SN was not put at the analyzer focus
+     (H kept); configuration=<older file> for positions noted with an older configuration (x, y converted, H kept).
    - Before sending the user to a new position, mention any out_of_range or collisions in the result.
 8. align_save_session(path) so the user can open the plate in the QuickAlignment program.
 
@@ -100,7 +105,7 @@ RULES
 
 Prompts: `start`, `find_samples`, `calibrate`
 
-## 2. MCP tools (60)
+## 2. MCP tools (61)
 
 `*` = required. **acts**: changes the session, a file or a window; the others only read.
 
@@ -138,10 +143,11 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `align_set_position` | **acts** | `motors*` (object), `optic_position` (number) | The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits. |
 | `align_bring_to_beam` | reads | `target*` (string), `motors` (object), `correct_sn` (boolean) | ST / SZ putting a target on the beam with SN kept (correct_sn: also SN, onto the analyzer focus). |
 | `align_beam_on` | reads | `motors` (object), `optic_position` (number) | What the beam hits at these positions and the optic focus position. |
-| `align_found_here` | **acts** | `target*` (string), `motors*` (object), `apply` (boolean) | A target was found on the beam in the analyzer focus at these positions: move its sample there. |
+| `align_found_here` | **acts** | `target*` (string), `motors*` (object), `apply` (boolean), `at_focus` (boolean), `configuration` (string) | A target was found on the beam at these positions: move its sample there (at_focus false: SN not corrected, H kept; configuration: positions read with an older configuration, H kept). |
 | `align_rotate` | reads | `srn*` (number), `srz` (number), `motors` (object), `measured_optic` (number), `target` (string) | New ST / SZ / SN and optic position after turning SRn / SRz, keeping the point now on the beam. |
 | `align_align_edge` | reads | `p1*` (array), `p2*` (array), `along` (string), `photo_id` (string), `plate_mm` (boolean), `current_srn` (number) | SRn turning an edge (two points: photo px, or plate mm with plate_mm=true) along or across the slit. |
 | `align_bz_angles` | reads | `lattice_a*` (number), `hv_map*` (number), `gamma*` (array), `ref_point*` (array), `ref_label` (string), `feature` (string), `line` (integer), `hv` (number), `map_srn` (number), `map_srz` (number), `binding` (number) | SRn / SRz putting a hexagonal Brillouin-zone point at the slit centre (from a measured map's angles). |
+| `align_bz_point_to` | reads | `lattice_a*` (number), `hv_map*` (number), `ref_point*` (array), `map_srn*` (number), `map_srz*` (number), `ref_label` (string), `hv` (number), `target_angles` (array), `gamma` (array), `keep_srn` (boolean), `binding` (number), `sample` (string) | SRn / SRz putting a K / M point read on a map at chosen analyzer angles at another hv (Γ optional; keep_srn: turn SRz only). |
 | `align_collision_check` | reads | `motors` (object), `optic_position` (number) | Does the plate touch the analyzer / optic at these positions; collision-free motor ranges. |
 | `align_save_session` | **acts** | `path*` (string) | Save the plate (samples, devices, stage) as a session file. |
 | `align_load_session` | **acts** | `path*` (string), `optic` (string) | Load a QuickAlignment session file. |
@@ -180,12 +186,13 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `beam_on(motors: 'dict \| None' = None, optic_position: 'float \| None' = None) -> 'dict'` | What the beam hits at these (or the current) positions, and the optic position focusing there. |
 | `bring_to_beam(target: 'str', motors: 'dict \| None' = None, correct_sn: 'bool' = False) -> 'dict'` | ST / SZ putting a target on the beam with SN kept (how the stage is run), at the given (or current) SRn, SRz, piezo; with correct_sn also SN, so that it is on the analyzer focus. |
 | `bz_angles(lattice_a: 'float', hv_map: 'float', gamma: 'list', ref_point: 'list', ref_label: 'str' = 'K', feature: 'str' = 'K', line: 'int' = 0, hv: 'float \| None' = None, map_srn: 'float \| None' = None, map_srz: 'float \| None' = None, binding: 'float' = 0.0) -> 'dict'` | SRn / SRz putting a 2-D hexagonal Brillouin-zone point (Γ, K, K', M) at the slit centre with the slit along a high-symmetry line, from a measured map (ARPES viewer angles θ = deflector, φ = along the slit). |
+| `bz_point_to(lattice_a: 'float', hv_map: 'float', ref_point: 'list', map_srn: 'float', map_srz: 'float', ref_label: 'str' = 'K', hv: 'float \| None' = None, target_angles: 'list \| None' = None, gamma: 'list \| None' = None, keep_srn: 'bool' = False, binding: 'float' = 0.0, sample: 'str \| None' = None) -> 'dict'` | SRn / SRz putting a K or M point read on a map (θ = deflector, φ = slit, ARPES viewer) at chosen analyzer angles at another photon energy. Γ is optional: without it the surface tilt is estimated from \|Γ–point\|. keep_srn: keep the in-plane orientation (slit already along Γ–K / Γ–M) and turn SRz only. With `sample`, also the ST / SZ / SN putting it at the analyzer focus there. |
 | `clear_samples() -> 'dict'` | - |
 | `collision_check(motors: 'dict \| None' = None, optic_position: 'float \| None' = None) -> 'dict'` | Does the plate touch the analyzer / optic at these positions, and how far can each motor go. |
 | `configurations(optic: 'str \| None' = None) -> 'dict'` | - |
 | `current_optic() -> 'float'` | - |
 | `detect_samples(photo_id: 'str \| None' = None, threshold: 'float' = 12.0, min_area_mm2: 'float' = 0.2, sample_colors_px=None, background_px=None) -> 'dict'` | Samples found by colour on the registered plate photo (nothing is added): boxes in plate mm. |
-| `found_here(target: 'str', motors: 'dict', apply: 'bool' = True) -> 'dict'` | The target was found on the beam, in the analyzer focus, at these stage positions: its sample (with its devices) is moved on the plate to where that puts it; the other samples and the configuration stay. |
+| `found_here(target: 'str', motors: 'dict', apply: 'bool' = True, at_focus: 'bool' = True, configuration: 'str \| None' = None) -> 'dict'` | The target was found on the beam at these stage positions: its sample (with its devices) is moved on the plate to where that puts it; the other samples and the configuration in use stay. |
 | `load_annotation(path: 'str \| None' = None, wait: 'bool' = False) -> 'dict'` | Read the result of the manual-annotation window into the plate (replacing the samples if the user chose so in the window, else adding them). |
 | `load_session(path: 'str', optic: 'str \| None' = None) -> 'dict'` | - |
 | `manual_annotation(photo_id: 'str \| None' = None) -> 'dict'` | Open the "Samples from a photo" window on the user's screen with this photo and its registration, so the user marks / corrects the samples and devices by hand (when they are not satisfied with what was found). Returns at once; call load_annotation when the user has pressed OK. |

@@ -54,7 +54,12 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    - The user says a sample is elsewhere / bigger / has another height: align_update_sample.
    - Rotation: align_rotate(srn, srz, motors=position with the point on the beam) gives ST, SZ, SN and the optic
      position (two answers: SN kept, and SN corrected; follow "recommended"). To turn an edge seen on the photo
-     along the slit: align_align_edge(p1, p2) then align_rotate. For a Brillouin-zone point: align_bz_angles.
+     along the slit: align_align_edge(p1, p2) then align_rotate. For a Brillouin-zone point: align_bz_angles (Γ and a
+     K / M point on the map, point to the slit centre). To move a K / M point read on a map to chosen angles at another
+     hv: align_bz_point_to (Γ optional; ask whether the slit is already along Γ–K / Γ–M: then keep_srn=true, only
+     SRz turns, θ is left to the deflector). Ask the map's SRn / SRz and hv; do not assume them.
+   - Not in focus, or old positions: align_found_here(at_focus=false) when SN was not put at the analyzer focus
+     (H kept); configuration=<older file> for positions noted with an older configuration (x, y converted, H kept).
    - Before sending the user to a new position, mention any out_of_range or collisions in the result.
 8. align_save_session(path) so the user can open the plate in the QuickAlignment program.
 

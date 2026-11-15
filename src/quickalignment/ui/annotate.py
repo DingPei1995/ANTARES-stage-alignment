@@ -61,6 +61,16 @@ def main(argv: list[str] | None = None) -> int:
     if ok:
         result["replace"] = dialog.replace_existing()
         result["samples"] = [asdict(s) for s in dialog.samples()]
+        # The registration the user ended with (they may have moved the points): the assistant adopts it, so the
+        # session's photo matches the samples measured here.
+        reg = dialog.reg
+        pts = [[float(x), float(y)] for x, y in reg.corner_positions()]
+        if len(pts) == len(reg.ref_points):
+            if reg.use_3d:
+                result["points_3d"] = [{"name": name, "plate_mm": [float(u), float(v), float(w)], "px": px}
+                                       for (name, (u, v)), w, px in zip(reg.ref_points, reg.ref_heights, pts)]
+            else:
+                result["corners_px"] = pts
     write_json(args.out, result)
     return 0
 

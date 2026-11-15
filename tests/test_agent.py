@@ -278,6 +278,55 @@ def test_real_sample_full_mode_sn_kept(api, configs):
     assert all(t["go_to"]["SN"] == pytest.approx(ref.sn) for t in fit["test_points"])
 
 
+def test_optics_mode_keeps_the_mechanics_of_a_chosen_configuration(api, configs):
+    """Zone plate mounted after a capillary calibration: keep the capillary's mechanics; test points keep SN and
+    SRz <= 0, as the stage is run."""
+    r = api.real_sample
+    cap = next(x for x in CalibrationStore(configs).records() if x.optic_name == "capillary")
+    out = r.start("optics", "zone plate", "gating", 2.687, 4.666, 0.748, configuration=cap.path.name)
+    assert out["previous_configuration"] == cap.label
+    with pytest.raises(APIError, match="No configuration"):
+        r.start("optics", "zone plate", "gating", 0, 0, 0, configuration="nope.json")
+    r.start("optics", "zone plate", "gating", 2.687, 4.666, 0.748, configuration=cap.label)
+    true = replace(cap.config, st0=cap.config.st0 + 0.8, sz0=cap.config.sz0 + 0.19)
+    model, uvw = StageModel(true, GATING_PLATE), (2.687, 4.666, GATING_PLATE.total_thickness + 0.748)
+    st, sz, optic = on_beam(model, uvw, 120.0, 0.0, -0.05, 150.0, 150.0, 53.75)
+    r.measure_set("1", st, sz, -0.05, optic=optic)
+    fit = r.fit()
+    values = {c["name"]: c["value"] for c in fit["constants"]}
+    assert values["ST0"] == pytest.approx(true.st0, abs=1e-4) and values["Optic at analyzer focus"] == \
+        pytest.approx(53.75, abs=1e-4)
+    assert fit["reading_errors_mm"]["optic"] == pytest.approx(0.02)
+    assert all(t["go_to"]["SN"] == pytest.approx(-0.05) and t["go_to"]["SRz"] <= 0 for t in fit["test_points"])
+
+
+def test_read_spem_positions(api, tmp_path):
+    h5py = pytest.importorskip("h5py")
+    path = tmp_path / "map.nxs"
+    with h5py.File(path, "w") as f:
+        e = f.create_group("img1_0001")
+        e.create_group("scan_data").create_dataset("data_01", data=np.zeros((2, 2)))
+        a = e.create_group("ANTARES")
+        for m, v in (("st", -3.4982), ("sz", 36.538), ("sn", -0.0517), ("srn", 120.0006), ("srz", 0.0005)):
+            a.create_dataset(f"i12-m-cx1-ex-sample-mt_{m}/position", data=[v])
+        a.create_dataset("PI/PI_X", data=[176.0])
+        a.create_dataset("PI/PI_Y", data=[40.0])
+        a.create_dataset("i12-m-cx1-op-zp-mt_zs/position", data=[53.7502])
+        a.create_dataset("i12-m-c04-op-mono1/energy", data=[95.0])
+        t = e.create_group("scan_config/trajectory/actuator_1_1")
+        for k, v in (("name", b"i12-m-cx1/ex/pi/x"), ("from", b"130.0"), ("to", b"180.0"), ("delta", b"2.0")):
+            t.create_dataset(k, data=v)
+    api.real_sample.start("optics", "zone plate", "gating", 0, 0, 0,
+                          configuration=next(x for x in CalibrationStore(api.configs).records()
+                                             if x.optic_name == "capillary").path.name)
+    out = api.real_sample.read_spem(str(path))
+    assert out["st"] == pytest.approx(-3.4982) and out["zps"] == pytest.approx(53.7502)
+    assert out["optic_for_this_calibration"] == pytest.approx(53.7502) and out["hv"] == pytest.approx(95.0)
+    assert out["scanned"] == [{"motor": "pix", "from": 130.0, "to": 180.0, "step": 2.0}]
+    with pytest.raises(APIError):
+        api.real_sample.read_spem(str(tmp_path / "missing.nxs"))
+
+
 # -- gold-frame calibration ----------------------------------------------------------------------------------
 def test_gold_frame_plan_simulate_fit_save(api, configs, tmp_path):
     g = api.gold_frame

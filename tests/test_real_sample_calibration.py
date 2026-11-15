@@ -6,7 +6,7 @@ import pytest
 from quickalignment.core.calibration import CalibrationStore
 from quickalignment.core.geometry import GATING_PLATE, STANDARD_PLATE, Sample, SampleLayout
 from quickalignment.realsample.fit import (
-    FOUND_TOLERANCE, NotEnoughData, TestPoint, fit_real_sample_calibration, real_sample_record, on_beam, optic_focus_of, predict_test_point,
+    FOUND_TOLERANCE, NotEnoughData, TestPoint, fit_real_sample_calibration, measurement_sigmas, real_sample_record, on_beam, optic_focus_of, predict_test_point,
     protocol_sets, verification_angles,
 )
 from quickalignment.core.stage import OPTIC_TYPES, MotorPositions, StageConfig, StageModel, focus_correction
@@ -242,6 +242,31 @@ def test_test_points_can_keep_sn():
     t = predict_test_point(model, REF, TestPoint("x", 100.0, -5.0), FOCUS, sn=0.2)
     assert t.sn == 0.2
     assert (t.pred_st, t.pred_sz, t.pred_optic) == pytest.approx(on_beam(model, REF, 100.0, -5.0, 0.2, 150, 150, FOCUS))
+
+
+def test_planned_angles_keep_srz_non_positive():
+    assert all(srz <= 0 for _, _, srz in verification_angles())
+    assert all(s.srz <= 0 for mode in ("full", "optics") for s in protocol_sets(mode=mode))
+
+
+def test_weighted_fit_reports_the_srz_axis_across_the_beam():
+    """A capillary focus 0.15 mm off in the SRz set: weighted by the reading errors, the fit leans on the positions,
+    and it says which combination the data hardly fix (the SRz axis across the beam, seen through the optic)."""
+    sets = _sn_kept_sets(TRUE, FOCUS)
+    sets[2].optic += 0.15
+    plain = fit_real_sample_calibration(sets, GATING_PLATE, REF, base=StageConfig())
+    weighted = fit_real_sample_calibration(sets, GATING_PLATE, REF, base=StageConfig(),
+                                           sigmas=measurement_sigmas("capillary"))
+    pos = lambda res: max(max(abs(v) for v in r[1:] if v is not None) for r in res.residuals)  # noqa: E731
+    assert pos(weighted) < pos(plain)
+    assert weighted.chi2_dof is not None and weighted.weakest is not None
+    sigma, combo = weighted.weakest
+    assert {"srz_offset_t", "srz_offset_n"} & set(combo) and sigma > 0
+    assert measurement_sigmas("zone plate + OSA")[1] < measurement_sigmas("capillary")[1]
+    # exact data: the weights do not change the solution
+    exact = _sn_kept_sets(TRUE, FOCUS)
+    res = fit_real_sample_calibration(exact, GATING_PLATE, REF, base=StageConfig(), sigmas=measurement_sigmas("capillary"))
+    assert np.allclose(params(res.config), params(TRUE), atol=1e-7) and res.rms < 1e-8
 
 
 def test_optics_only_check_sets_show_changed_mechanics():

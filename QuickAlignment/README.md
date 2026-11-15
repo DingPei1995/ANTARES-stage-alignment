@@ -268,7 +268,8 @@ Both plates share the same back plate (18 × 15.5 × 1.1 mm Ta with tab), which 
   Axis: the centre line of the plate surface at SRn=120, plus a calibration offset.
 - Stack (bottom → top): ST/SN/SZ → SRz → SRn → PIX/PIY → plate.
 - **PIX/PIY** piezo stage riding on top of all the above (sample frame), 0–300 µm, centre 150/150.
-  Seen from the analyzer: PIX 0→300 = left→right, PIY 0→300 = down→up.
+  Seen from the analyzer: PIX 0→300 = left→right, PIY 0→300 = up→down (against +SZ; checked at the
+  beamline 2026-11-14: a feature seen at a larger PIY needs a larger SZ). PIX not checked yet.
 
 Plate frame (x, y), mm: front view (sample side) with the tab up, origin = centre of the 18 × 15.5 mm back
 plate, x right, y up. At the reference orientation (SRn = 120, SRz = 0) a plate point comes onto the beam at

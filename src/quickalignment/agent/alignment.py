@@ -118,8 +118,11 @@ class AlignmentSession:
             name = optic_short(optic_type(optic))
             records = [r for r in records if r.optic_name == name]
         return {"folder": str(self.store.folder), "configurations": [
-            {"label": r.label, "file": r.path.name if r.path else None, "optic": r.optic_name, "comment": r.comment}
-            for r in records], "note": "Newest first; `start` uses the newest of the chosen optic."}
+            {"label": r.label, "file": r.path.name if r.path else None, "optic": r.optic_name,
+             "plate": r.plate or "standard (not recorded)", "comment": r.comment}
+            for r in records], "note": "Newest first; `start` uses the newest of the chosen optic. A configuration "
+                                       "made with another plate than the one mounted is corrected for the plate "
+                                       "seat height (gating plate 1 mm higher in the holder: SZ0 shifted)."}
 
     def start(self, plate: str = "standard", optic: str | None = "capillary", custom_plate_mm: dict | None = None,
               configuration: str | None = None) -> dict:
@@ -165,8 +168,11 @@ class AlignmentSession:
 
     def _record_info(self) -> dict:
         r = self.record
-        c = r.config
+        c = self.model.config
+        note = r.plate_note(self.layout.plate.key) if self.started else ""
         return {"label": r.label, "file": r.path.name if r.path else None, "comment": r.comment,
+                "made_with_plate": r.plate or "standard (not recorded)",
+                **({"plate_correction": note} if note else {}),
                 "constants": rounded({"st0": c.st0, "sz0": c.sz0, "sn_f": c.sn_f, "srn_ref": c.srn_ref,
                                       "srn_axis": [c.srn_axis_u, c.srn_axis_v],
                                       "srz_offset_st": c.srz_offset_t, "srz_offset_sn": c.srz_offset_n}),
@@ -178,7 +184,7 @@ class AlignmentSession:
 
     @property
     def model(self) -> StageModel:
-        return StageModel(self.record.config, self.layout.plate)
+        return StageModel(self.record.config_for(self.layout.plate.key), self.layout.plate)
 
     def status(self) -> dict:
         self._need_start()
@@ -683,7 +689,7 @@ class AlignmentSession:
     def _base_motors(self) -> MotorPositions:
         if self.motors is not None:
             return self.motors
-        c = self.record.config
+        c = self.model.config
         return MotorPositions(st=c.st0, sn=c.sn_f, sz=c.sz0, srn=c.srn_ref, srz=0.0, pix=c.pi_center, piy=c.pi_center)
 
     def set_position(self, motors: dict, optic_position: float | None = None) -> dict:
@@ -795,8 +801,8 @@ class AlignmentSession:
             raise APIError("Choose a sample or device, not the plate centre.")
         sample = self.layout.sample_of(label)
         m = motors_from(motors, self._base_motors())
-        model = self.model if configuration is None else StageModel(self._find_record(configuration).config,
-                                                                   self.layout.plate)
+        model = self.model if configuration is None else StageModel(
+            self._find_record(configuration).config_for(self.layout.plate.key), self.layout.plate)
         if at_focus and configuration is None:
             du, dv, dw = found_offset(model, m, *uvw)
         else:

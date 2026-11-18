@@ -76,8 +76,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_record(self, record: CalibrationRecord) -> None:
         self.stage.set_record(record)
         self.rotation.update_optic()
-        self.cal_label.setText(f"Configuration: {record.label}")
+        self._show_cal_label()
         self.stage.update_view()
+
+    def _show_cal_label(self) -> None:
+        record = self.stage.record
+        d = record.plate_shift(self.editor.layout_model.plate.key)
+        self.cal_label.setText(f"Configuration: {record.label}"
+                               + (f" (made with the {record.plate or 'standard'} plate: SZ0 {d:+g} mm)" if d else ""))
+        self.cal_label.setToolTip(record.plate_note(self.editor.layout_model.plate.key))
 
     def _on_limits(self) -> None:
         self.stage.motors.apply_limits()
@@ -91,6 +98,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def set_session(self, session: Session) -> None:
         self.editor.set_layout(session.layout)
         self.plate_label.setText(f"Plate: {session.layout.plate.name}")
+        self.stage.plate_changed()
+        self._show_cal_label()
         self.stage.motors.set_value(session.motors)
         self.stage.refresh_targets()
         self.stage.update_view()

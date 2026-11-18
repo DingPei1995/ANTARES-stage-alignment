@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ._qt import QtCore, QtWidgets
 from .plate_editor import plate_pixmap
-from ..core.geometry import PLATES, STANDARD_PLATE, PlateGeometry, custom_plate, custom_plate_params
+from ..core.geometry import CUSTOM_MIN_HEIGHT, PLATES, STANDARD_PLATE, PlateGeometry, custom_plate, custom_plate_params
 from ..core.stage import OPTIC_TYPES
 
 Qt = QtCore.Qt
@@ -109,8 +109,9 @@ class PlateChoiceDialog(QtWidgets.QDialog):
         self.custom_width = box(params["width"], 0.1, base.height, "Block size along y (bottom–top).")
         self.custom_center_y = box(params["center_y"], -base.height / 2, base.height / 2,
                                    "Block centre along y (0 = centre of the back plate, + = towards the tab).")
-        self.custom_height = box(params["height"], base.base_thickness + 0.01, 50.0,
-                                 "Height of the block top, measured from the back face of the plate (standard plate: 5.0 mm).")
+        self.custom_height = box(params["height"], CUSTOM_MIN_HEIGHT, 50.0,
+                                 "Height of the block top, measured from the back face of the plate (standard plate: 5.0 mm;\n"
+                                 f"at least {CUSTOM_MIN_HEIGHT:g} mm: the sample holder stands out below the plate).")
         self.custom_note = QtWidgets.QLabel()
         self.custom_note.setWordWrap(True)
         self.custom_note.setStyleSheet("color: #555;")

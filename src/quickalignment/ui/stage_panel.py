@@ -133,7 +133,7 @@ class StagePanel(QtWidgets.QWidget):
         self.limits_label.setWordWrap(True)
         self.limits_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.limits_label.setToolTip(
-            "Anti-collision check: the plate with its samples against the analyzer nose (MBS A1, front 30 mm from\n"
+            "Anti-collision check: the plate with its samples against the analyzer nose (MBS A1, front 35 mm from\n"
             "the focus) and the focusing optic (OSA / zone plate, or capillary) at the entered optic position.\n"
             "Each range moves one motor with the others kept. Working distances: under the optic position.")
         self.limits_label.hide()
@@ -269,6 +269,12 @@ class StagePanel(QtWidgets.QWidget):
         if not self.start_box.isHidden():
             self.show_start_positions()
 
+    def plate_changed(self) -> None:
+        """Another plate is mounted: the configuration's plate correction (SZ shift) may change."""
+        self._show_record()
+        if not self.start_box.isHidden():
+            self.show_start_positions()
+
     def _show_record(self) -> None:
         record, optics = self.record, self.record.optics
         if optics.enabled:
@@ -278,10 +284,15 @@ class StagePanel(QtWidgets.QWidget):
         else:
             ref = f"in focus on the analyzer focus at optic {optics.optic_position:.4f}"
         self.optic_ref_label.setText(f"Optics reference: {ref}")
-        self.cal_status.setText(f"Configuration in use: <b>{record.label}</b> — {record.comment}")
+        note = record.plate_note(self._layout_getter().plate.key)
+        self.cal_status.setText(f"Configuration in use: <b>{record.label}</b>"
+                                + (f" — <span style='color:#b05000'>{note}</span>" if note else "")
+                                + f" — {record.comment}")
 
     def config(self) -> StageConfig:
-        return self.record.config
+        """Stage constants of the configuration for the plate mounted now (SZ shift if it was made with a plate
+        seated at another height, e.g. gating vs standard)."""
+        return self.record.config_for(self._layout_getter().plate.key)
 
     def calibration(self) -> OpticsCalibration:
         return self.record.optics

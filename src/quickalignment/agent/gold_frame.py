@@ -63,7 +63,7 @@ class GoldFrameSession:
         self.started = False
 
     def newest(self):
-        return self.store.latest(self.optic)
+        return self.store.latest(self.optic).for_plate("standard")  # the gold frame is on the standard plate
 
     def guide_setup(self) -> Setup:
         return Setup(self.newest().config, self.frame)

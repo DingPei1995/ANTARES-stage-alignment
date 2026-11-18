@@ -40,7 +40,7 @@ SN_FIELDS = ("srn", "srz", "st", "sz", "sn")
 
 def base_config(store: CalibrationStore | None = None, optic: str | None = None) -> StageConfig:
     """The newest configuration's stage constants (the built-in default if there is none)."""
-    return (store or CalibrationStore()).latest(optic).config
+    return (store or CalibrationStore()).latest(optic).for_plate("standard").config
 
 
 def nominal_setup(config: StageConfig, height: float = 0.05) -> Setup:
@@ -189,7 +189,7 @@ def result_text(result, newest) -> str:
 # -- plan ---------------------------------------------------------------------------------------------------
 def cmd_plan(args) -> int:
     store = CalibrationStore(args.configs) if args.configs else CalibrationStore()
-    newest = store.latest(args.optic)
+    newest = store.latest(args.optic).for_plate("standard")  # gold frame on the standard plate
     guide = Setup(newest.config, GoldFrame(height=args.height, u=args.frame_u, v=args.frame_v))
     plan = survey_plan(guide)
     points = sn_point_plan(guide)
@@ -237,7 +237,7 @@ def cmd_simulate(args) -> int:
 def cmd_fit(args) -> int:
     store = CalibrationStore(args.configs) if args.configs else CalibrationStore()
     scans = [load_map([f]) for f in args.files]
-    newest = store.latest(args.optic)
+    newest = store.latest(args.optic).for_plate("standard")  # gold frame on the standard plate
     ref = newest.config.srn_ref
     if args.sn_gold is not None:
         sn_gold = args.sn_gold
@@ -305,7 +305,7 @@ def cmd_gui(args) -> int:
         ax = fig.add_axes([0.12 + 0.32 * col, 0.34 - 0.055 * row, 0.17, 0.025])
         value = getattr(config, name) if init is None else init
         sliders.append((target, name, Slider(ax, label, lo, hi, valinit=value)))
-    check = CheckButtons(fig.add_axes([0.72, 0.02, 0.22, 0.05]), ["show the SZ × SRn sweep (optional data)"], [False])
+    check = CheckButtons(fig.add_axes([0.72, 0.02, 0.22, 0.05]), ["show the SZ Ã— SRn sweep (optional data)"], [False])
 
     def redraw(_=None):
         s = state["setup"]
@@ -320,15 +320,15 @@ def cmd_gui(args) -> int:
                                       overview_st_step=0.1)
         overlay = {"perfect": perfect}
         ax_overview.clear()
-        draw_map(ax_overview, scans.pop("overview"), overlay, "overview: ST × SZ (SRn 120, SRz 0)")
+        draw_map(ax_overview, scans.pop("overview"), overlay, "overview: ST Ã— SZ (SRn 120, SRz 0)")
         ax_sweep.clear()
         if "srn_sweep" in scans:
-            draw_map(ax_sweep, scans.pop("srn_sweep"), overlay, "SZ × SRn sweep (optional)")
+            draw_map(ax_sweep, scans.pop("srn_sweep"), overlay, "SZ Ã— SRn sweep (optional)")
         else:
             ax_sweep.axis("off")
-            ax_sweep.text(0.5, 0.5, "SZ × SRn sweep: optional\n(tick the box below)", ha="center", va="center")
+            ax_sweep.text(0.5, 0.5, "SZ Ã— SRn sweep: optional\n(tick the box below)", ha="center", va="center")
         ax_lines.clear()
-        draw_lines(ax_lines, list(scans.values()), overlay, "SZ lines of the survey (A: SRn 120, B: ±45°, C: SRz)")
+        draw_lines(ax_lines, list(scans.values()), overlay, "SZ lines of the survey (A: SRn 120, B: Â±45Â°, C: SRz)")
         fig.canvas.draw_idle()
 
     def toggle(_):

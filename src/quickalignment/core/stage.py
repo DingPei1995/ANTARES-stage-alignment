@@ -51,6 +51,15 @@ class StageConfig:
     srz_offset_n: float = 0.0  # ... along +SN (mm)
 
 
+def config_for_plate(config: StageConfig, from_seat: float, to_seat: float) -> StageConfig:
+    """The configuration fitted with a plate seated `from_seat` mm high in the holder (geometry.PLATE_SEAT_V), for a
+    plate seated `to_seat` mm high. The plate frame moves with the plate: a plate seated d = to - from higher reaches
+    the focus at an SZ d lower (SZ0 - d), and the SRn axis, fixed to the holder, is d lower in its frame. ST0, SN_f
+    and the SRz axis (lab offsets) do not change."""
+    d = to_seat - from_seat
+    return replace(config, sz0=config.sz0 - d, srn_axis_v=config.srn_axis_v - d)
+
+
 @dataclass
 class MotorPositions:
     st: float = 0.0

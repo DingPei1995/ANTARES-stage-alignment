@@ -19,7 +19,8 @@ from pathlib import Path
 
 from .collision import CollisionGeometry, default_geometry
 from .fileio import read_json, write_json
-from .stage import MotorPositions, OpticsCalibration, StageConfig
+from .geometry import plate_seat_v
+from .stage import MotorPositions, OpticsCalibration, StageConfig, config_for_plate
 
 # repository root: src/quickalignment/core/calibration.py -> parents[3]
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -58,6 +59,39 @@ class CalibrationRecord:
     check: dict | None = None  # what the calibration measured, for the record
     path: Path | None = None
     collision: CollisionGeometry | None = None  # analyzer / optic solids; None: defaults for the optic
+
+    @property
+    def plate(self) -> str | None:
+        """Key of the plate the configuration was made with ("check" -> "plate"); None if not recorded (taken as
+        the standard plate)."""
+        key = self.check.get("plate") if isinstance(self.check, dict) else None
+        return str(key) if key else None
+
+    def config_for(self, plate: str | None) -> StageConfig:
+        """The stage constants for the plate `plate` (key) mounted now. The plate frame moves with the plate: a
+        configuration made with another plate, seated at another height in the holder (PLATE_SEAT_V: the gating
+        plate sits higher), gets SZ0 and the SRn axis shifted; same plate (or same seat): unchanged."""
+        return config_for_plate(self.config, plate_seat_v(self.plate), plate_seat_v(plate))
+
+    def for_plate(self, plate: str | None) -> CalibrationRecord:
+        """This record with its stage constants brought to the plate `plate` (config_for); the copy records that
+        plate, so it is not shifted twice. Unchanged when no shift is needed."""
+        if self.plate_shift(plate) == 0.0:
+            return self
+        check = {**(self.check or {}), "plate": plate, "plate_converted_from": self.plate or "standard"}
+        return replace(self, config=self.config_for(plate), check=check)
+
+    def plate_shift(self, plate: str | None) -> float:
+        """SZ0 change of config_for(plate) (mm, 0: none)."""
+        return plate_seat_v(self.plate) - plate_seat_v(plate)
+
+    def plate_note(self, plate: str | None) -> str:
+        """One line on the plate correction for `plate`, "" when there is none."""
+        d = self.plate_shift(plate)
+        if d == 0.0:
+            return ""
+        return (f"configuration made with the {self.plate or 'standard'} plate, {plate or 'standard'} plate mounted: "
+                f"SZ0 {self.config.sz0:.4f} -> {self.config.sz0 + d:.4f} ({d:+g} mm, plate seat height in the holder)")
 
     def collision_geometry(self) -> CollisionGeometry:
         """Solid models for the anti-collision check: from the file, else the defaults for the optic in use."""

@@ -5,7 +5,7 @@ Simple solid models, in the lab frame of stage.py (origin = analyzer focus,
 
 * analyzer (MBS A1 lens): a truncated cone on the analyzer axis (-n, the
   normal of the analyzer focal plane through the focus); its front face is
-  `distance` = 30 mm from the focus, the cone widens away from it;
+  `distance` = 35 mm from the focus, the cone widens away from it;
 * focusing optic, on the beam axis upstream of the optic focus. Zone plate:
   two thin square plates across the beam, the zone plate, which moves with the
   zone plate motor (upstream of the focus for the optic position in use), and
@@ -125,16 +125,26 @@ class SheetBody:
         return list(zip(pts[:-1], pts[1:]))
 
 
-# MBS A1: front face 30 mm from the focal plane (beamline). The front opening has to pass the ±15° lens acceptance
-# (r >= 30 tan 15° = 8 mm), so the outer radius is taken as 10 mm; the 35° cone angle is an estimate.
-ANALYZER_A1 = SolidBody("analyzer (MBS A1)", distance=30.0, tip_radius=10.0, half_angle=35.0, length=150.0)
+# MBS A1 lens front, from its drawing (Detail A, beamline 2026-11-18): front face 35 mm from the sample centre (the
+# analyzer focus), Ø52 nose 15 mm long, Ø150 body; all its metal is at least 9.1 mm ("free distance to metal") from
+# the 45° line through the sample centre, i.e. within r <= s - 9.1 sqrt2. The front face edge, the nose corner and
+# the shoulder lie on that line. The analyzer is taken as that 45° envelope: front face Ø44.3 at 35 mm, widening at
+# 45° to the Ø150 body (87.9 mm); on the safe side by at most 11 mm across the axis at the end of the nose (the real
+# nose is a Ø52 cylinder). The body behind is far from the sample and not modelled. (Before: r 10 mm, 35°, estimates.)
+ANALYZER_FREE_DISTANCE = 9.1
+_A1_FRONT = 35.0
+_A1_TIP = _A1_FRONT - ANALYZER_FREE_DISTANCE * math.sqrt(2)
+ANALYZER_A1 = SolidBody("analyzer (MBS A1)", distance=_A1_FRONT, tip_radius=round(_A1_TIP, 2), half_angle=45.0,
+                        length=round(75.0 - _A1_TIP, 2))
 
 # The working distances can be entered in the Stage & Optics tab.
-# Zone plate and OSA: thin plates across the beam. Zone plate (10 × 10 mm, 0.5 mm: placeholder): working
-# distance 26.613 mm at 100 eV (beamline data); the focal length f = D dr / lambda grows with the photon energy, so at
-# 95 eV it is 26.613 * 95 / 100 = 25.28 mm. OSA: the copper shield just in front of the plate, estimated on the
+# Zone plate and OSA: thin plates across the beam. Zone plate (10 × 10 mm, 0.5 mm: placeholder): the focal length
+# f = D dr / lambda grows in proportion to the photon energy; the beamline's energy coefficient of ZPS, -0.256 mm/eV
+# (ZPS taken 1:1 with the lens, beamline 2026-11-17), gives f = 0.256 * E: 24.32 mm at 95 eV (the earlier
+# 26.613 mm at 100 eV, i.e. 25.28 at 95 eV, is replaced). OSA: the copper shield just in front of the plate, estimated on the
 # design view at 100 eV (no scale: plate and zone plate distance as references, 1.3 ... 5.4 mm): 3.5 mm before the
-# focus where its tab crosses the beam; not moved when the zone plate refocuses (so the same at 95 eV); the main
+# focus where its tab crosses the beam, at the OSA working position S 80 / X 0.5 / Z 26.63 (beamline); not moved
+# when the zone plate refocuses (so the same at 95 eV); the main
 # limit. Top view from a photo of the shield in use (four pieces, three bends; lengths estimated, no scale), from the
 # sample side: (1) the shortest piece, parallel to the plate surface, about 1.7 mm in front of it; (2) parallel to
 # the zone plate, across the beam (with the aperture), the beam through its middle, 2.3 mm long;
@@ -153,7 +163,7 @@ DEFAULT_OPTIC_BODIES = {
     "zone plate + OSA": (
         SheetBody("OSA", distance=3.5, points=((0.71, -1.86), (0.0, -1.15), (0.0, 1.15), (4.13, 2.65), (6.74, 3.35)),
                   thickness=0.2, height=20.0, moves=False),
-        SolidBody("zone plate", distance=25.28, tip_radius=5.0, length=0.5, square=True),
+        SolidBody("zone plate", distance=24.32, tip_radius=5.0, length=0.5, square=True),
     ),
     "capillary": (
         SolidBody("capillary nose", distance=7.2, tip_radius=1.85, length=0.7, group="capillary"),

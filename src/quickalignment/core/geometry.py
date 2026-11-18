@@ -116,21 +116,39 @@ GATING_PLATE = PlateGeometry(
 
 PLATES = {p.key: p for p in (STANDARD_PLATE, GATING_PLATE)}
 
+# How much higher (+v, mm) each plate sits in the sample holder than the standard plate, at the same motor positions.
+# The gating plate's ceramic contact block reaches 1 mm below the plate bottom (v -8.75 against -7.75) and rests on
+# the pin of the holder, so the whole plate sits higher (user, 2026-11-18; 1.0 mm from the drawing, kept by the
+# user; not measured at the beamline). A configuration fitted with one plate needs this SZ shift for another (stage.config_for_plate).
+# Custom plates sit like the standard one.
+PLATE_SEAT_V = {"standard": 0.0, "gating": 1.0}
+
+
+def plate_seat_v(key: str | None) -> float:
+    return PLATE_SEAT_V.get(key or "standard", 0.0)
+
 # SN_f always refers to the riser top of the standard plate (w = 5.0), whatever plate is mounted
 SN_REFERENCE_W = STANDARD_PLATE.total_thickness
+
+
+# Lowest block top of a custom plate (mm above the back face): the standard riser height. The sample holder has a
+# part standing out about 2 mm above the 5 mm riser, below the plate; a lower block would bring it closer to the OSA /
+# capillary when the sample surface is in the analyzer focal plane (beamline decision 2026-11-17).
+CUSTOM_MIN_HEIGHT = STANDARD_PLATE.total_thickness
 
 
 def custom_plate(length: float, width: float, height: float, center_y: float = 0.0) -> PlateGeometry:
     """User plate: the standard back plate without its raised part, carrying a
     block of `length` (along u, centred left-right) x `width` (along v, centred
     at v = `center_y`), whose top face is `height` mm above the back face of
-    the plate (standard plate: 5.0)."""
+    the plate (standard plate: 5.0; at least CUSTOM_MIN_HEIGHT)."""
     base = STANDARD_PLATE
     eps = 1e-9
     if not (0 < length <= base.width + eps and 0 < width and abs(center_y) + width / 2 <= base.height / 2 + eps):
         raise ValueError(f"The block must fit on the {base.width:g} × {base.height:g} mm back plate.")
-    if height <= base.base_thickness:
-        raise ValueError(f"The block top must be above the back plate ({base.base_thickness:g} mm).")
+    if height < CUSTOM_MIN_HEIGHT - eps:
+        raise ValueError(f"The block top must be at least {CUSTOM_MIN_HEIGHT:g} mm above the back face of the plate "
+                         "(as the standard riser): the sample holder stands out below the plate.")
     return PlateGeometry(
         key="custom",
         name=f"Custom plate ({length:g} × {width:g} mm at y = {center_y:g}, height {height:g} mm)",

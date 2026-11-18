@@ -435,7 +435,8 @@ class RealSampleCalibrationWindow(QtWidgets.QMainWindow):
 
     def previous(self):
         """The newest configuration of the chosen optic: start values, kept constants (optics only) and comparison."""
-        return self.store.latest(self.optic())
+        # made with another plate: SZ0 / SRn axis for the plate mounted
+        return self.store.latest(self.optic()).for_plate(self.plate().key)
 
     def _show_previous(self, *_) -> None:
         prev = self.previous()

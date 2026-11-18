@@ -282,7 +282,7 @@ class GoldFrameWindow(QtWidgets.QMainWindow):
         self.normalize.toggled.connect(lambda _: self.reload())
         self.sn_auto = QtWidgets.QCheckBox("SN of a file at SRn 120 / SRz 0")
         self.sn_auto.setChecked(True)
-        self.sn_gold = spin(0.0, -30, 65, 4, 0.01)
+        self.sn_gold = spin(0.0, -12, 65, 4, 0.01)
         self.sn_gold.setEnabled(False)
         self.sn_auto.toggled.connect(lambda on: (self.sn_gold.setEnabled(not on), self._data_changed()))
         self.height = spin(0.05, 0, 3, 3, 0.01)
@@ -405,7 +405,8 @@ class GoldFrameWindow(QtWidgets.QMainWindow):
 
     # -- helpers ------------------------------------------------------------------------------------------
     def newest_record(self):
-        return self.store.latest(self.optic.currentData())
+        # the gold frame is on the standard plate: a configuration made with the gating plate is shifted to it
+        return self.store.latest(self.optic.currentData()).for_plate("standard")
 
     def frame(self) -> GoldFrame:
         return GoldFrame(outer=self.outer.value(), inner=self.inner.value(), height=self.height.value(),

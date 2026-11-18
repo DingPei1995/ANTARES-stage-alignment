@@ -113,7 +113,8 @@ class RealSampleCalibrationSession:
 
     def previous(self):
         """The configuration giving the start values and the kept mechanics (chosen at start, else the newest)."""
-        return self.base if self.base is not None else self.store.latest(self.optic)
+        prev = self.base if self.base is not None else self.store.latest(self.optic)
+        return prev.for_plate(self.plate.key)  # made with another plate: SZ0 / SRn axis for the plate mounted
 
     def _optic_record(self):
         """The newest configuration of the chosen optic: its optic reference and collision geometry."""

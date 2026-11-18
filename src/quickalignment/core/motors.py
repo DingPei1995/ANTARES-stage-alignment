@@ -11,9 +11,10 @@ from .stage import MotorPositions
 
 MOTOR_SPECS = {  # name: (label, min, max, decimals, step, suffix); min / max: default limits (Configuration window)
     "st": ("ST", -9, 9, 4, 0.1, " mm"),
-    # SN: below the focal plane (SN_f ≈ 0) the real limit is a collision (OSA / capillary, analyzer 30 mm away),
-    # computed for the current positions by the anti-collision check
-    "sn": ("SN", -30, 65, 4, 0.1, " mm"),
+    # SN: travel -12 ... 65 (beamline 2026-11-17; the homing reference is -11.67). Below the focal plane (SN_f ≈ 0)
+    # a collision (OSA / capillary) can come first, computed for the current positions by the anti-collision check;
+    # the analyzer front, 35 mm away, is beyond the travel
+    "sn": ("SN", -12, 65, 4, 0.1, " mm"),
     "sz": ("SZ", 35, 45, 4, 0.1, " mm"),
     "srn": ("SRn", -720, 720, 3, 1.0, " °"),
     "srz": ("SRz", -720, 720, 3, 1.0, " °"),

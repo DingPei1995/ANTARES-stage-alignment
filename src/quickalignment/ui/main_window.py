@@ -27,6 +27,7 @@ class MainWindow(QtWidgets.QMainWindow):
         set_motor_limits(self.store.motor_limits())  # before the input fields are made
         self.editor = PlateEditor()
         self.stage = StagePanel(lambda: self.editor.layout_model)
+        self.editor.config_getter = self.stage.config  # SN_f of the configuration in use, for the height check
         self.editor.layoutChanged.connect(self.stage.refresh_targets)
         self.editor.samplesPlaced.connect(self.go_to_stage)
         self.stage.layoutCorrected.connect(self._on_layout_corrected)
@@ -132,6 +133,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         session = self.session()
         session.layout.plate = plate  # samples are kept; misplaced ones are flagged
+        session.layout.plate_offset_v = 0.0  # another plate goes in: the offset found for the old one is gone
         self.set_session(session)
 
     def open_session(self) -> None:

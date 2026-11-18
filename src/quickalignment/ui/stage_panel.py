@@ -15,13 +15,14 @@ from dataclasses import replace
 from ._qt import QtCore, QtWidgets, Signal
 from ..core.calibration import CalibrationRecord
 from ..core.motors import (  # noqa: F401  (re-exported for the other windows)
-    CONFIG_SPECS, DEFAULT_LIMITS, FOCUS_WARNING, LARGE_FOUND_OFFSET, LIMIT_MOTORS, MOTOR_SPECS, TOLERANCE, TRAVEL,
-    current_limits, out_of_range, set_motor_limits,
+    CONFIG_SPECS, DEFAULT_LIMITS, FOCUS_WARNING, LARGE_FOUND_OFFSET, LIMIT_MOTORS, MOTOR_SPECS, PLATE_OFFSET_WARNING,
+    TOLERANCE, TRAVEL, current_limits, out_of_range, set_motor_limits,
 )
 from ..core.collision import ACCEPTANCE_HALF_ANGLE, collisions, in_acceptance, motor_limits
 from ..core.schematic import draw_schematic
 from ..core.stage import (
-    OPTIC_TYPES, MotorPositions, OpticsCalibration, StageConfig, StageModel, focus_correction, found_offset, sn_to_focus,
+    OPTIC_TYPES, MotorPositions, OpticsCalibration, StageConfig, StageModel, apply_found_offset, checked_sn,
+    focus_correction, found_offset, sn_to_focus,
 )
 
 Qt = QtCore.Qt
@@ -202,9 +203,11 @@ class StagePanel(QtWidgets.QWidget):
         self.start_box = QtWidgets.QGroupBox("Where the samples are at the initial rotation")
         self.start_box.setStyleSheet("QGroupBox { background: #eef6ee; }")
         self.found_combo = QtWidgets.QComboBox()
-        found_btn = QtWidgets.QPushButton("Found here: correct its sample")
+        found_btn = QtWidgets.QPushButton("Found here: correct plate / sample")
         found_btn.setToolTip("The chosen device is on the beam, in the analyzer focus, at the stage positions\n"
-                             "entered below: move its sample (with all its devices) there on the plate.")
+                             "entered below. The SZ difference is taken as the plate sitting at another height in\n"
+                             "the holder (all samples move with it; the beam is not corrected); the ST difference and\n"
+                             "the height correct this sample (with all its devices).")
         found_btn.clicked.connect(self.correct_from_found)
         sb = QtWidgets.QVBoxLayout(self.start_box)
         sb.addWidget(self.start_label)
@@ -291,8 +294,9 @@ class StagePanel(QtWidgets.QWidget):
 
     def config(self) -> StageConfig:
         """Stage constants of the configuration for the plate mounted now (SZ shift if it was made with a plate
-        seated at another height, e.g. gating vs standard)."""
-        return self.record.config_for(self._layout_getter().plate.key)
+        seated at another height, e.g. gating vs standard; and the plate offset found with "Found here")."""
+        layout = self._layout_getter()
+        return self.record.config_for(layout.plate.key, layout.plate_offset_v)
 
     def calibration(self) -> OpticsCalibration:
         return self.record.optics
@@ -375,12 +379,17 @@ class StagePanel(QtWidgets.QWidget):
     def show_start_positions(self) -> None:
         """List the ST / SZ / SN putting each sample / device on the analyzer focus at SRn = ref, SRz = 0."""
         model = self.model()
+        layout = self._layout_getter()
         c = model.config
         rows = []
         for label in ["plate centre", *self.target_labels()]:
             st, sz, sn = (unsigned_zero(x, 3) for x in model.reference_motors(*self.target_point(label)))
+            mark = " (H checked)" if checked_sn(layout, label) is not None else ""
             rows.append(f"<tr><td>{label}</td><td align=right>{st:.3f}</td><td align=right>{sz:.3f}</td>"
-                        f"<td align=right>{sn:.3f}</td></tr>")
+                        f"<td align=right>{sn:.3f}{mark}</td></tr>")
+        if layout.plate_offset_v:
+            rows.append(f"<tr><td colspan=4><i>plate {layout.plate_offset_v:+.3f} mm off its usual height in the "
+                        "holder (Found here): SZ0 shifted for all samples</i></td></tr>")
         self.start_label.setText(
             f"At SRn = {c.srn_ref:g}° (plate vertical, tab up), SRz = 0°, PIX = PIY = {c.pi_center:g} µm, "
             "each sample centre is on the beam at the analyzer focus at:"
@@ -400,25 +409,37 @@ class StagePanel(QtWidgets.QWidget):
         if t is None or sample is None:
             return None
         m = self.motors.value()
+        layout = self._layout_getter()
         du, dv, dw = found_offset(self.model(), m, *t)
         su, sv, sw = (unsigned_zero(x, 3) for x in (du, dv, dw))
         large = ""
-        if max(abs(du), abs(dv), abs(dw)) > LARGE_FOUND_OFFSET:
-            large = (f"\n\nThis is more than {LARGE_FOUND_OFFSET:g} mm. If other samples show the same shift, the "
-                     "configuration may be outdated (motors re-homed?): ask beamline staff to run a calibration (RealSampleCalibration or GoldFrameCalibration).")
+        if abs(du) > LARGE_FOUND_OFFSET:
+            large = (f"\n\nΔx (ST) is more than {LARGE_FOUND_OFFSET:g} mm: more likely the beam spot has moved (optic "
+                     "realigned?) than the sample. If other samples show the same ST shift, ask beamline staff for an "
+                     "optics recalibration (RealSampleCalibration, mode optics) instead of correcting the sample.")
+        if abs(dw) > LARGE_FOUND_OFFSET:
+            large += (f"\n\nΔH is more than {LARGE_FOUND_OFFSET:g} mm: check the sample height (height check) or SN_f "
+                      "of the configuration.")
+        if abs(layout.plate_offset_v + dv) > PLATE_OFFSET_WARNING:
+            large += (f"\n\nThe plate would then sit {layout.plate_offset_v + dv:+.2f} mm off its usual height in the "
+                      f"holder (more than {PLATE_OFFSET_WARNING:g} mm): check that the right sample was found.")
         answer = QtWidgets.QMessageBox.question(
-            self, "Correct the sample position?",
+            self, "Correct the plate / sample position?",
             f"{label} is on the beam, in the analyzer focus, at ST = {m.st:.4f}, SZ = {m.sz:.4f}, SN = {m.sn:.4f} "
             f"(SRn = {m.srn:g}°, SRz = {m.srz:g}°)?\n\n"
             f"Then it is at Δx = {su:+.3f}, Δy = {sv:+.3f} mm on the plate and ΔH = {sw:+.3f} mm from where it was "
-            f"drawn. {sample.name} (with its devices) is moved there; the other samples stay." + large,
+            "drawn.\n\n"
+            f"• Δy is taken as the plate sitting at another height in the sample holder (it does not always go in "
+            f"at the same height; not the beam): the whole plate moves by {sv:+.3f} mm (plate offset "
+            f"{layout.plate_offset_v:+.3f} → {layout.plate_offset_v + dv:+.3f} mm), so every sample's SZ changes by "
+            f"{-dv:+.3f} mm.\n"
+            f"• Δx and ΔH: {sample.name} (with its devices) is moved by Δx and its height corrected; the other "
+            "samples stay." + large,
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes,
         )
         if answer != QtWidgets.QMessageBox.Yes:
             return None
-        sample.u += du
-        sample.v += dv
-        sample.height = max(sample.height + dw, 0.0)
+        apply_found_offset(self.config(), layout, sample, du, dv, dw)
         self.layoutCorrected.emit(sample.name)
         self.refresh_targets()
         self.update_view()
@@ -439,17 +460,21 @@ class StagePanel(QtWidgets.QWidget):
 
     # -- actions ----------------------------------------------------------------
     def bring_target_on_beam(self) -> MotorPositions | None:
-        """ST / SZ putting the target on the beam with SN as entered; reports its distance from the analyzer focus."""
+        """ST / SZ putting the target on the beam with SN as entered; reports its distance from the analyzer focus.
+        A target whose sample height was checked keeps the SN of that check (exact at SRn ref, SRz 0: its height
+        was corrected with it), whatever the SN field says."""
         label = self.target_combo.currentText()
         t = self.target_point(label)
         if t is None:
             return None
         m = self.motors.value()
-        new = self.model().motors_on_beam(*t, srn=m.srn, srz=m.srz, sn=m.sn, pix=m.pix, piy=m.piy)
+        checked = checked_sn(self._layout_getter(), label)
+        sn = m.sn if checked is None else checked
+        new = self.model().motors_on_beam(*t, srn=m.srn, srz=m.srz, sn=sn, pix=m.pix, piy=m.piy)
         if not self._go_to(new, "The target cannot be brought onto the beam with SN kept",
                            "\n\nCorrect SN may reach it (it also moves SN)."):
             return None
-        self._show_goto(label, t, new)
+        self._show_goto(label, t, new, checked=checked is not None)
         return new
 
     def bring_target_to_focus(self) -> MotorPositions | None:
@@ -480,7 +505,8 @@ class StagePanel(QtWidgets.QWidget):
         self.update_view()
         return True
 
-    def _show_goto(self, label: str, t, m: MotorPositions, sn_before: float | None = None) -> None:
+    def _show_goto(self, label: str, t, m: MotorPositions, sn_before: float | None = None,
+                   checked: bool = False) -> None:
         """Where the target is along the beam after a move, and the SN correction that would remove it."""
         model = self.model()
         y = model.beam_position(m, *t)
@@ -492,9 +518,19 @@ class StagePanel(QtWidgets.QWidget):
                     f"<b>SN = {m.sn:.4f}</b> (ΔSN = {unsigned_zero(m.sn - sn_before, 4):+.4f} mm).{optic}")
             self.goto_label.setStyleSheet("color: #207020;")
         else:
-            text = f"<b>{label}</b> on the beam with SN = {m.sn:.4f} kept: ST = {m.st:.4f}, SZ = {m.sz:.4f}.{optic}<br>"
+            kept = "SN of its height check" if checked else "SN"
+            text = (f"<b>{label}</b> on the beam with {kept} = {m.sn:.4f} kept: ST = {m.st:.4f}, SZ = {m.sz:.4f}."
+                    f"{optic}<br>")
             if abs(y) < TOLERANCE:
                 text += "It is on the analyzer focus."
+            elif checked:
+                text += (f"It is {abs(y) * 1000:.0f} µm {'downstream' if y > 0 else 'upstream'} of the analyzer focus "
+                         "(model, this rotation): SN is kept from the height check (right at SRn "
+                         f"{self.config().srn_ref:g}°, SRz 0°); the optic refocuses on it.")
+                self.goto_label.setStyleSheet("color: #207020;")
+                self.goto_label.setText(text)
+                self.goto_label.show()
+                return
             else:
                 text += (f"It is <b>{abs(y) * 1000:.0f} µm {'downstream' if y > 0 else 'upstream'}</b> of the analyzer "
                          f"focus (model); ΔSN = {sn_to_focus(model, m, *t):+.4f} mm (ST compensating) would remove it.")

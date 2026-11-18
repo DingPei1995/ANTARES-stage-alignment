@@ -441,6 +441,36 @@ class PlateEditor(QtWidgets.QWidget):
         done_btn.setStyleSheet("font-weight: bold;")
         done_btn.clicked.connect(self.confirm_samples_placed)
 
+        # height check: H is often not known or not measured. The sample top surface is driven onto the camera
+        # reference line (analyzer focal plane) at SRn ref, SRz 0, and the SN read there gives H (by eye).
+        self.config_getter = None  # set by the main window: the StageConfig in use (SN_f, SRn ref)
+        self.check_combo = QtWidgets.QComboBox()
+        self.check_combo.setToolTip("Sample whose top surface was put on the reference line")
+        self.check_sn = QtWidgets.QDoubleSpinBox()
+        self.check_sn.setRange(-50.0, 50.0)
+        self.check_sn.setDecimals(3)
+        self.check_sn.setSingleStep(0.01)
+        self.check_sn.setSuffix(" mm")
+        self.check_sn.setKeyboardTracking(False)
+        self.check_sn.setToolTip("SN read when the sample top surface is on the camera reference line\n"
+                                 "(analyzer focal plane), at SRn = 120°, SRz = 0°. Set by eye: about ±0.05 mm.")
+        check_btn = QtWidgets.QPushButton("Correct H")
+        check_btn.setToolTip("Set the sample height H from this SN. 'Bring target onto the beam' then keeps this\n"
+                             "SN for its targets (right at SRn = 120°, SRz = 0°).")
+        check_btn.clicked.connect(self.apply_height_check)
+        self.check_label = QtWidgets.QLabel()
+        self.check_label.setWordWrap(True)
+        self.check_label.setStyleSheet("color: #555;")
+        check_box = QtWidgets.QGroupBox("Height check (optional, H not known): top surface on the reference line")
+        cb = QtWidgets.QGridLayout(check_box)
+        cb.addWidget(QtWidgets.QLabel("Sample"), 0, 0)
+        cb.addWidget(self.check_combo, 0, 1)
+        cb.addWidget(QtWidgets.QLabel("SN at SRn 120°, SRz 0°"), 0, 2)
+        cb.addWidget(self.check_sn, 0, 3)
+        cb.addWidget(check_btn, 0, 4)
+        cb.addWidget(self.check_label, 1, 0, 1, 5)
+        cb.setColumnStretch(1, 1)
+
         self.info = QtWidgets.QLabel()
         self.info.setWordWrap(True)
         self.cursor_label = QtWidgets.QLabel("cursor: x = –, y = –")
@@ -456,7 +486,9 @@ class PlateEditor(QtWidgets.QWidget):
         for b in (add_btn, photo_btn, dev_btn, del_btn):
             buttons.addWidget(b)
         buttons.addStretch(1)
-        buttons.addWidget(done_btn)
+        done_row = QtWidgets.QHBoxLayout()
+        done_row.addStretch(1)
+        done_row.addWidget(done_btn)
 
         help_text = QtWidgets.QLabel(
             "Sample plate, front view (sample side), tab up. Coordinates x, y are in mm on the plate "
@@ -473,6 +505,8 @@ class PlateEditor(QtWidgets.QWidget):
         right.addWidget(help_text)
         right.addLayout(form)
         right.addLayout(buttons)
+        right.addWidget(check_box)
+        right.addLayout(done_row)
         right.addWidget(QtWidgets.QLabel("<b>Samples / substrates</b>"))
         right.addWidget(self.table, 3)
         right.addWidget(QtWidgets.QLabel("<b>Devices</b> (dx, dy: distances from two substrate edges to the device centre)"))
@@ -730,6 +764,46 @@ class PlateEditor(QtWidgets.QWidget):
             self._update_row(row)
         for row in range(len(self._device_rows)):
             self._update_dev_row(row)
+        self._refresh_height_check()
+
+    # -- height check --------------------------------------------------------------
+    def _refresh_height_check(self) -> None:
+        names = [s.name for s in self.layout_model.samples]
+        current = self.check_combo.currentText()
+        if [self.check_combo.itemText(i) for i in range(self.check_combo.count())] != names:
+            self.check_combo.blockSignals(True)
+            self.check_combo.clear()
+            self.check_combo.addItems(names)
+            self.check_combo.setCurrentIndex(max(self.check_combo.findText(current), 0))
+            self.check_combo.blockSignals(False)
+        done = [f"{s.name}: SN {s.sn_checked:.3f} → H {s.height:.3f} mm" for s in self.layout_model.samples
+                if s.sn_checked is not None]
+        self.check_label.setText("Checked: " + "; ".join(done) if done else
+                                 "Drive the sample top surface onto the camera reference line at SRn 120°, SRz 0°, "
+                                 "type the SN read there and press Correct H.")
+
+    def apply_height_check(self, sn: float | None = None, name: str | None = None) -> float | None:
+        """H of the chosen sample from the SN at which its top surface is on the reference line; returns ΔH."""
+        from ..core.stage import StageConfig, check_height, height_from_sn
+        name = self.check_combo.currentText() if name is None else name
+        sample = next((s for s in self.layout_model.samples if s.name == name), None)
+        if sample is None:
+            QtWidgets.QMessageBox.information(self, "Height check", "Draw or add the sample first.")
+            return None
+        sn = self.check_sn.value() if sn is None else sn
+        config = self.config_getter() if self.config_getter else StageConfig()
+        h = height_from_sn(config, sn, self.layout_model.plate)
+        if h < 0:
+            QtWidgets.QMessageBox.warning(
+                self, "Height check", f"SN = {sn:.3f} puts the reference line {-h:.3f} mm below the plate top "
+                f"(SN_f = {config.sn_f:.3f}): check the SN value and the configuration. H is not changed.")
+            return None
+        dh = check_height(config, self.layout_model, sample, sn)
+        self.sample_changed(sample)
+        self._refresh_height_check()
+        self.info.setText(f"{sample.name}: H = {sample.height:.3f} mm from SN = {sn:.3f} (ΔH = {dh:+.3f} mm; "
+                          f"SN_f = {config.sn_f:.3f}).")
+        return dh
 
     def _update_row(self, row: int) -> None:
         s = self.layout_model.samples[row]
@@ -750,6 +824,7 @@ class PlateEditor(QtWidgets.QWidget):
         if col == 0:
             if text:
                 s.name = text
+                self._refresh_height_check()
         elif FIELDS[col]:
             try:
                 value = float(text)
@@ -759,8 +834,11 @@ class PlateEditor(QtWidgets.QWidget):
                 value = None
             attr = FIELDS[col]
             if value is not None and (attr in ("u", "v") or value >= (0 if attr == "height" else MIN_SIZE)):
+                if attr == "height" and value != s.height:
+                    s.sn_checked = None  # typed by hand: no longer from the height check
                 setattr(s, attr, value)
         self.sample_changed(s)
+        self._refresh_height_check()
 
     # -- device table ------------------------------------------------------------
     def _update_dev_row(self, row: int) -> None:

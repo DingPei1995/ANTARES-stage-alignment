@@ -224,6 +224,44 @@ def sn_to_focus(model: StageModel, m: MotorPositions, u: float, v: float, w: flo
     return -model.beam_position(m, u, v, w) / np.sqrt(2)
 
 
+def height_from_sn(config: StageConfig, sn: float, plate: PlateGeometry) -> float:
+    """Sample height H above the plate surface whose top is on the analyzer focal plane (the camera reference line)
+    at SN = `sn`, SRn ref, SRz 0 (inverse of SN = SN_f + (plate top - 5.0) + H; piezo, ST, SZ do not matter)."""
+    return sn - config.sn_f + SN_REFERENCE_W - plate.total_thickness
+
+
+def sn_from_height(config: StageConfig, height: float, plate: PlateGeometry) -> float:
+    """SN putting a surface H above the plate top on the analyzer focal plane at SRn ref, SRz 0."""
+    return config.sn_f - SN_REFERENCE_W + plate.total_thickness + height
+
+
+def check_height(config: StageConfig, layout: SampleLayout, sample, sn: float) -> float:
+    """Height check: the top surface of `sample` was on the camera reference line (analyzer focal plane) at SN = sn,
+    SRn ref, SRz 0. Sets its height from it (never below 0) and remembers sn; returns the change of H (mm)."""
+    h = max(height_from_sn(config, sn, layout.plate), 0.0)
+    dh = h - sample.height
+    sample.height, sample.sn_checked = h, float(sn)
+    return dh
+
+
+def apply_found_offset(config: StageConfig, layout: SampleLayout, sample, du: float, dv: float, dw: float) -> None:
+    """"Found here" (found_offset du, dv, dw of a target of `sample`): ST is usually right and SZ is off because the
+    plate does not always go into the holder at the same height (0-2 mm), not because of the beam. So dv moves the
+    whole plate in the holder (layout.plate_offset_v; all samples, the plate drawing stays), du moves this sample
+    and dw changes its height (its checked SN, if any, follows). `config`: the configuration in use before."""
+    layout.plate_offset_v += dv
+    sample.u += du
+    sample.height = max(sample.height + dw, 0.0)
+    if sample.sn_checked is not None and dw:
+        sample.sn_checked = sn_from_height(config, sample.height, layout.plate)
+
+
+def checked_sn(layout: SampleLayout, label: str) -> float | None:
+    """SN of the height check of the sample of target `label` ("sample" or "sample/device"); None if not checked."""
+    sample = layout.sample_of(label)
+    return None if sample is None else sample.sn_checked
+
+
 def found_offset(model: StageModel, m: MotorPositions, u: float, v: float, w: float) -> tuple[float, float, float]:
     """(du, dv, dw) from the expected plate point (u, v, w) to the one really on the analyzer focus at m.
 

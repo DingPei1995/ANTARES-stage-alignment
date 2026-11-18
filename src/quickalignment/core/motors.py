@@ -33,7 +33,8 @@ CONFIG_SPECS = {
     "srz_offset_n": ("SRz axis offset along +SN", " mm"),
 }
 TOLERANCE = 1e-3  # mm; below this a move is reported as not needed
-LARGE_FOUND_OFFSET = 0.3  # mm; a larger "Found here" correction hints at an outdated configuration
+LARGE_FOUND_OFFSET = 0.3  # mm; a larger "Found here" correction (x, H) hints at an outdated configuration
+PLATE_OFFSET_WARNING = 2.5  # mm; the plate goes into the holder 0-2 mm off in SZ: more hints at a wrong sample
 FOCUS_WARNING = 0.05  # mm from the analyzer focus; farther, the spectra would be distorted
 TRAVEL = {name: MOTOR_SPECS[name][1:3] for name in ("st", "sn", "sz")}  # kept up to date by set_motor_limits
 LIMIT_MOTORS = ("st", "sz", "sn", "srn", "srz")  # limits that can be changed by hand in the Configuration window

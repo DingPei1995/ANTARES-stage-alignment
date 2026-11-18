@@ -67,11 +67,12 @@ class CalibrationRecord:
         key = self.check.get("plate") if isinstance(self.check, dict) else None
         return str(key) if key else None
 
-    def config_for(self, plate: str | None) -> StageConfig:
+    def config_for(self, plate: str | None, offset_v: float = 0.0) -> StageConfig:
         """The stage constants for the plate `plate` (key) mounted now. The plate frame moves with the plate: a
         configuration made with another plate, seated at another height in the holder (PLATE_SEAT_V: the gating
-        plate sits higher), gets SZ0 and the SRn axis shifted; same plate (or same seat): unchanged."""
-        return config_for_plate(self.config, plate_seat_v(self.plate), plate_seat_v(plate))
+        plate sits higher), gets SZ0 and the SRn axis shifted; same plate (or same seat): unchanged. `offset_v`:
+        how much higher this plate sits than usual for its type (SampleLayout.plate_offset_v, from "found here")."""
+        return config_for_plate(self.config, plate_seat_v(self.plate), plate_seat_v(plate) + offset_v)
 
     def for_plate(self, plate: str | None) -> CalibrationRecord:
         """This record with its stage constants brought to the plate `plate` (config_for); the copy records that

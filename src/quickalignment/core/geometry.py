@@ -213,6 +213,9 @@ class Sample:
     width: float = 2.0
     height: float = 0.5
     devices: list[Device] = field(default_factory=list)
+    # SN read when the sample top surface was on the camera reference line (analyzer focal plane) at SRn ref,
+    # SRz 0 (height check, by eye); `height` follows from it. None: not checked.
+    sn_checked: float | None = None
 
     @property
     def kind(self) -> str:
@@ -242,6 +245,10 @@ Box = tuple[float, float, float, float, float, float, str]  # (u0, v0, u1, v1, w
 class SampleLayout:
     plate: PlateGeometry = field(default_factory=PlateGeometry)
     samples: list[Sample] = field(default_factory=list)
+    # How much higher (mm, along +v) this plate sits in the holder than the configuration expects for its type:
+    # the plate does not always go in at the same height (0-2 mm in SZ). Set by "found here" (the SZ offset of a
+    # found sample); shifts SZ0 / the SRn axis for all samples, the plate drawing and the samples stay.
+    plate_offset_v: float = 0.0
 
     def warnings(self, sample: Sample) -> list[str]:
         """Problems with one sample's placement (empty list if it is fine)."""
@@ -326,6 +333,7 @@ class SampleLayout:
             "SN = SN_f + H",
             "plate_type": self.plate.key,
             **({"custom_plate": custom_plate_params(self.plate)} if self.plate.key == "custom" else {}),
+            "plate_offset_v": self.plate_offset_v,
             "samples": [asdict(s) for s in self.samples],
         }
 
@@ -355,7 +363,8 @@ class SampleLayout:
                     raise ValueError(f"device {dev.name}: edges must be {X_EDGES} and {Y_EDGES}.")
                 devices.append(dev)
             samples.append(Sample(**_typed(raw, _FIELD_TYPES[Sample], "sample"), devices=devices))
-        return cls(plate=plate, samples=samples)
+        offset = _typed(data, {"plate_offset_v": float}, "layout").get("plate_offset_v", 0.0)
+        return cls(plate=plate, samples=samples, plate_offset_v=offset)
 
     def save(self, path: str | Path) -> None:
         write_json(path, self.to_dict())
@@ -367,7 +376,8 @@ class SampleLayout:
 
 _FIELD_TYPES = {
     Device: {"name": str, "x_edge": str, "dx": float, "y_edge": str, "dy": float, "length": float, "width": float},
-    Sample: {"name": str, "u": float, "v": float, "length": float, "width": float, "height": float},
+    Sample: {"name": str, "u": float, "v": float, "length": float, "width": float, "height": float,
+             "sn_checked": float},
 }
 
 
@@ -375,7 +385,7 @@ def _typed(raw: dict, types: dict, what: str) -> dict:
     """The known keys of raw, converted to their types (numbers must be finite)."""
     out = {}
     for key, kind in types.items():
-        if key not in raw:
+        if key not in raw or raw[key] is None:  # None: not set (optional values)
             continue
         value = raw[key]
         try:

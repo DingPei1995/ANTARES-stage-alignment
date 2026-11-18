@@ -128,6 +128,11 @@ TOOLS = [
           "photo_id": STR}, ["points_px"]),
     tool("align_update_sample", "alignment", "update_sample", "Change a sample (centre, size, height, name).",
          {"name": STR, "x": NUM, "y": NUM, "length": NUM, "width": NUM, "height": NUM, "new_name": STR}, ["name"]),
+    tool("align_check_height", "alignment", "check_height",
+         "Height check: SN read when the sample top surface is on the camera reference line (analyzer focal plane) "
+         "at SRn ref, SRz 0 gives its height H; bring_to_beam then keeps this SN for its targets.",
+         {"sample": STR, "sn": d("SN with the top surface on the reference line (by eye)", **NUM)},
+         ["sample", "sn"]),
     tool("align_remove_sample", "alignment", "remove_sample", "Remove a sample.", {"name": STR}, ["name"]),
     tool("align_clear_samples", "alignment", "clear_samples", "Remove all samples."),
     tool("align_add_device", "alignment", "add_device",
@@ -149,14 +154,16 @@ TOOLS = [
          "The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits.",
          {"motors": MOTORS_ARG, "optic_position": NUM}, ["motors"]),
     tool("align_bring_to_beam", "alignment", "bring_to_beam",
-         "ST / SZ putting a target on the beam with SN kept (correct_sn: also SN, onto the analyzer focus).",
+         "ST / SZ putting a target on the beam with SN kept (height-checked sample: the SN of its check; "
+         "correct_sn: also SN, onto the analyzer focus).",
          {"target": d("'sample', 'sample/device' or 'plate centre'", **STR), "motors": MOTORS_ARG, "correct_sn": BOOL},
          ["target"]),
     tool("align_beam_on", "alignment", "beam_on", "What the beam hits at these positions and the optic focus position.",
          {"motors": MOTORS_ARG, "optic_position": NUM}),
     tool("align_found_here", "alignment", "found_here",
-         "A target was found on the beam at these positions: move its sample there (at_focus false: SN not corrected, "
-         "H kept; configuration: positions read with an older configuration, H kept).",
+         "A target was found on the beam at these positions: the y (SZ) shift moves the whole plate in the holder "
+         "(plate offset, all samples), x and H correct its sample (at_focus false: SN not corrected, H kept; "
+         "configuration: positions read with an older configuration: the sample moves, H kept).",
          {"target": STR, "motors": MOTORS_ARG, "apply": d("false: only report the shift", **BOOL),
           "at_focus": d("true (default): SN put the target in the analyzer focus", **BOOL),
           "configuration": d("configuration the motor values were read with (default: the one in use)", **STR)},
@@ -263,6 +270,7 @@ TOOL_INDEX = {t["name"]: t for t in TOOLS}
 ACTING = {
     "align_start", "align_register_photo", "align_register_photo_3d", "align_manual_annotation",
     "align_load_annotation", "align_add_sample", "align_add_sample_from_photo", "align_update_sample",
+    "align_check_height",
     "align_remove_sample", "align_clear_samples", "align_add_device", "align_remove_device",
     "align_register_device_photo", "align_set_position", "align_found_here", "align_save_session",
     "align_load_session",

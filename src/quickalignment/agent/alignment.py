@@ -36,9 +36,14 @@ from ..alignment.rotation import relocate, wrap180
 from ..core.calibration import CalibrationRecord, CalibrationStore
 from ..core.collision import ACCEPTANCE_HALF_ANGLE, collisions, in_acceptance, motor_limits
 from ..core.geometry import PLATES, STANDARD_PLATE, X_EDGES, Y_EDGES, Device, Sample, SampleLayout, custom_plate
-from ..core.motors import FOCUS_WARNING, LARGE_FOUND_OFFSET, TOLERANCE, TRAVEL, out_of_range, set_motor_limits
+from ..core.motors import (
+    FOCUS_WARNING, LARGE_FOUND_OFFSET, PLATE_OFFSET_WARNING, TOLERANCE, TRAVEL, out_of_range, set_motor_limits,
+)
 from ..core.session import Session
-from ..core.stage import MotorPositions, StageModel, focus_correction, found_offset, sn_to_focus
+from ..core.stage import (
+    MotorPositions, StageModel, apply_found_offset, check_height, checked_sn, focus_correction, found_offset,
+    height_from_sn, sn_to_focus,
+)
 from .common import APIError, motors_dict, motors_from, number, optic_short, optic_type, rounded
 from .photos import grid_png, overlay_png, plate_png, read_image
 
@@ -184,7 +189,7 @@ class AlignmentSession:
 
     @property
     def model(self) -> StageModel:
-        return StageModel(self.record.config_for(self.layout.plate.key), self.layout.plate)
+        return StageModel(self.record.config_for(self.layout.plate.key, self.layout.plate_offset_v), self.layout.plate)
 
     def status(self) -> dict:
         self._need_start()
@@ -611,6 +616,8 @@ class AlignmentSession:
         for attr, value in (("u", x), ("v", y), ("length", length), ("width", width), ("height", height)):
             if value is not None:
                 setattr(s, attr, number(value, attr))
+        if height is not None:
+            s.sn_checked = None  # given by hand: no longer from the height check
         if new_name and new_name != s.name:
             s.name = self._unique(new_name)
         return {"sample": self._sample_info(s)}
@@ -660,6 +667,8 @@ class AlignmentSession:
     def _sample_info(self, s: Sample) -> dict:
         info = {"name": s.name, "x": s.u, "y": s.v, "length": s.length, "width": s.width, "height": s.height,
                 "warnings": self.layout.warnings(s)}
+        if s.sn_checked is not None:
+            info["height_checked_at_sn"] = s.sn_checked
         if s.devices:
             info["devices"] = [{"name": d.name, "x": d.position(s)[0], "y": d.position(s)[1],
                                 "warnings": self.layout.device_warnings(s, d)} for d in s.devices]
@@ -667,7 +676,27 @@ class AlignmentSession:
 
     def samples(self) -> dict:
         self._need_start()
-        return {"plate": self.layout.plate.name, "samples": [self._sample_info(s) for s in self.layout.samples]}
+        return {"plate": self.layout.plate.name, "plate_offset_mm": rounded(self.layout.plate_offset_v, 4),
+                "samples": [self._sample_info(s) for s in self.layout.samples]}
+
+    def check_height(self, sample: str, sn: float) -> dict:
+        """Height check: the top surface of `sample` was driven onto the camera reference line (the analyzer focal
+        plane) at SRn ref, SRz 0, at SN = sn (read by eye). Its height H follows; bring_to_beam then keeps this SN
+        for its targets (right at SRn ref, SRz 0, as the height was corrected with it)."""
+        self._need_start()
+        s = self._sample(sample)
+        sn = number(sn, "sn")
+        c = self.model.config
+        h = height_from_sn(c, sn, self.layout.plate)
+        if h < 0:
+            raise APIError(f"SN = {sn:g} puts the reference line {-h:.3f} mm below the plate top (SN_f = {c.sn_f:g}): "
+                           "check the SN value and the configuration.")
+        old = s.height
+        dh = check_height(c, self.layout, s, sn)
+        return {"sample": self._sample_info(s), "height_before": rounded(old, 4), "dH": rounded(dh, 4),
+                "note": f"H = SN - SN_f + 5.0 - plate top ({self.layout.plate.total_thickness:g}); SN read by eye "
+                        "(about ±0.05 mm).",
+                "positions": self.sample_positions()["positions"]}
 
     # ----------------------------------------------------------------------------------------- stage positions
     def _target(self, label: str):
@@ -714,13 +743,17 @@ class AlignmentSession:
             _, (u, v, w) = self._target(label)
             st, sz, sn = model.reference_motors(u, v, w)
             m = MotorPositions(st=st, sn=sn, sz=sz, srn=c.srn_ref, srz=0.0, pix=c.pi_center, piy=c.pi_center)
-            rows.append({"target": label, "x": rounded(u, 3), "y": rounded(v, 3), "ST": rounded(st), "SZ": rounded(sz),
-                         "SN": rounded(sn), "out_of_range": out_of_range(m)})
+            row = {"target": label, "x": rounded(u, 3), "y": rounded(v, 3), "ST": rounded(st), "SZ": rounded(sz),
+                   "SN": rounded(sn), "out_of_range": out_of_range(m)}
+            if label != "plate centre" and checked_sn(self.layout, label) is not None:
+                row["height_checked"] = True
+            rows.append(row)
         return {"rotation": {"SRn": c.srn_ref, "SRz": 0.0, "PIX": c.pi_center, "PIY": c.pi_center},
-                "configuration": self.record.label, "positions": rows,
+                "configuration": self.record.label, "plate_offset_mm": rounded(self.layout.plate_offset_v, 4),
+                "positions": rows,
                 "formula": f"ST = ST0 - x = {c.st0:g} - x, SZ = SZ0 - y = {c.sz0:g} - y, SN = SN_f + H (SN_f = {c.sn_f:g})",
                 "next": "Go to a position; when the target is really found elsewhere on the beam in the analyzer focus, "
-                        "give its ST, SZ, SN to found_here to correct its sample."}
+                        "give its ST, SZ, SN to found_here (SZ off: the plate sits at another height in the holder)."}
 
     def _collision_text(self, new: MotorPositions, optic_new: float | None) -> list[str]:
         model = self.model
@@ -756,15 +789,28 @@ class AlignmentSession:
 
     def bring_to_beam(self, target: str, motors: dict | None = None, correct_sn: bool = False) -> dict:
         """ST / SZ putting a target on the beam with SN kept (how the stage is run), at the given (or current)
-        SRn, SRz, piezo; with correct_sn also SN, so that it is on the analyzer focus."""
+        SRn, SRz, piezo; with correct_sn also SN, so that it is on the analyzer focus. A target whose sample height
+        was checked (check_height) keeps the SN of that check unless `motors` gives SN."""
         self._need_start()
         label, uvw = self._target(target)
         m = motors_from(motors, self._base_motors())
+        checked = checked_sn(self.layout, label)
+        sn_given = isinstance(motors, dict) and any(k.lower() == "sn" and v is not None for k, v in motors.items())
+        use_checked = checked is not None and not correct_sn and not sn_given
         if correct_sn:
             new = self.model.motors_for_target(*uvw, srn=m.srn, srz=m.srz, pix=m.pix, piy=m.piy)
         else:
-            new = self.model.motors_on_beam(*uvw, srn=m.srn, srz=m.srz, sn=m.sn, pix=m.pix, piy=m.piy)
+            sn = checked if use_checked else m.sn
+            new = self.model.motors_on_beam(*uvw, srn=m.srn, srz=m.srz, sn=sn, pix=m.pix, piy=m.piy)
         out = self._move_report(label, uvw, new)
+        if use_checked:
+            out["sn_from_height_check"] = rounded(checked)
+            if not out["focus_ok"]:
+                out["advice"] = ("SN kept from the height check (right at SRn ref, SRz 0); the optic refocuses on the "
+                                 "target. Do not correct SN unless the user asks.")
+            elif out["out_of_range"] or out["collisions"]:
+                out["advice"] = "Not reachable as it is: see out_of_range / collisions."
+            return out
         if not correct_sn and not out["focus_ok"]:
             out["advice"] = (f"{out['distance_from_analyzer_focus_um']:.0f} µm from the analyzer focus: the spectra would "
                              "be distorted. Call again with correct_sn=true to move SN as well.")
@@ -788,13 +834,16 @@ class AlignmentSession:
 
     def found_here(self, target: str, motors: dict, apply: bool = True, at_focus: bool = True,
                    configuration: str | None = None) -> dict:
-        """The target was found on the beam at these stage positions: its sample (with its devices) is moved on the
-        plate to where that puts it; the other samples and the configuration in use stay.
+        """The target was found on the beam at these stage positions. ST is usually right; SZ is off (0-2 mm) because
+        the plate does not always go into the holder at the same height, not because of the beam: the y shift moves
+        the whole plate in the holder (plate offset: SZ of every sample changes, the configuration and the drawing
+        stay), the x shift moves its sample (with its devices) and the height shift changes its H.
 
         at_focus: SN was set so that the target is in the analyzer focus (then its height H follows from SN too).
         false: SN was not corrected (only on the beam): x, y follow and H is kept.
         configuration: the motor values were read with another (older) configuration, e.g. a position noted months
-        ago; x, y follow from that configuration and H is kept (heights do not carry over between configurations)."""
+        ago (another mounting of the plate); x, y follow from that configuration and move the sample, H is kept
+        (heights do not carry over between configurations)."""
         self._need_start()
         label, uvw = self._target(target)
         if label == "plate centre":
@@ -812,20 +861,36 @@ class AlignmentSession:
             u, v, _ = model.lab_to_plate(m, hit)
             du, dv, dw = u - uvw[0], v - uvw[1], 0.0
         out = {"target": label, "stage": motors_dict(m), "shift_mm": rounded({"dx": du, "dy": dv, "dH": dw})}
+        plate_move = configuration is None  # an older configuration: another mounting, the sample moves as before
+        if plate_move:
+            out["plate_offset_mm"] = rounded({"before": self.layout.plate_offset_v,
+                                              "after": self.layout.plate_offset_v + dv}, 4)
+            out["how"] = ("dy: the plate sits at another height in the holder (not the beam): all samples move with it "
+                          f"(their SZ by {-dv:+.4f} mm); dx and dH: {sample.name} only.")
         if configuration is not None or not at_focus:
             out["height_kept"] = (f"H kept at {sample.height:.3f} mm; x, y from where the beam crosses the surface"
                                   + (f" with configuration {configuration!r}." if configuration else "."))
-        if max(abs(du), abs(dv), abs(dw)) > LARGE_FOUND_OFFSET:
-            out["warning"] = (f"More than {LARGE_FOUND_OFFSET:g} mm. If other samples show the same shift the "
-                              "configuration may be outdated (motors re-homed?): run a calibration "
-                              "(RealSampleCalibration or GoldFrameCalibration).")
+        if abs(du) > LARGE_FOUND_OFFSET:
+            out["warning"] = (f"x (ST) off by more than {LARGE_FOUND_OFFSET:g} mm: more likely the beam spot has moved "
+                              "(optic realigned?) than the sample. If other samples show the same ST shift, suggest an "
+                              "optics recalibration (RealSampleCalibration, mode optics) rather than moving samples.")
+        elif max([abs(dw)] + ([] if plate_move else [abs(dv)])) > LARGE_FOUND_OFFSET:
+            out["warning"] = (f"More than {LARGE_FOUND_OFFSET:g} mm in H (or y with an older configuration): check the "
+                              "height (check_height) or run a calibration.")
+        if plate_move and abs(self.layout.plate_offset_v + dv) > PLATE_OFFSET_WARNING:
+            out["warning_plate"] = (f"The plate would sit {self.layout.plate_offset_v + dv:+.2f} mm off its usual "
+                                    f"height (more than {PLATE_OFFSET_WARNING:g} mm): check that the right target "
+                                    "was found.")
         if apply:
-            sample.u += du
-            sample.v += dv
-            sample.height = max(sample.height + dw, 0.0)
-            if configuration is None:  # positions read with another configuration are not the stage now
+            if plate_move:
+                apply_found_offset(self.model.config, self.layout, sample, du, dv, dw)
                 self.motors = m
-            out["applied"] = f"{sample.name} moved; positions recomputed."
+            else:  # positions read with another configuration are not the stage now
+                sample.u += du
+                sample.v += dv
+                sample.height = max(sample.height + dw, 0.0)
+            out["applied"] = (f"plate offset {self.layout.plate_offset_v:+.4f} mm, {sample.name} corrected; "
+                              "positions recomputed." if plate_move else f"{sample.name} moved; positions recomputed.")
             out["sample"] = self._sample_info(sample)
             out["positions"] = self.sample_positions()["positions"]
         return out

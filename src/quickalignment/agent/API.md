@@ -48,6 +48,9 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    and/or read each sample's corners on the photo yourself -> align_add_sample_from_photo(points_px, height, name).
    The height H (sample thickness above the plate surface) is NOT visible from above: ask the user (default
    0.525 mm, a Si wafer). Name the samples as the user calls them. Check with align_photo_overlay.
+   Many users do not know H: offer the HEIGHT CHECK (before step 6): at SRn 120, SRz 0 they drive the sample top
+   surface onto the camera reference line (the analyzer focal plane) and read SN there (by eye, about ±0.05 mm);
+   align_check_height(sample, sn) sets H from it.
 5. Devices (small structures on a substrate): read them on the plate photo (align_add_device with photo_px), or on a
    microscope photo of the substrate registered with align_register_device_photo (2-4 point pairs: the same
    substrate corners / marks on the microscope photo and on the plate photo). Show align_photo_overlay again.
@@ -59,11 +62,14 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
 6. align_sample_positions: ST / SZ / SN of every sample and device at the start rotation (SRn 120, SRz 0, piezo
    150 / 150). Give the user this table.
 7. Feedback from the beamline:
-   - The user is at some position and wants another target: align_bring_to_beam(target, motors) (SN kept; if the
+   - The user is at some position and wants another target: align_bring_to_beam(target, motors) (SN kept; a
+     height-checked sample keeps the SN of its check: do not correct SN then unless the user asks; otherwise, if the
      result says the target is too far from the analyzer focus, call again with correct_sn=true).
-   - "Found S1 at ST=…, SZ=…, SN=…" (on the beam, in focus): align_found_here(target, motors). It moves that sample on
-     the plate (an error of the photo / drawing) and recomputes the positions. More than 0.3 mm for several samples:
-     suggest a calibration.
+   - "Found S1 at ST=…, SZ=…, SN=…" (on the beam, in focus): align_found_here(target, motors). ST is usually right;
+     SZ can be 0-2 mm off because the plate does not always go into the holder at the same height (not the beam):
+     the SZ shift moves the whole plate (plate offset, every sample's SZ), the ST shift and H correct that sample.
+     Positions are recomputed. A large ST shift (> 0.3 mm) points rather to the beam spot (optic realigned): if
+     several samples show it, suggest an optics recalibration instead of moving samples.
    - The user says a sample is elsewhere / bigger / has another height: align_update_sample.
    - Rotation: align_rotate(srn, srz, motors=position with the point on the beam) gives ST, SZ, SN and the optic
      position (two answers: SN kept, and SN corrected; follow "recommended"). To turn an edge seen on the photo
@@ -114,7 +120,7 @@ RULES
 
 Prompts: `start`, `find_samples`, `calibrate`
 
-## 2. MCP tools (62)
+## 2. MCP tools (63)
 
 `*` = required. **acts**: changes the session, a file or a window; the others only read.
 
@@ -142,6 +148,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `align_add_sample` | **acts** | `x*` (number), `y*` (number), `length*` (number), `width*` (number), `height` (number), `name` (string) | Add a rectangular sample (plate mm). |
 | `align_add_sample_from_photo` | **acts** | `points_px*` (array), `height` (number), `name` (string), `photo_id` (string) | Add a sample from its corners read on the plate photo (4 corners, or 2 opposite corners). |
 | `align_update_sample` | **acts** | `name*` (string), `x` (number), `y` (number), `length` (number), `width` (number), `height` (number), `new_name` (string) | Change a sample (centre, size, height, name). |
+| `align_check_height` | **acts** | `sample*` (string), `sn*` (number) | Height check: SN read when the sample top surface is on the camera reference line (analyzer focal plane) at SRn ref, SRz 0 gives its height H; bring_to_beam then keeps this SN for its targets. |
 | `align_remove_sample` | **acts** | `name*` (string) | Remove a sample. |
 | `align_clear_samples` | **acts** | - | Remove all samples. |
 | `align_add_device` | **acts** | `sample*` (string), `name` (string), `x` (number), `y` (number), `photo_px` (array), `photo_id` (string), `x_edge` (string), `y_edge` (string), `size_mm` (number) | Add a device on a substrate at plate (x, y) mm or at a pixel of a registered photo (plate or microscope). |
@@ -150,9 +157,9 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `align_samples` | reads | - | The samples and devices with their warnings. |
 | `align_sample_positions` | reads | - | ST / SZ / SN of every sample and device at the start rotation (SRn ref, SRz 0, piezo centred). |
 | `align_set_position` | **acts** | `motors*` (object), `optic_position` (number) | The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits. |
-| `align_bring_to_beam` | reads | `target*` (string), `motors` (object), `correct_sn` (boolean) | ST / SZ putting a target on the beam with SN kept (correct_sn: also SN, onto the analyzer focus). |
+| `align_bring_to_beam` | reads | `target*` (string), `motors` (object), `correct_sn` (boolean) | ST / SZ putting a target on the beam with SN kept (height-checked sample: the SN of its check; correct_sn: also SN, onto the analyzer focus). |
 | `align_beam_on` | reads | `motors` (object), `optic_position` (number) | What the beam hits at these positions and the optic focus position. |
-| `align_found_here` | **acts** | `target*` (string), `motors*` (object), `apply` (boolean), `at_focus` (boolean), `configuration` (string) | A target was found on the beam at these positions: move its sample there (at_focus false: SN not corrected, H kept; configuration: positions read with an older configuration, H kept). |
+| `align_found_here` | **acts** | `target*` (string), `motors*` (object), `apply` (boolean), `at_focus` (boolean), `configuration` (string) | A target was found on the beam at these positions: the y (SZ) shift moves the whole plate in the holder (plate offset, all samples), x and H correct its sample (at_focus false: SN not corrected, H kept; configuration: positions read with an older configuration: the sample moves, H kept). |
 | `align_rotate` | reads | `srn*` (number), `srz` (number), `motors` (object), `measured_optic` (number), `target` (string) | New ST / SZ / SN and optic position after turning SRn / SRz, keeping the point now on the beam. |
 | `align_align_edge` | reads | `p1*` (array), `p2*` (array), `along` (string), `photo_id` (string), `plate_mm` (boolean), `current_srn` (number) | SRn turning an edge (two points: photo px, or plate mm with plate_mm=true) along or across the slit. |
 | `align_bz_angles` | reads | `lattice_a*` (number), `hv_map*` (number), `gamma*` (array), `ref_point*` (array), `ref_label` (string), `feature` (string), `line` (integer), `hv` (number), `map_srn` (number), `map_srz` (number), `binding` (number) | SRn / SRz putting a hexagonal Brillouin-zone point at the slit centre (from a measured map's angles). |
@@ -194,15 +201,16 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `add_sample_from_photo(points_px, height: 'float \| None' = None, name: 'str \| None' = None, photo_id: 'str \| None' = None) -> 'dict'` | A sample from points read on the plate photo: its 4 corners (any order), or 2 opposite corners of its box. The sample is the plate rectangle around them; its in-plane angle is reported. |
 | `align_edge(p1, p2, along: 'str' = 'slit', photo_id: 'str \| None' = None, plate_mm: 'bool' = False, current_srn: 'float \| None' = None) -> 'dict'` | SRn turning a straight edge (two points on it: photo pixels of a registered photo, or plate mm with plate_mm=true) along the analyzer slit (horizontal at ANTARES) or across it ('vertical'). |
 | `beam_on(motors: 'dict \| None' = None, optic_position: 'float \| None' = None) -> 'dict'` | What the beam hits at these (or the current) positions, and the optic position focusing there. |
-| `bring_to_beam(target: 'str', motors: 'dict \| None' = None, correct_sn: 'bool' = False) -> 'dict'` | ST / SZ putting a target on the beam with SN kept (how the stage is run), at the given (or current) SRn, SRz, piezo; with correct_sn also SN, so that it is on the analyzer focus. |
+| `bring_to_beam(target: 'str', motors: 'dict \| None' = None, correct_sn: 'bool' = False) -> 'dict'` | ST / SZ putting a target on the beam with SN kept (how the stage is run), at the given (or current) SRn, SRz, piezo; with correct_sn also SN, so that it is on the analyzer focus. A target whose sample height was checked (check_height) keeps the SN of that check unless `motors` gives SN. |
 | `bz_angles(lattice_a: 'float', hv_map: 'float', gamma: 'list', ref_point: 'list', ref_label: 'str' = 'K', feature: 'str' = 'K', line: 'int' = 0, hv: 'float \| None' = None, map_srn: 'float \| None' = None, map_srz: 'float \| None' = None, binding: 'float' = 0.0) -> 'dict'` | SRn / SRz putting a 2-D hexagonal Brillouin-zone point (Γ, K, K', M) at the slit centre with the slit along a high-symmetry line, from a measured map (ARPES viewer angles θ = deflector, φ = along the slit). |
 | `bz_point_to(lattice_a: 'float', hv_map: 'float', ref_point: 'list', map_srn: 'float', map_srz: 'float', ref_label: 'str' = 'K', hv: 'float \| None' = None, target_angles: 'list \| None' = None, gamma: 'list \| None' = None, keep_srn: 'bool' = False, binding: 'float' = 0.0, sample: 'str \| None' = None) -> 'dict'` | SRn / SRz putting a K or M point read on a map (θ = deflector, φ = slit, ARPES viewer) at chosen analyzer angles at another photon energy. Γ is optional: without it the surface tilt is estimated from \|Γ–point\|. keep_srn: keep the in-plane orientation (slit already along Γ–K / Γ–M) and turn SRz only. With `sample`, also the ST / SZ / SN putting it at the analyzer focus there. |
+| `check_height(sample: 'str', sn: 'float') -> 'dict'` | Height check: the top surface of `sample` was driven onto the camera reference line (the analyzer focal plane) at SRn ref, SRz 0, at SN = sn (read by eye). Its height H follows; bring_to_beam then keeps this SN for its targets (right at SRn ref, SRz 0, as the height was corrected with it). |
 | `clear_samples() -> 'dict'` | - |
 | `collision_check(motors: 'dict \| None' = None, optic_position: 'float \| None' = None) -> 'dict'` | Does the plate touch the analyzer / optic at these positions, and how far can each motor go. |
 | `configurations(optic: 'str \| None' = None) -> 'dict'` | - |
 | `current_optic() -> 'float'` | - |
 | `detect_samples(photo_id: 'str \| None' = None, threshold: 'float' = 12.0, min_area_mm2: 'float' = 0.2, sample_colors_px=None, background_px=None) -> 'dict'` | Samples found by colour on the registered plate photo (nothing is added): boxes in plate mm. |
-| `found_here(target: 'str', motors: 'dict', apply: 'bool' = True, at_focus: 'bool' = True, configuration: 'str \| None' = None) -> 'dict'` | The target was found on the beam at these stage positions: its sample (with its devices) is moved on the plate to where that puts it; the other samples and the configuration in use stay. |
+| `found_here(target: 'str', motors: 'dict', apply: 'bool' = True, at_focus: 'bool' = True, configuration: 'str \| None' = None) -> 'dict'` | The target was found on the beam at these stage positions. ST is usually right; SZ is off (0-2 mm) because the plate does not always go into the holder at the same height, not because of the beam: the y shift moves the whole plate in the holder (plate offset: SZ of every sample changes, the configuration and the drawing stay), the x shift moves its sample (with its devices) and the height shift changes its H. |
 | `load_annotation(path: 'str \| None' = None, wait: 'bool' = False) -> 'dict'` | Read the result of the manual-annotation window into the plate (replacing the samples if the user chose so in the window, else adding them). |
 | `load_session(path: 'str', optic: 'str \| None' = None) -> 'dict'` | - |
 | `manual_annotation(photo_id: 'str \| None' = None) -> 'dict'` | Open the "Samples from a photo" window on the user's screen with this photo and its registration, so the user marks / corrects the samples and devices by hand (when they are not satisfied with what was found). Returns at once; call load_annotation when the user has pressed OK. |

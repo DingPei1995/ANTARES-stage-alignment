@@ -62,8 +62,9 @@ def test_custom_plate(tmp_path):
         custom_plate(20.0, 4.0, 8.0)  # wider than the back plate
     with pytest.raises(ValueError):
         custom_plate(6.0, 4.0, 1.0)  # below the back plate
-    with pytest.raises(ValueError, match="at least 5"):
-        custom_plate(6.0, 4.0, 4.9)  # lower than the standard riser: the holder stands out below the plate
+    with pytest.raises(ValueError, match="at least 4.5"):
+        custom_plate(6.0, 4.0, 4.4)  # the holder, standing out below the plate, would touch the OSA
+    assert custom_plate(6.0, 4.0, 4.5).total_thickness == 4.5
     assert custom_plate(6.0, 4.0, 5.0).total_thickness == 5.0
     shifted = custom_plate(6.0, 4.0, 8.2, center_y=-5.75)  # flush with the bottom edge
     assert shifted.riser_bounds() == (-3.0, -7.75, 3.0, -3.75)

@@ -48,7 +48,7 @@ def test_start_asks_for_what_is_missing(api):
         api.alignment.sample_positions()
     with pytest.raises(APIError, match="custom_plate_mm"):
         api.alignment.start("custom", "capillary")
-    with pytest.raises(APIError, match="at least 5"):  # lower than the standard riser
+    with pytest.raises(APIError, match="at least 4.5"):  # the holder would touch the OSA
         api.alignment.start("custom", "zone plate", {"length": 8, "width": 6, "height": 4.2})
     out = api.alignment.start("custom", "zone plate", {"length": 8, "width": 6, "height": 6.2})
     assert out["optic"] == "zone plate + OSA" and "Custom plate" in out["plate"]

@@ -131,10 +131,13 @@ def plate_seat_v(key: str | None) -> float:
 SN_REFERENCE_W = STANDARD_PLATE.total_thickness
 
 
-# Lowest block top of a custom plate (mm above the back face): the standard riser height. The sample holder has a
-# part standing out about 2 mm above the 5 mm riser, below the plate; a lower block would bring it closer to the OSA /
-# capillary when the sample surface is in the analyzer focal plane (beamline decision 2026-11-17).
-CUSTOM_MIN_HEIGHT = STANDARD_PLATE.total_thickness
+# Lowest block top of a custom plate (mm above the back face). The sample holder stands out below the plate; a lower
+# block brings it closer to the OSA / capillary when the sample surface is in the analyzer focal plane. Checked on the
+# anti-collision model of the stage and optics (2026-11-18; block 11 x 15.5 mm, bare block top in focus at its centre
+# and corners, SRn 100-140, SRz 0 to -25, zone plate + OSA and capillary, margin 0.1 mm): 3.5 and 4.0 mm let the
+# holder touch the OSA with the lower block corner on the beam at SRn 120, SRz 0; 4.5 mm is free, closest 0.19 mm
+# (holder / OSA). Was 5.0 (beamline decision 2026-11-17).
+CUSTOM_MIN_HEIGHT = 4.5
 
 
 def custom_plate(length: float, width: float, height: float, center_y: float = 0.0) -> PlateGeometry:
@@ -148,7 +151,7 @@ def custom_plate(length: float, width: float, height: float, center_y: float = 0
         raise ValueError(f"The block must fit on the {base.width:g} × {base.height:g} mm back plate.")
     if height < CUSTOM_MIN_HEIGHT - eps:
         raise ValueError(f"The block top must be at least {CUSTOM_MIN_HEIGHT:g} mm above the back face of the plate "
-                         "(as the standard riser): the sample holder stands out below the plate.")
+                         "(standard riser: 5.0): the sample holder stands out below the plate.")
     return PlateGeometry(
         key="custom",
         name=f"Custom plate ({length:g} × {width:g} mm at y = {center_y:g}, height {height:g} mm)",

@@ -50,7 +50,7 @@ At every start the program asks which **sample plate** is mounted and which **fo
 - **Standard Ta plate**: 18 × 15.5 mm back plate with an 11 mm wide raised part, 5.0 mm high.
 - **Gating plate**: the same, with a contact block (3 gold pads, 4 screws); samples go only on the 11 × 10.5 mm above
   the block.
-- **Custom plate**: the back plate with your own block (length, width, centre y and height from the back face).
+- **Custom plate**: the back plate with your own block (length, width, centre y and height from the back face; the height must be at least 4.5 mm: lower, the sample holder would touch the OSA).
 - **Optic**: *zone plate + OSA* (95 eV only) or *capillary* (30–180 eV). The newest configuration made by the
   beamline staff for that optic is loaded (shown in the toolbar).
 
@@ -61,7 +61,7 @@ At every start the program asks which **sample plate** is mounted and which **fo
 | x, y | position on the plate (mm), front view with the tab up, origin = centre of the back plate | – |
 | H | sample height above the plate surface (mm) | – |
 | ST | along the analyzer focal plane; ST < 0 moves the sample upper-left (top view) | −9 … 9 mm |
-| SN | perpendicular to the analyzer focal plane; SN = 65 is the transfer position | −30 … 65 mm; below SN_f the limit is a collision (see *Anti-collision*) |
+| SN | perpendicular to the analyzer focal plane; SN = 65 is the transfer position | −12 … 65 mm; below SN_f a collision can come first (see *Anti-collision*) |
 | SZ | vertical | 35 … 45 mm |
 | SRn | azimuth about the sample normal; SRn = 120°: plate vertical, tab up | usable 60 … 180° |
 | SRz | rotation about the vertical; SRz = 0: plate parallel to the analyzer focal plane | usable −25 … +10° |
@@ -229,7 +229,7 @@ be wrong.
 
 After *Update*, the line under the motors gives the **collision-free range** of ST, SN and SZ at the entered positions
 (one motor moved, the others and the optic kept) and what sets each limit, e.g. *SN −4.1 (OSA) … 65*. The top view
-draws the analyzer nose (MBS A1, 30 mm from the focus), the zone plate and OSA (thin plates; the OSA stays where it is
+draws the analyzer nose (MBS A1, 35 mm from the focus), the zone plate and OSA (thin plates; the OSA stays where it is
 when the zone plate refocuses) or the capillary at scale, in red when the plate touches them. *Bring target onto the
 beam*, *Correct SN* and the Rotate tab refuse a position where the plate would touch something. Lowering SN brings the
 surface towards the optic and the analyzer: SN is limited from below only. ST and SZ are free for a plate parallel to

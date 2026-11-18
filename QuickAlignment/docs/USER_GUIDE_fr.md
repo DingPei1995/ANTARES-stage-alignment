@@ -52,7 +52,7 @@ utilisée :
 - **Gating plate** : la même, avec un bloc de contact (3 plots en or, 4 vis) ; les échantillons vont seulement sur
   les 11 × 10,5 mm au-dessus du bloc.
 - **Custom plate** : la plaquette de base avec votre propre bloc (longueur, largeur, centre y, hauteur depuis la face
-  arrière).
+  arrière ; au moins 4.5 mm : plus bas, le porte-échantillon toucherait l'OSA).
 - **Optique** : *zone plate + OSA* (95 eV uniquement) ou *capillary* (30–180 eV). La configuration la plus récente
   faite par le personnel de la ligne pour cette optique est chargée (affichée dans la barre d'outils).
 
@@ -63,7 +63,7 @@ utilisée :
 | x, y | position sur la plaquette (mm), vue de face, languette en haut, origine = centre de la plaquette | – |
 | H | hauteur de l'échantillon au-dessus de la surface de la plaquette (mm) | – |
 | ST | le long du plan focal de l'analyseur ; ST < 0 déplace l'échantillon vers le haut à gauche (vue de dessus) | −9 … 9 mm |
-| SN | perpendiculaire au plan focal de l'analyseur ; SN = 65 est la position de transfert | −30 … 65 mm ; sous SN_f la limite est une collision (voir *Anticollision*) |
+| SN | perpendiculaire au plan focal de l'analyseur ; SN = 65 est la position de transfert | −12 … 65 mm ; sous SN_f une collision peut venir avant (voir *Anticollision*) |
 | SZ | vertical | 35 … 45 mm |
 | SRn | azimut autour de la normale ; SRn = 120° : plaquette verticale, languette en haut | utilisable 60 … 180° |
 | SRz | rotation autour de la verticale ; SRz = 0 : plaquette parallèle au plan focal | utilisable −25 … +10° |
@@ -242,7 +242,7 @@ gardé, le point n'est en général pas au foyer de l'analyseur, et ΔH serait f
 
 Après *Update*, la ligne sous les moteurs donne la **plage sans collision** de ST, SN et SZ aux positions entrées (un
 moteur déplacé, les autres et l'optique gardés) et ce qui fixe chaque limite, par ex. *SN −4.1 (OSA) … 65*. La vue de
-dessus montre à l'échelle le nez de l'analyseur (MBS A1, à 30 mm du foyer), la zone plate et l'OSA (plaques minces ;
+dessus montre à l'échelle le nez de l'analyseur (MBS A1, à 35 mm du foyer), la zone plate et l'OSA (plaques minces ;
 l'OSA ne bouge pas quand la zone plate refocalise) ou le capillaire, en rouge quand la plaquette les touche. *Bring
 target onto the beam*, *Correct SN* et l'onglet Rotate refusent une position où la plaquette toucherait quelque
 chose. Baisser SN rapproche la surface de l'optique et de l'analyseur : SN n'est limité que vers le bas. ST et SZ sont

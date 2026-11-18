@@ -254,13 +254,16 @@ class PhotoRegistration(QtWidgets.QWidget):
         self.cursor_text: Callable[[float, float], str] | None = None  # extra text for the cursor read-out
         self._photo_overlay: list[QtWidgets.QGraphicsItem] = []
         self._overlay_shapes: list = []
+        self._corner_lines: list[QtWidgets.QGraphicsItem] = []  # lines joining the clicked points
+        self._rubber: list[QtWidgets.QGraphicsLineItem] = []  # dashed: last point -> cursor while picking
+        self._cursor: tuple[float, float] | None = None
 
         self.photo_scene = QtWidgets.QGraphicsScene(self)
         self.photo_view = ZoomView(self.photo_scene)
         self.photo_view.clicked.connect(self._on_photo_click)
         self.photo_view.hovered.connect(self._on_photo_hover)
-        self.photo_view.left.connect(lambda: self.cursor_label.setText(self._idle_cursor_text()))
-        self.photo_item = QtWidgets.QGraphicsPixmapItem()
+        self.photo_view.left.connect(self._on_photo_leave)
+        self.photo_item =QtWidgets.QGraphicsPixmapItem()
         self.photo_item.setTransformationMode(Qt.SmoothTransformation)
         self.photo_scene.addItem(self.photo_item)
 
@@ -437,6 +440,65 @@ class PhotoRegistration(QtWidgets.QWidget):
     def _on_corner_moved(self) -> None:
         if len(self.corners) == len(self.ref_points):
             self._registration_changed()
+        else:
+            self._redraw_corner_lines()
+
+    # -- lines joining the clicked points: the user sees whether they follow the plate edges --
+    def _corner_groups(self) -> list[tuple[list[int], bool]]:
+        """Point indices joined by lines, and whether the group closes: the four sample-area corners (a closed
+        outline); in 3D mode also the back plate top edge and the tab top edge."""
+        groups = [([0, 1, 2, 3], True)]
+        if self.use_3d:
+            groups += [([4, 5], False), ([6, 7], False)]
+        return [(g, closed) for g, closed in groups if g[-1] < len(self.ref_points)]
+
+    def _redraw_corner_lines(self) -> None:
+        for it in self._corner_lines:
+            self.photo_scene.removeItem(it)
+        self._corner_lines = []
+        pts = self.corner_positions()
+        pen = cosmetic_pen(COLOR_CORNER, 1.5)
+        for group, closed in self._corner_groups():
+            placed = [pts[i] for i in group if i < len(pts)]
+            if len(placed) < 2:
+                continue
+            if closed and len(placed) == len(group):
+                placed.append(placed[0])
+            path = QtGui.QPainterPath(QtCore.QPointF(*placed[0]))
+            for p in placed[1:]:
+                path.lineTo(QtCore.QPointF(*p))
+            item = self.photo_scene.addPath(path, pen)
+            item.setZValue(15)
+            item.setAcceptedMouseButtons(Qt.NoButton)
+            self._corner_lines.append(item)
+        self._redraw_rubber()
+
+    def _redraw_rubber(self) -> None:
+        """Dashed line(s) from the last point of the group being clicked to the cursor (and back to its first point
+        before the last corner of a closed outline), so the next edge can be followed before clicking."""
+        for it in self._rubber:
+            self.photo_scene.removeItem(it)
+        self._rubber = []
+        n = len(self.corners)
+        if self._cursor is None or self.photo is None or n >= len(self.ref_points):
+            return
+        cx, cy = self._cursor
+        pts = self.corner_positions()
+        pen = cosmetic_pen(COLOR_NEXT, 1.2, Qt.DashLine)
+        for group, closed in self._corner_groups():
+            if n not in group or group.index(n) == 0:
+                continue
+            ends = [pts[n - 1]] + ([pts[group[0]]] if closed and n == group[-1] else [])
+            for x, y in ends:
+                item = self.photo_scene.addLine(x, y, cx, cy, pen)
+                item.setZValue(15)
+                item.setAcceptedMouseButtons(Qt.NoButton)
+                self._rubber.append(item)
+
+    def _on_photo_leave(self) -> None:
+        self._cursor = None
+        self._redraw_rubber()
+        self.cursor_label.setText(self._idle_cursor_text())
 
     def _on_photo_click(self, x: float, y: float) -> None:
         if self.photo is None:
@@ -466,6 +528,7 @@ class PhotoRegistration(QtWidgets.QWidget):
             except ValueError as exc:
                 self.h, self.error = None, str(exc)
         self._update_markers()
+        self._redraw_corner_lines()
         if self.rectified is None:
             self.rect_item.setPixmap(QtGui.QPixmap())
         else:
@@ -521,5 +584,8 @@ class PhotoRegistration(QtWidgets.QWidget):
         self.cursor_label.setText(f"cursor: x = {u:7.3f} mm, y = {v:7.3f} mm on the plate" + (f"   {extra}" if extra else ""))
 
     def _on_photo_hover(self, x: float, y: float) -> None:
+        self._cursor = (x, y)
+        if self.photo is not None and len(self.corners) < len(self.ref_points):
+            self._redraw_rubber()
         if self.h is not None:
             self._show_cursor(*self.photo_to_plate(x, y))

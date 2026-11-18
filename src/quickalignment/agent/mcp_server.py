@@ -69,7 +69,7 @@ TOOLS = [
          "Start finding samples on a plate: plate type, optic and (default newest) configuration. Clears the samples.",
          {"plate": d("'standard', 'gating' or 'custom'", **STR), "optic": OPTIC,
           "custom_plate_mm": d("custom plate: {length, width, height, center_y} in mm; height (block top above the "
-                               "back face) at least 5.0", type="object"),
+                               "back face) at least 4.5", type="object"),
           "configuration": d("configuration label or file name (default: newest for the optic)", **STR)},
          ["plate", "optic"]),
     tool("align_status", "alignment", "status", "Plate, configuration, samples, photos and stage position of the session."),

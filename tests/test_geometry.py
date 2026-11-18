@@ -62,6 +62,9 @@ def test_custom_plate(tmp_path):
         custom_plate(20.0, 4.0, 8.0)  # wider than the back plate
     with pytest.raises(ValueError):
         custom_plate(6.0, 4.0, 1.0)  # below the back plate
+    with pytest.raises(ValueError, match="at least 5"):
+        custom_plate(6.0, 4.0, 4.9)  # lower than the standard riser: the holder stands out below the plate
+    assert custom_plate(6.0, 4.0, 5.0).total_thickness == 5.0
     shifted = custom_plate(6.0, 4.0, 8.2, center_y=-5.75)  # flush with the bottom edge
     assert shifted.riser_bounds() == (-3.0, -7.75, 3.0, -3.75)
     assert SampleLayout.from_dict(SampleLayout(plate=shifted).to_dict()).plate == shifted

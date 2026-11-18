@@ -87,9 +87,10 @@ def test_capillary_limit_and_analyzer():
     assert first == "capillary head"
     lim = motor_limits(model, m, layout, CAP, [0.0], TRAVEL)["sn"]
     assert lim.lo_by == "capillary" and rooms[first] <= m.sn - lim.lo < rooms[first] + SAMPLING_ALLOWANCE
-    # without the optic the analyzer nose, 30 mm from the focal plane, is the limit
+    # without the optic the analyzer nose, 35 mm from the focal plane, is the limit (beyond the SN travel of -30,
+    # so the travel is widened here)
     bare = replace(CAP, optics=())
-    lim = motor_limits(model, m, layout, bare, [0.0], TRAVEL)["sn"]
+    lim = motor_limits(model, m, layout, bare, [0.0], dict(TRAVEL, sn=(-45.0, 65.0)))["sn"]
     assert lim.lo_by == "analyzer (MBS A1)"
     assert lim.lo == pytest.approx(m.sn - (bare.analyzer.distance - grown(bare)), abs=0.03)
 
@@ -200,3 +201,15 @@ def test_sheet_inside_and_roundtrip():
     assert CollisionGeometry.from_dict(data).optics[0] == sheet
     with pytest.raises(ValueError):
         CollisionGeometry.from_dict({"optics": [{"name": "S", "points": [[0, 1]]}]})
+
+
+def test_analyzer_from_the_mbs_a1_drawing():
+    from quickalignment.core.collision import ANALYZER_A1 as a
+    # front face 35 mm from the focus; edge on the line 9.1 mm from the 45 deg line through the sample centre
+    assert a.distance == 35.0
+    assert a.tip_radius == pytest.approx(35.0 - 9.1 * np.sqrt(2), abs=0.01)
+    assert a.half_angle == 45.0
+    assert a.radius_at(a.distance + a.length) == pytest.approx(75.0, abs=0.01)  # up to the 150 mm body
+    # the drawn lens is inside the model: the Ø52 nose (to 15 mm behind the front) and the shoulder corner
+    for s, r in ((35.0, 22.0), (38.9, 26.0), (50.0, 26.0), (50.0, 37.1)):
+        assert a.radius_at(s) >= r - 0.01

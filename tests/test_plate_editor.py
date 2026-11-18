@@ -8,6 +8,7 @@ from dataclasses import replace  # noqa: E402
 
 from quickalignment.core.geometry import Device, Sample, SampleLayout  # noqa: E402
 from quickalignment.core.session import Session  # noqa: E402
+from quickalignment.core.stage import MotorPositions  # noqa: E402
 from quickalignment.ui.main_window import MainWindow  # noqa: E402
 
 QtCore, QtGui, QtWidgets = qt.QtCore, qt.QtGui, qt.QtWidgets
@@ -576,8 +577,8 @@ def test_motor_ranges(window, monkeypatch):
     from quickalignment.ui.stage_panel import out_of_range
 
     assert out_of_range(MotorPositions()) == []
-    assert out_of_range(MotorPositions(st=10, sn=-31, sz=34)) == [
-        "ST = 10.0000 (range -9 … 9)", "SN = -31.0000 (range -30 … 65)", "SZ = 34.0000 (range 35 … 45)"]
+    assert out_of_range(MotorPositions(st=10, sn=-13, sz=34)) == [
+        "ST = 10.0000 (range -9 … 9)", "SN = -13.0000 (range -12 … 65)", "SZ = 34.0000 (range 35 … 45)"]
 
     # y = 6 needs SZ = SZ0 - 6 = 34 at SRn = 120: refused, positions unchanged
     ed, st = window.editor, window.stage
@@ -689,10 +690,12 @@ def test_found_device_corrects_its_sample(window, monkeypatch):
     st.found_combo.setCurrentText("Sub/D1")
     du, dv, dw = st.correct_from_found()
     assert (du, dv, dw) == pytest.approx((0.2, -0.1, 0.05), abs=1e-4)
-    # only that sample (with its devices) moved, and the editor shows it; no configuration change
-    assert (sub.u, sub.v, sub.height) == pytest.approx((1.2, -1.1, 0.55), abs=1e-4)
-    assert d2.position(sub) == pytest.approx((2.2, -0.1), abs=1e-4)
+    # x and H: only that sample (with its devices), the editor shows it; y: the whole plate sits 0.1 mm lower in the
+    # holder (plate offset), the drawing stays; no configuration change
+    assert (sub.u, sub.v, sub.height) == pytest.approx((1.2, -1.0, 0.55), abs=1e-4)
+    assert d2.position(sub) == pytest.approx((2.2, 0.0), abs=1e-4)
     assert (other.u, other.v, other.height) == (-3.0, 3.0, 0.3)
+    assert ed.layout_model.plate_offset_v == pytest.approx(-0.1, abs=1e-4)
     assert ed.items[id(sub)].pos().x() == pytest.approx(1.2, abs=1e-4)
     assert ed.table.item(0, 2).text() == "1.200"
     assert st.record is record and not window.store.folder.exists()
@@ -701,6 +704,32 @@ def test_found_device_corrects_its_sample(window, monkeypatch):
     st.bring_target_to_focus()
     m = st.motors.value()
     assert (m.st, m.sz, m.sn) == pytest.approx((found.st, found.sz, found.sn), abs=1e-4)
+
+
+def test_height_check_then_bring_to_beam_keeps_its_sn(window, monkeypatch):
+    ed, st = window.editor, window.stage
+    s = ed.add_sample(Sample("S1", u=1.0, v=1.0, length=2, width=2, height=0.525))
+    ed.add_sample(Sample("S2", u=-3.0, v=1.0, length=2, width=2, height=0.525))
+    sn_f = st.config().sn_f
+    ed.check_combo.setCurrentText("S1")
+    ed.check_sn.setValue(sn_f + 0.8)
+    assert ed.apply_height_check() == pytest.approx(0.8 - 0.525)
+    assert s.height == pytest.approx(0.8) and s.sn_checked == pytest.approx(sn_f + 0.8)
+    assert "S1: SN" in ed.check_label.text()
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: QtWidgets.QMessageBox.Yes)
+    ed.confirm_samples_placed()
+    assert "(H checked)" in st.start_label.text()
+    # turned, with another SN in the field: the SN of the check is kept, no "Correct SN?" prompt
+    m = st.motors.value()
+    st.motors.set_value(MotorPositions(st=m.st, sn=sn_f + 2.0, sz=m.sz, srn=140.0, srz=-10.0, pix=m.pix, piy=m.piy))
+    st.target_combo.setCurrentText("S1")
+    new = st.bring_target_on_beam()
+    assert new is not None and new.sn == pytest.approx(sn_f + 0.8)
+    assert "height check" in st.goto_label.text() and "Correct SN?" not in st.goto_label.text()
+    # typing H by hand drops the check
+    row = ed.layout_model.samples.index(s)
+    ed.table.item(row, 6).setText("0.600")
+    assert s.sn_checked is None
 
 
 def test_real_sample_calibration_asks_what_was_recalibrated(tmp_path):

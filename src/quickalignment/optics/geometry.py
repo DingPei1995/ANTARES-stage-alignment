@@ -1,7 +1,7 @@
 """3-D geometry of the focusing optics: zone plate (ZP) and capillary on the shared ZPZ carriage.
 
-Separate from the stage model: nothing here is used by QuickAlignment, RealSampleCalibration or
-GoldFrameCalibration. It runs through its own program (OpticsGeometry/OpticsGeometry.py).
+Separate from the stage model: nothing here is used by QuickAlignment or RealSampleCalibration.
+It runs through its own program (OpticsGeometry/OpticsGeometry.py).
 
 Lab frame of `quickalignment.core.stage`, mm: origin = analyzer focus, +x right, +y along the beam
 (downstream), +z up. The analyzer sits at -n = (-1, -1, 0)/sqrt2, so "towards the analyzer" across the

@@ -64,12 +64,15 @@ optic are kept. How the constants are computed from the sets and the test points
 
 | optic | file | how it was made |
 |---|---|---|
-| zone plate | `configs/calibration_2026-11-15_151356_zone_plate.json` | optics mode on sample Cav (gating plate) + SRn / SRz axes from zone-plate SPEM point tracking |
+| zone plate | `configs/calibration_2026-11-19_123901_zone_plate.json` | standard plate, 2026-11-19: ST0 / SZ0 from one device found on the beam at SRn 120 / SRz 0 (zone-plate working distance, SN_f and the rotation axes of the 2026-11-17 configuration kept) |
 | capillary | `configs/calibration_2026-11-15_151356_capillary.json` | full calibration of 2026-11-14 (5 sets on a gold-pad corner) with the axes of 2026-11-15 |
 
 Reports: [2026-11-14 capillary real-sample calibration](docs/reports/2026-11-14_capillary_real_sample_calibration.pdf) ·
 [2026-11-15 zone-plate calibration and SRz-axis correction](docs/reports/2026-11-15_zone_plate_calibration_srz_axis.pdf)
-(sources in `docs/reports/src/`). Everything that was measured is also kept in the `check` record of each file.
+(sources in `docs/reports/src/`). Earlier zone-plate steps kept as history: `…2026-11-15_151356_zone_plate.json` (optics mode on
+sample Cav, gating plate, + SRn / SRz axes from zone-plate SPEM point tracking) and `…2026-11-17_153957_zone_plate.json`
+(the same, with the tracked point re-read on the plate photo: the plate frame shifted by +0.135 / −0.063 mm). Everything
+that was measured is also kept in the `check` record of each file.
 
 ---
 

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, os.environ.get("ARPES_VIEWER", r"D:\Codes\ARPES-viewer-main"))
 from arpes_viewer.loader.registry import load  # noqa: E402
-from quickalignment.goldframe.spem_nxs import read_positions  # noqa: E402
+from quickalignment.realsample.spem_nxs import read_positions  # noqa: E402
 
 OUT = Path(__file__).parent / "spem"
 OUT.mkdir(exist_ok=True)

@@ -430,7 +430,7 @@ class RealSampleCalibrationSession:
     def read_spem(self, path: str) -> dict:
         """Motor values of a SPEM map file (.nxs): what to enter in measure_set / answer_test, with the PIX / PIY of
         the tracked point read on the map by the user (the file's PIX / PIY are where the scan ended)."""
-        from ..goldframe.spem_nxs import read_positions
+        from ..realsample.spem_nxs import read_positions
         try:
             pos = read_positions(str(path))
         except ImportError as exc:

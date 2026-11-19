@@ -329,27 +329,6 @@ def test_read_spem_positions(api, tmp_path):
         api.real_sample.read_spem(str(tmp_path / "missing.nxs"))
 
 
-# -- gold-frame calibration ----------------------------------------------------------------------------------
-def test_gold_frame_plan_simulate_fit_save(api, configs, tmp_path):
-    g = api.gold_frame
-    out = g.start("capillary", gold_height=0.05)
-    assert out["step"] == "measure" and len(out["protocol"]) == 6
-    plan = g.plan(csv_path=str(tmp_path / "plan.csv"))
-    assert len(plan["lines"]) == 33 and plan["settings"] == 9 and plan["problems"] == 0
-    assert (tmp_path / "plan.csv").exists()
-    sim = g.simulate_example(str(tmp_path / "sim"))
-    added = g.add_files(sim["files"])
-    assert not added["errors"] and added["step"] == "fit"
-    fit = g.fit(sn_gold=sim["sn_gold"])
-    values = {c["name"]: c["value"] for c in fit["constants"]}
-    for k, v in sim["truth_with_frame_at_centre"].items():
-        assert values[k] == pytest.approx(v, abs=0.03), k
-    assert all(q["ok"] for q in fit["quality"][:2])
-    assert g.plot()["image_png"][:4] == b"\x89PNG"
-    saved = g.save("agent test")
-    assert Path(saved["saved"]).exists()
-
-
 # -- MCP server ----------------------------------------------------------------------------------------------
 def rpc(server, method, params=None, mid=1):
     return server.handle({"jsonrpc": "2.0", "id": mid, "method": method, "params": params or {}})
@@ -374,8 +353,8 @@ def test_mcp_protocol_in_process(configs):
     assert bad["isError"] and "Unknown plate" in bad["content"][0]["text"]
     assert rpc(server, "tools/call", {"name": "nope"})["error"]["code"] == -32602
     assert rpc(server, "foo/bar")["error"]["code"] == -32601
-    prompt = rpc(server, "prompts/get", {"name": "calibrate", "arguments": {"method": "gold frame"}})["result"]
-    assert "gold frame" in prompt["messages"][0]["content"]["text"]
+    prompt = rpc(server, "prompts/get", {"name": "calibrate"})["result"]
+    assert "real sample" in prompt["messages"][0]["content"]["text"]
 
 
 def test_mcp_server_over_stdio(configs):

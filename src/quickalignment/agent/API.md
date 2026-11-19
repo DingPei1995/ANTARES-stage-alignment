@@ -1,4 +1,4 @@
-# QuickAlignment, RealSampleCalibration, GoldFrameCalibration -- the agent's reference
+# QuickAlignment, RealSampleCalibration -- the agent's reference
 
 *Generated from the program by `python -m quickalignment.agent.catalog --write`; do not edit by hand. A test
 fails when it is out of date.*
@@ -11,7 +11,7 @@ Read this before anything else: it is everything an agent can do, by name.
   (with `src/` on the path) or `quickalignment-mcp`. Same protocol as ARPES viewer: `readOnlyHint` is true
   for every tool that only reads; an error inside a tool comes back as a tool error with its text -- read it.
 - **Python**: `from quickalignment.agent import AgentAPI; api = AgentAPI()`, then `api.alignment.*`,
-  `api.real_sample.*`, `api.gold_frame.*` (section 3). Every method returns a JSON-friendly dict or raises
+  `api.real_sample.*` (section 3). Every method returns a JSON-friendly dict or raises
   `APIError` with a message for the user.
 - Numbers always in the standard format (`1234.5`), never the system locale.
 
@@ -19,7 +19,7 @@ Read this before anything else: it is everything an agent can do, by name.
 
 ```
 QuickAlignment tools for the ANTARES beamline (SOLEIL) sample stage: find samples on a plate from photos
-(alignment), and calibrate the stage (real-sample calibration or gold-frame calibration). Talk to the user in
+(alignment), and calibrate the stage (real-sample calibration). Talk to the user in
 their language; keep the tool names and numbers as they are. Numbers always use "." as decimal separator.
 
 START OF A CONVERSATION (also when the user just sends photos of a sample plate):
@@ -82,9 +82,8 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    - Before sending the user to a new position, mention any out_of_range or collisions in the result.
 8. align_save_session(path) so the user can open the plate in the QuickAlignment program.
 
-(b) CALIBRATION: ask real-sample calibration or gold-frame calibration.
-- Real sample (RealSampleCalibration): ask whether only the focusing optic was realigned (mode "optics", the usual
-  case) or the motors were re-homed / maintenance / first use (mode "full"), the optic, the plate, and a small sharp
+(b) CALIBRATION (RealSampleCalibration, with one feature of a real sample):
+- Ask whether only the focusing optic was realigned (mode "optics", the usual case) or the motors were re-homed / maintenance / first use (mode "full"), the optic, the plate, and a small sharp
   reference feature near the plate centre (plate x, y; height H). rsc_start(...), then follow rsc_guide: for every
   set tell the user exactly what to set and measure (the result says where the feature is expected), collect the
   numbers they read, rsc_measure_set, then rsc_fit; go through the test points one by one (rsc_answer_test), fit
@@ -104,30 +103,26 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
   use the zone plate and SRz down to -20 / -25. When readings contradict the model (chi2_per_dof large, a focus far
   from the prediction), list the mismatches and possible causes for the user to judge; do not free more constants
   to absorb them.
-- Gold frame (GoldFrameCalibration, SPEM total-intensity SZ lines over the 2 x 2 mm gold frame): gfc_start(optic,
-  gold_height, frame position), give the protocol step by step (gfc_guide), gfc_plan (33 SZ lines, CSV), then
-  gfc_add_files(paths of the .nxs files), gfc_fit, show gfc_plot and the quality checks, gfc_save after the user
-  agrees. gfc_simulate_example makes test files for a dry run.
 
 RULES
-- Never invent measured values (motor positions, optic positions, SN gold): ask the user.
+- Never invent measured values (motor positions, optic positions): ask the user.
 - Positions are absolute motor values: ST, SN, SZ in mm, SRn, SRz in degrees, PIX, PIY in µm. Plate coordinates are
   mm in the front view (tab up, origin at the centre of the back plate, x right, y up).
-- Writing a configuration (rsc_save, gfc_save) changes what QuickAlignment uses for everyone: only on the user's
+- Writing a configuration (rsc_save) changes what QuickAlignment uses for everyone: only on the user's
   explicit request.
 - Photo reading is approximate: say so when it matters, and prefer the user's beamline feedback (found_here).
 ```
 
 Prompts: `start`, `find_samples`, `calibrate`
 
-## 2. MCP tools (63)
+## 2. MCP tools (52)
 
 `*` = required. **acts**: changes the session, a file or a window; the others only read.
 
 | Tool | | Arguments | What it does |
 |---|---|---|---|
 | `workflow` | reads | - | How to lead the user through alignment or calibration (read when unsure). |
-| `status` | reads | - | What each tool (alignment, real-sample calibration, gold frame) is doing now. |
+| `status` | reads | - | What each tool (alignment, real-sample calibration) is doing now. |
 | `align_plates` | reads | - | The sample plates known (standard, gating, custom) and their sample area. |
 | `align_configurations` | reads | `optic` (string) | The calibration configurations in configs/ (newest first). |
 | `align_start` | **acts** | `plate*` (string), `optic*` (string), `custom_plate_mm` (object), `configuration` (string) | Start finding samples on a plate: plate type, optic and (default newest) configuration. Clears the samples. |
@@ -178,17 +173,6 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `rsc_answer_test` | **acts** | `name*` (string), `found` (boolean), `st` (number), `sz` (number), `optic` (number) | A test point: found at the prediction, or the real ST, SZ (and optic). |
 | `rsc_change_test_angles` | **acts** | `name*` (string), `srn*` (number), `srz*` (number) | Other SRn / SRz for an open test point. |
 | `rsc_save` | **acts** | `comment` (string) | Save the configuration in configs/ (only when the user asks). |
-| `gfc_guide` | reads | - | Gold-frame calibration: where it stands and what to do next. |
-| `gfc_start` | **acts** | `optic*` (string), `gold_height` (number), `frame_x` (number), `frame_y` (number), `outer` (number), `inner` (number) | Start a gold-frame calibration. |
-| `gfc_status` | reads | - | Files loaded, SN points, fit state. |
-| `gfc_plan` | **acts** | `csv_path` (string) | The SZ lines to measure (checked against ranges and collisions); CSV. |
-| `gfc_add_files` | **acts** | `paths*` (array), `normalize` (boolean) | Load measured .nxs (or simulated .npz) files. |
-| `gfc_remove_file` | **acts** | `name*` (string) | Unload a file. |
-| `gfc_set_sn_points` | **acts** | `points` (array), `csv_path` (string) | Optional SN points: [{srn, srz, st, sz, sn}] or a CSV. |
-| `gfc_fit` | **acts** | `sn_gold` (number), `fit_tilt` (boolean), `fit_scales` (boolean) | Fit every edge of every line; constants, change, quality checks. |
-| `gfc_plot` | reads | - | The data with the fitted edges (PNG). |
-| `gfc_save` | **acts** | `comment` (string), `optic_position` (number) | Save the configuration in configs/ (only when the user asks). |
-| `gfc_simulate_example` | **acts** | `folder` (string) | Write a simulated measurement (known faults) to try the steps without beam time. |
 
 ## 3. Agent API (Python)
 
@@ -254,22 +238,3 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `start(mode: 'str' = 'optics', optic: 'str \| None' = None, plate: 'str' = 'standard', feature_x: 'float' = 0.0, feature_y: 'float' = 0.0, feature_height: 'float' = 0.0, sn_kept: 'bool' = True, configuration: 'str \| None' = None) -> 'dict'` | Begin a calibration: mode "optics" (optic realigned: ST0, SZ0, optic reference; the mechanics are kept from the newest configuration) or "full" (optics + motors: all constants), the optic, the plate and the reference feature (plate x, y in mm and its height H above the plate surface). `sn_kept` (full mode): the rotated sets keep the SN of set 1 and refocus the optic (usual); false: every set is moved to the analyzer focus with SN. `configuration` (label or file name): keep the mechanics from this configuration instead of the newest of the optic; it may be one of the other optic (e.g. the zone plate calibrated with the axes of a recent capillary calibration). The optic reference is still compared with the newest of the chosen optic. |
 | `status() -> 'dict'` | - |
 | `test_points() -> 'dict'` | The test points of the open round: where to go (SRn, SRz, ST, SZ, SN, optic). |
-
-### `api.gold_frame` (GoldFrameSession)
-
-| Method | What it does |
-|---|---|
-| `add_files(paths, normalize: 'bool' = False) -> 'dict'` | Measured files (.nxs; .npz from the simulator): survey lines, overview map, SRn sweep, single lines. |
-| `file_list() -> 'dict'` | - |
-| `fit(sn_gold: 'float \| None' = None, fit_tilt: 'bool' = True, fit_scales: 'bool' = True) -> 'dict'` | Fit every edge of every line; the constants, their change and a quality check. |
-| `guide() -> 'dict'` | - |
-| `guide_setup() -> 'Setup'` | - |
-| `newest()` | - |
-| `plan(csv_path: 'str \| None' = None) -> 'dict'` | The SZ lines to measure, placed with the newest configuration, each checked (motor range, collision). |
-| `plot() -> 'dict'` | The loaded data with the fitted edges (after fit) as a PNG. |
-| `remove_file(name: 'str') -> 'dict'` | - |
-| `save(comment: 'str' = '', optic_position: 'float \| None' = None) -> 'dict'` | Save the fit as a new configuration in configs/ (only after the user agreed). |
-| `set_sn_points(points=None, csv_path: 'str \| None' = None) -> 'dict'` | Optional SN points: [{srn, srz, st, sz, sn}] (sn: SN at the intensity peak), or a CSV with those columns. |
-| `simulate_example(folder: 'str \| None' = None) -> 'dict'` | A simulated measurement of the planned lines over a frame with known faults, written as files (to try the steps). Returns the files and the true values. |
-| `start(optic: 'str \| None' = 'capillary', gold_height: 'float' = 0.05, frame_x: 'float' = 0.0, frame_y: 'float' = 0.0, outer: 'float' = 2.0, inner: 'float' = 1.0) -> 'dict'` | Begin: optic, gold height above the riser top (mm, measured with SN scans), where the frame centre is taken to be on the plate (mm), its outer size and hole (mm). |
-| `status() -> 'dict'` | - |

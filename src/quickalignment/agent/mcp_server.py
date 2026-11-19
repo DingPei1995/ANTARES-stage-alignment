@@ -1,4 +1,4 @@
-"""MCP server (stdio) of QuickAlignment, RealSampleCalibration and GoldFrameCalibration.
+"""MCP server (stdio) of QuickAlignment and RealSampleCalibration.
 
     python Agent/quickalignment_mcp.py [--configs FOLDER]
     python -m quickalignment.agent.mcp_server [--configs FOLDER]     (with src/ on the Python path)
@@ -14,8 +14,7 @@ texts, JSON results written with indent=1, `python -m quickalignment.agent`, and
 agents: src/quickalignment/agent/API.md (python -m quickalignment.agent.catalog --write; a test fails when it
 is out of date). In addition to ARPES viewer: prompts (workflow.py).
 
-Tools are grouped by prefix: `align_*` (find samples), `rsc_*` (real-sample calibration), `gfc_*` (gold-frame
-calibration). The server keeps one session of each in memory while the client is connected.
+Tools are grouped by prefix: `align_*` (find samples), `rsc_*` (real-sample calibration). The server keeps one session of each in memory while the client is connected.
 """
 
 from __future__ import annotations
@@ -60,7 +59,7 @@ def tool(name, target, method, description, properties=None, required=()):
 TOOLS = [
     # -- general ----------------------------------------------------------------------------------------
     tool("workflow", "api", "workflow", "How to lead the user through alignment or calibration (read when unsure)."),
-    tool("status", "api", "status", "What each tool (alignment, real-sample calibration, gold frame) is doing now."),
+    tool("status", "api", "status", "What each tool (alignment, real-sample calibration) is doing now."),
     # -- alignment ----------------------------------------------------------------------------------------
     tool("align_plates", "alignment", "plates", "The sample plates known (standard, gating, custom) and their sample area."),
     tool("align_configurations", "alignment", "configurations", "The calibration configurations in configs/ (newest first).",
@@ -240,28 +239,6 @@ TOOLS = [
          {"name": STR, "srn": NUM, "srz": NUM}, ["name", "srn", "srz"]),
     tool("rsc_save", "real_sample", "save", "Save the configuration in configs/ (only when the user asks).",
          {"comment": STR}),
-    # -- gold-frame calibration ---------------------------------------------------------------------------------
-    tool("gfc_guide", "gold_frame", "guide", "Gold-frame calibration: where it stands and what to do next."),
-    tool("gfc_start", "gold_frame", "start", "Start a gold-frame calibration.",
-         {"optic": OPTIC, "gold_height": d("gold top above the riser top (mm, default 0.05)", **NUM),
-          "frame_x": d("frame centre on the plate (mm, default 0)", **NUM), "frame_y": NUM,
-          "outer": d("outer size (mm, default 2)", **NUM), "inner": d("hole size (mm, default 1)", **NUM)}, ["optic"]),
-    tool("gfc_status", "gold_frame", "status", "Files loaded, SN points, fit state."),
-    tool("gfc_plan", "gold_frame", "plan", "The SZ lines to measure (checked against ranges and collisions); CSV.",
-         {"csv_path": STR}),
-    tool("gfc_add_files", "gold_frame", "add_files", "Load measured .nxs (or simulated .npz) files.",
-         {"paths": {"type": "array", "items": STR}, "normalize": d("divide by the diode", **BOOL)}, ["paths"]),
-    tool("gfc_remove_file", "gold_frame", "remove_file", "Unload a file.", {"name": STR}, ["name"]),
-    tool("gfc_set_sn_points", "gold_frame", "set_sn_points", "Optional SN points: [{srn, srz, st, sz, sn}] or a CSV.",
-         {"points": {"type": "array", "items": {"type": "object"}}, "csv_path": STR}),
-    tool("gfc_fit", "gold_frame", "fit", "Fit every edge of every line; constants, change, quality checks.",
-         {"sn_gold": d("SN with the gold top at the analyzer focus (default: from a flat file)", **NUM),
-          "fit_tilt": BOOL, "fit_scales": BOOL}),
-    tool("gfc_plot", "gold_frame", "plot", "The data with the fitted edges (PNG)."),
-    tool("gfc_save", "gold_frame", "save", "Save the configuration in configs/ (only when the user asks).",
-         {"comment": STR, "optic_position": d("optic position focused on the gold (default: from the files)", **NUM)}),
-    tool("gfc_simulate_example", "gold_frame", "simulate_example",
-         "Write a simulated measurement (known faults) to try the steps without beam time.", {"folder": STR}),
 ]
 TOOL_INDEX = {t["name"]: t for t in TOOLS}
 
@@ -275,8 +252,6 @@ ACTING = {
     "align_register_device_photo", "align_set_position", "align_found_here", "align_save_session",
     "align_load_session",
     "rsc_start", "rsc_add_set", "rsc_measure_set", "rsc_fit", "rsc_answer_test", "rsc_change_test_angles", "rsc_save",
-    "gfc_start", "gfc_plan", "gfc_add_files", "gfc_remove_file", "gfc_set_sn_points", "gfc_fit", "gfc_save",
-    "gfc_simulate_example",
 }
 
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quickalignment"
 version = "2.0.0"
-description = "ANTARES sample alignment: QuickAlignment, RealSampleCalibration, GoldFrameCalibration, and their agent API / MCP server"
+description = "ANTARES sample alignment: QuickAlignment, RealSampleCalibration, and their agent API / MCP server"
 requires-python = ">=3.9"
 dependencies = ["numpy", "matplotlib>=3.5"]
 

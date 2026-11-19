@@ -112,6 +112,10 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 精度为托照片的精度（角点，0.1–0.3 mm）加上点对应的误差。
 
+#### 高度检查（H 未知时）
+
+样品高度 H 常常未知或没有测量。表格下方的 *Height check*：在 SRn = 120°、SRz = 0° 时把样品上表面移到 **相机参考线**（分析器焦平面）上，选择该样品，输入 **此时读到的 SN**，按 **Correct H**。程序由该 SN 和配置中的 SN_f 算出 H（目测，约 ±0.05 mm）；下方一行列出已检查的样品。之后 *Bring target onto the beam* 对该样品的目标保持这个 SN（在 SRn = 120°、SRz = 0° 时准确），初始位置列表中标为 *(H checked)*。在表格中手动输入 H 会取消该检查。
+
 样品画完后，按 **Samples placed → Stage**。
 
 ## Stage & Optics 页：移动到样品
@@ -134,9 +138,14 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 ![Found here](images/guide/found_here.png)
 
-照片（或手画）的精度为 0.1–0.3 mm，所以 device 通常是在离列出位置稍远处找到的。当它确实 **位于光斑上且在分析器焦点处** 时，输入当前位置，在 *Found* 中选择该 device，按 **Found here: correct its sample**。窗口要求确认，并给出绘图误差（托上的 Δx、Δy，高度 ΔH）；按 *Yes* 会把该样品连同所有 device 一起移动，其他样品不动。之后所有预测都使用修正后的位置（随 session 保存），初始位置列表也随之更新。
+照片（或手画）的精度为 0.1–0.3 mm，所以 device 通常是在离列出位置稍远处找到的。当它确实 **位于光斑上且在分析器焦点处** 时，输入当前位置，在 *Found* 中选择该 device，按 **Found here: correct its sample**。窗口要求确认，并给出绘图误差（托上的 Δx、Δy，高度 ΔH）；按 *Yes* 后分两部分修正：
 
-例子中 D1 在 ST = −2.4601、SZ = 37.8095、SN = 0（SRn = 120°，SRz = 0°）处找到：它在图上画得偏右 0.20 mm、偏上 0.27 mm。修正量超过 0.3 mm，或所有样品偏移相同，可能说明配置已过时：请告知线站人员。尽量在 SRz = 0° 时使用 *Found here*：此时 SN 不变就意味着"在分析器焦点处"；转过 SRz 且 SN 不变时，该点通常不在分析器焦点处，ΔH 会算错。
+- **Δy（SZ）** 视为 **样品托** 在样品架中插入的高度不同（每次插入高度不一定相同）：整个托一起移动，**所有** 样品的 SZ 改变相同的量。初始位置列表显示 *plate offset*；超过 2.5 mm 时会提醒检查找到的是否是正确的样品。更换样品托时归零。
+- **Δx 和 ΔH** 只修正该样品（连同所有 device），其他样品不动。
+
+之后所有预测都使用修正后的位置（随 session 保存），初始位置列表也随之更新。
+
+例子中 D1 在 ST = −2.4601、SZ = 37.8095、SN = 0（SRn = 120°，SRz = 0°）处找到：它在图上画得偏右 0.20 mm，y 方向偏 0.27 mm（画得偏上 0.27 mm），作为样品托的偏移。Δx 或 ΔH 超过 0.3 mm，或所有样品的 ST 偏移相同，可能说明配置已过时：请告知线站人员。尽量在 SRz = 0° 时使用 *Found here*：此时 SN 不变就意味着"在分析器焦点处"；转过 SRz 且 SN 不变时，该点通常不在分析器焦点处，ΔH 会算错。
 
 ### 防碰撞
 
@@ -224,7 +233,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 | *Collision: the plate would touch …* | 在该位置样品托（或样品、螺丝）会撞到聚焦元件或分析器；数值不变：换一个位置，或把聚焦元件退后 |
 | *… in the analyzer acceptance cone: it would shadow the electrons* | 聚焦元件挡在电子飞向分析器的路径上；把它移开 |
 | *… µm from the analyzer focus*（红色） | 转 SRz 后该点离开了焦平面：勾选 *Correct SN* |
-| *Correct the sample position?* | *Found here*：核对位置和 device，按 *Yes* 移动样品 |
+| *Correct the plate / sample position?* | *Found here*：核对位置和 device；按 *Yes* 把样品托移动 Δy（所有样品），把该样品移动 Δx、ΔH |
 | *Found here* 移动样品超过 0.3 mm | 绘图有误，或配置已过时（电机重新回零）：请联系线站人员 |
 | *The beam misses the plate* | ST / SZ 没有把光打到托上 |
 | *Check the input: Γ–K on the map is …* | 晶格常数、点或光子能量与 map 不符 |

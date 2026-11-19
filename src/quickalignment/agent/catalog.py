@@ -5,7 +5,7 @@ never written by hand, from the program itself:
 
 1. how to lead the user (workflow.INSTRUCTIONS, the MCP server instructions) and the prompts;
 2. the MCP tools (name, reads / acts, arguments, description);
-3. the methods of the agent API (``AgentAPI``: alignment, real_sample, gold_frame), for scripts.
+3. the methods of the agent API (``AgentAPI``: alignment, real_sample), for scripts.
 
 ``tests/test_catalog.py`` regenerates it and fails when the file differs. After every change to the tools, the
 API or the workflow::
@@ -21,7 +21,7 @@ import sys
 
 PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "API.md")
 
-HEADER = """# QuickAlignment, RealSampleCalibration, GoldFrameCalibration -- the agent's reference
+HEADER = """# QuickAlignment, RealSampleCalibration -- the agent's reference
 
 *Generated from the program by `python -m quickalignment.agent.catalog --write`; do not edit by hand. A test
 fails when it is out of date.*
@@ -34,7 +34,7 @@ Read this before anything else: it is everything an agent can do, by name.
   (with `src/` on the path) or `quickalignment-mcp`. Same protocol as ARPES viewer: `readOnlyHint` is true
   for every tool that only reads; an error inside a tool comes back as a tool error with its text -- read it.
 - **Python**: `from quickalignment.agent import AgentAPI; api = AgentAPI()`, then `api.alignment.*`,
-  `api.real_sample.*`, `api.gold_frame.*` (section 3). Every method returns a JSON-friendly dict or raises
+  `api.real_sample.*` (section 3). Every method returns a JSON-friendly dict or raises
   `APIError` with a message for the user.
 - Numbers always in the standard format (`1234.5`), never the system locale.
 """
@@ -73,11 +73,9 @@ def tools_reference() -> list[str]:
 
 def api_reference() -> list[str]:
     from .alignment import AlignmentSession
-    from .gold_frame import GoldFrameSession
     from .real_sample import RealSampleCalibrationSession
     lines = ["## 3. Agent API (Python)", ""]
-    for attr, cls in (("alignment", AlignmentSession), ("real_sample", RealSampleCalibrationSession),
-                      ("gold_frame", GoldFrameSession)):
+    for attr, cls in (("alignment", AlignmentSession), ("real_sample", RealSampleCalibrationSession)):
         lines += [f"### `api.{attr}` ({cls.__name__})", "", "| Method | What it does |", "|---|---|"]
         for name, member in inspect.getmembers(cls, inspect.isfunction):
             if name.startswith("_"):

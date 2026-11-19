@@ -1,6 +1,5 @@
-"""Build the PDF guides: user guide (QuickAlignment/docs), beamline staff guide (RealSampleCalibration/docs), the
-gold-frame report (GoldFrameCalibration/docs) in English, Chinese and French, and the gold-frame experiment plan
-(GoldFrameCalibration/docs, English). Each PDF goes to the ``pdf/`` folder beside its source.
+"""Build the PDF guides: user guide (QuickAlignment/docs) and beamline staff guide (RealSampleCalibration/docs), in
+English, Chinese and French. Each PDF goes to the ``pdf/`` folder beside its source.
 
 Each ``<tool>/docs/<GUIDE>_<lang>.md`` is turned into HTML by pandoc (GitHub flavour,
 so the section links work as on GitHub), styled for A4 print and printed to
@@ -15,7 +14,7 @@ Needs:  pandoc, and ``pip install playwright`` with a Chromium it can use
         (``playwright install chromium``, or set ``CHROMIUM`` to a Chrome or
         Chromium executable).
 
-Usage:  python devtools/build_guides.py [user|staff|gold|plan] [en|zh|fr] ...   (default: all)
+Usage:  python devtools/build_guides.py [user|staff] [en|zh|fr] ...   (default: all)
 """
 
 from __future__ import annotations
@@ -40,14 +39,6 @@ GUIDES = {  # key: (folder, source stem, PDF stem, titles)
         "en": "RealSampleCalibration — Beamline Staff Guide",
         "zh": "RealSampleCalibration 线站人员指南",
         "fr": "RealSampleCalibration — Guide du personnel de la ligne",
-    }),
-    "gold": ("GoldFrameCalibration", "GOLD_FRAME_REPORT", "GoldFrame_calibration_report", {
-        "en": "Gold-frame calibration — Report",
-        "zh": "金框标定 — 报告",
-        "fr": "Étalonnage par le cadre en or — Rapport",
-    }),
-    "plan": ("GoldFrameCalibration", "EXPERIMENT_PLAN", "GoldFrame_experiment_plan", {
-        "en": "Gold-frame calibration — Experiment plan",
     }),
 }
 HTML_LANG = {"en": "en", "zh": "zh-CN", "fr": "fr"}

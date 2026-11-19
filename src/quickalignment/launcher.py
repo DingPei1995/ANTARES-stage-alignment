@@ -1,6 +1,6 @@
 """Start a program of the repository from its launcher (``QuickAlignment/QuickAlignment.py``, ...).
 
-The launchers live in the tool folders (QuickAlignment/, RealSampleCalibration/, GoldFrameCalibration/);
+The launchers live in the tool folders (QuickAlignment/, RealSampleCalibration/);
 they put ``src/`` on the import path and call `launch`. A missing package (PyQt5, numpy, matplotlib) is
 reported in a dialog, since a double-clicked .pyw has no console.
 """

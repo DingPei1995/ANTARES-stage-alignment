@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""MCP server of QuickAlignment, RealSampleCalibration and GoldFrameCalibration (stdio).
+"""MCP server of QuickAlignment and RealSampleCalibration (stdio).
 
 Registered in .mcp.json at the repository root (Claude Code) or in the Claude Desktop configuration; see
-Agent/README.md. Needs numpy, matplotlib (and h5py for the gold-frame .nxs files); no Qt, no MCP SDK.
+Agent/README.md. Needs numpy, matplotlib (and h5py for SPEM .nxs files); no Qt, no MCP SDK.
 
     python Agent/quickalignment_mcp.py [--configs FOLDER] [--list-tools]
 """

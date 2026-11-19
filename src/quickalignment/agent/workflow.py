@@ -6,7 +6,7 @@ the reference for anyone driving `quickalignment.agent.AgentAPI` from Python.
 
 INSTRUCTIONS = """\
 QuickAlignment tools for the ANTARES beamline (SOLEIL) sample stage: find samples on a plate from photos
-(alignment), and calibrate the stage (real-sample calibration or gold-frame calibration). Talk to the user in
+(alignment), and calibrate the stage (real-sample calibration). Talk to the user in
 their language; keep the tool names and numbers as they are. Numbers always use "." as decimal separator.
 
 START OF A CONVERSATION (also when the user just sends photos of a sample plate):
@@ -69,9 +69,8 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    - Before sending the user to a new position, mention any out_of_range or collisions in the result.
 8. align_save_session(path) so the user can open the plate in the QuickAlignment program.
 
-(b) CALIBRATION: ask real-sample calibration or gold-frame calibration.
-- Real sample (RealSampleCalibration): ask whether only the focusing optic was realigned (mode "optics", the usual
-  case) or the motors were re-homed / maintenance / first use (mode "full"), the optic, the plate, and a small sharp
+(b) CALIBRATION (RealSampleCalibration, with one feature of a real sample):
+- Ask whether only the focusing optic was realigned (mode "optics", the usual case) or the motors were re-homed / maintenance / first use (mode "full"), the optic, the plate, and a small sharp
   reference feature near the plate centre (plate x, y; height H). rsc_start(...), then follow rsc_guide: for every
   set tell the user exactly what to set and measure (the result says where the feature is expected), collect the
   numbers they read, rsc_measure_set, then rsc_fit; go through the test points one by one (rsc_answer_test), fit
@@ -91,16 +90,12 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
   use the zone plate and SRz down to -20 / -25. When readings contradict the model (chi2_per_dof large, a focus far
   from the prediction), list the mismatches and possible causes for the user to judge; do not free more constants
   to absorb them.
-- Gold frame (GoldFrameCalibration, SPEM total-intensity SZ lines over the 2 x 2 mm gold frame): gfc_start(optic,
-  gold_height, frame position), give the protocol step by step (gfc_guide), gfc_plan (33 SZ lines, CSV), then
-  gfc_add_files(paths of the .nxs files), gfc_fit, show gfc_plot and the quality checks, gfc_save after the user
-  agrees. gfc_simulate_example makes test files for a dry run.
 
 RULES
-- Never invent measured values (motor positions, optic positions, SN gold): ask the user.
+- Never invent measured values (motor positions, optic positions): ask the user.
 - Positions are absolute motor values: ST, SN, SZ in mm, SRn, SRz in degrees, PIX, PIY in µm. Plate coordinates are
   mm in the front view (tab up, origin at the centre of the back plate, x right, y up).
-- Writing a configuration (rsc_save, gfc_save) changes what QuickAlignment uses for everyone: only on the user's
+- Writing a configuration (rsc_save) changes what QuickAlignment uses for everyone: only on the user's
   explicit request.
 - Photo reading is approximate: say so when it matters, and prefer the user's beamline feedback (found_here).
 """
@@ -123,9 +118,9 @@ PROMPTS = {
                  "and whether I am satisfied (else let me annotate by hand), then give me the ST / SZ / SN of every sample."),
     },
     "calibrate": {
-        "description": "Calibrate the stage step by step (real sample or gold frame).",
-        "arguments": [{"name": "method", "description": "real sample or gold frame", "required": False}],
-        "text": ("I want to calibrate the stage ({method}). Ask me what is needed and guide me one step at a time; "
+        "description": "Calibrate the stage step by step with a real sample (RealSampleCalibration).",
+        "arguments": [],
+        "text": ("I want to calibrate the stage with a real sample. Ask me what is needed and guide me one step at a time; "
                  "tell me exactly what to set and what to read at each step."),
     },
 }
@@ -137,7 +132,7 @@ def render_prompt(name: str, arguments: dict | None = None) -> str:
     args.update({k: v for k, v in (arguments or {}).items() if v})
     if name == "start":
         args["photos"] = f"My photos: {args['photos']}. " if args.get("photos") else ""
-    for key in ("plate", "optic", "method"):
+    for key in ("plate", "optic"):
         if key in args and not args[key]:
             args[key] = "not given"
     return p["text"].format(**args)

@@ -1,7 +1,7 @@
 # OpticsGeometry
 
 3-D geometry of the zone plate and the capillary on the shared ZPZ carriage. It is a separate
-program: QuickAlignment, RealSampleCalibration and GoldFrameCalibration do not use it.
+program: QuickAlignment and RealSampleCalibration do not use it.
 
 ```
 python OpticsGeometry/OpticsGeometry.py                      # reference geometry + 3-D schematic

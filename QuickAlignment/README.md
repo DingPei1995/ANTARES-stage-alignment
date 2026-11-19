@@ -26,8 +26,8 @@ in one JSON file; the first *Save* asks for the file name.
 
 ### Configuration files (`configs/`)
 
-- `calibration_YYYY-MM-DD_HHMMSS_<optic>.json`: written by beamline staff with RealSampleCalibration or
-  GoldFrameCalibration, one file per calibration.
+- `calibration_YYYY-MM-DD_HHMMSS_<optic>.json`: written by beamline staff with RealSampleCalibration, one file
+  per calibration.
 - QuickAlignment only reads them: it asks nothing and writes no configuration.
 - At start-up the newest of these files (by its time stamp) made with the chosen optic is loaded. If there is
   none for that optic, the stage constants of the newest file are used and the optic position is left
@@ -221,8 +221,7 @@ SN_f and the axes are kept).
 
 Read-only: the configuration in use (time stamp, optic, comment), its constants and optics reference. An
 older configuration can be selected for the session. There is no calibration in QuickAlignment: the
-configuration comes from RealSampleCalibration or GoldFrameCalibration (constants fitted and checked within
-0.05 mm), and what remains for a sample – mostly the error of drawing it on the plate – is corrected with
+configuration comes from RealSampleCalibration (constants fitted and checked within 0.05 mm), and what remains for a sample – mostly the error of drawing it on the plate – is corrected with
 *Found here* in the Stage & Optics tab. A configuration error of 0.05 mm, absorbed that way, leaves a few
 10 µm at other rotations (tested). If *Found here* has to move a sample by more than 0.3 mm, the program
 suggests checking whether the configuration is outdated (motors re-homed): then beamline staff run

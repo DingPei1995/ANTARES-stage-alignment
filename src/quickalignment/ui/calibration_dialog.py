@@ -1,6 +1,6 @@
 """Configuration window: which configuration is in use, its constants (read-only), and the motor limits.
 
-Configurations are made by beamline staff with RealSampleCalibration.py or GoldFrameCalibration.py (fit of
+Configurations are made by beamline staff with RealSampleCalibration.py (fit of
 all constants, checked at test points). In QuickAlignment the remaining error
 of a sample (mostly from drawing it on the plate) is corrected with "Found
 here" in the Stage & Optics tab, so no calibration is done here. An older
@@ -19,8 +19,8 @@ from ..core.calibration import CalibrationRecord, CalibrationStore
 
 Qt = QtCore.Qt
 
-HELP = ("Configurations are made by beamline staff with <b>RealSampleCalibration.py</b> or "
-        "<b>GoldFrameCalibration.py</b> (after an optics realignment, re-homing the motors or maintenance). Where a sample really is on the plate is corrected with <i>Found here</i> in the "
+HELP = ("Configurations are made by beamline staff with <b>RealSampleCalibration.py</b> "
+        "(after an optics realignment, re-homing the motors or maintenance). Where a sample really is on the plate is corrected with <i>Found here</i> in the "
         "Stage &amp; Optics tab.")
 
 

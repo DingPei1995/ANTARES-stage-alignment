@@ -4,7 +4,7 @@ Files in the configuration folder (default: ``configs/`` at the repository root)
 
 * ``calibration_YYYY-MM-DD_HHMMSS_<optic>.json`` (optic: ``capillary`` or
   ``zone_plate``): one file per calibration made by beamline staff with
-  RealSampleCalibration.py or GoldFrameCalibration.py. QuickAlignment only reads them.
+  RealSampleCalibration.py. QuickAlignment only reads them.
 
 At start-up the newest of them (by its time stamp) made with the chosen optic
 is loaded.

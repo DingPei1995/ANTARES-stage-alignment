@@ -31,7 +31,7 @@ next start.
 
 ![RealSampleCalibration](RealSampleCalibration/docs/images/guide/ic_window.png)
 
-**The latest calibration (2026-11-14 / 15, gating plate):**
+**The latest calibrations (2026-11-14 … 19):**
 
 1. **Capillary, full calibration (2026-11-14).** One gold-pad corner of a device on Si, five sets (SRn 120 / 140 / 100,
    SRz 0 / −10 / −5, SN kept in the rotated sets, capillary refocused). The two check sets were predicted from the
@@ -45,7 +45,12 @@ next start.
 
 ![Redundant SRz series with the zone plate](RealSampleCalibration/docs/images/calculation/srz_series.png)
 
-Configurations in use: `configs/calibration_2026-11-15_151356_zone_plate.json` and
+3. **Zone plate on the standard plate (2026-11-19).** One device found on the beam at SRn 120 / SRz 0 gave ST0 / SZ0
+   for the standard plate; the zone-plate working distance, SN_f and the rotation axes of 2026-11-15 / 17 were kept.
+   It also showed that the gating plate does not sit 1 mm higher than the standard plate in the holder (within
+   0.08 mm).
+
+Configurations in use (the newest per optic): `configs/calibration_2026-11-19_123901_zone_plate.json` and
 `configs/calibration_2026-11-15_151356_capillary.json`. Reports:
 [2026-11-14 capillary](RealSampleCalibration/docs/reports/2026-11-14_capillary_real_sample_calibration.pdf) ·
 [2026-11-15 zone plate / SRz axis](RealSampleCalibration/docs/reports/2026-11-15_zone_plate_calibration_srz_axis.pdf).
@@ -111,9 +116,10 @@ An oblique photo can optionally be corrected in 3D (points at several heights: r
 
 * "I'm at ST −3.50, SZ 36.54, SN −0.05, I want S3" → ST / SZ that put S3 on the beam with SN kept, or with SN
   corrected to the analyzer focus if it is too far (`align_bring_to_beam`).
-* "Found S1 at ST …, SZ …, SN …" → the sample is moved on the plate model and every position recomputed
-  (`align_found_here`). Several samples off by more than ~0.3 mm in the same way → the assistant suggests a
+* "Found S1 at ST …, SZ …, SN …" → the SZ shift moves the whole plate in its holder (all samples), the ST / SN shift
+  corrects S1, and every position is recomputed (`align_found_here`). Several samples off by more than ~0.3 mm in the same way → the assistant suggests a
   calibration.
+* "S2 is on the camera reference line at SN …" → its height H, kept for the next moves (`align_check_height`).
 * "What does the beam hit here, and where is the focus?" → `align_beam_on`, `align_set_position`.
 
 **3 · Rotations**
@@ -173,7 +179,9 @@ the `.pyw` files open without a console).
 QuickAlignment/          program, user guide, technical README
 RealSampleCalibration/   program, staff guide, protocol, calculation details, reports
 Agent/                   MCP server for AI assistants
+OpticsGeometry/          3-D geometry of the zone plate and the capillary (separate tool, report)
 configs/                 calibration configurations (newest per optic is used)
-src/quickalignment/      shared code (core, alignment, realsample, ui, agent)
+docs/rotation_formula/   the rotation formula (HTML / PDF)
+src/quickalignment/      shared code (core, alignment, realsample, optics, ui, agent)
 tests/   devtools/       tests (python -m pytest) and documentation tools
 ```

@@ -10,8 +10,6 @@ ROOT = Path(__file__).resolve().parent.parent
 LAUNCHERS = {
     "QuickAlignment/QuickAlignment.py": "quickalignment.ui.main_window",
     "RealSampleCalibration/RealSampleCalibration.py": "quickalignment.ui.real_sample_window",
-    "GoldFrameCalibration/GoldFrameCalibration.py": "quickalignment.ui.gold_frame_window",
-    "GoldFrameCalibration/GoldFrameSimulator.py": "quickalignment.goldframe.cli",
     "Agent/quickalignment_mcp.py": "quickalignment.agent.mcp_server",
 }
 

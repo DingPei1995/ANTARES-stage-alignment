@@ -1,6 +1,6 @@
 # Agent: MCP server and internal API
 
-The three tools — **QuickAlignment** (find samples), **RealSampleCalibration** and **GoldFrameCalibration** — can be
+The two programs — **QuickAlignment** (find samples) and **RealSampleCalibration** (calibrate the stage) — can be
 driven by an AI agent (Claude Desktop, Claude Code, or any MCP client) or from Python. Same computations as the
 windows; no Qt needed.
 
@@ -19,15 +19,17 @@ What a conversation looks like:
    You report where a sample was really found → it corrects the model (*found here*). You ask for
    another SRn / SRz, or to turn an edge along the slit, or for a Brillouin-zone point → it gives the new **ST / SZ /
    SN and optic position**, with range and collision checks.
-4. **Calibrate**: the agent asks *real sample* or *gold frame*, then leads you one step at a time (what to set, what
-   to read), fits, shows the result, and saves the configuration only when you say so.
+4. **Calibrate** (real sample): the agent asks *optics only* or *full*, the reference feature and the optic, then
+   leads you one step at a time (what to set, what to read), fits, shows the result, and saves the configuration
+   only when you say so.
 
 ![The plate model drawn back on a photo by the agent tools (green: sample area, blue: the sample marked)](images/photo_overlay.png)
 
 ## Setup
 
-Requirements: Python ≥ 3.9 with `numpy`, `matplotlib` (Pillow comes with it), and `h5py` for the gold-frame `.nxs`
-files: `pip install -r requirements.txt`. The server uses only the standard library for the protocol (no MCP SDK).
+Requirements: Python ≥ 3.9 with `numpy`, `matplotlib` (Pillow comes with it), and `h5py` to read SPEM `.nxs`
+files (`rsc_read_spem`): `pip install -r requirements.txt`. The server uses only the standard library for the
+protocol (no MCP SDK).
 
 **Claude Code**: `.mcp.json` at the repository root registers the server; open Claude Code in the repository and
 approve the `quickalignment` server.
@@ -80,21 +82,23 @@ print(a.sample_positions())
 print(a.rotate(140, -10, target="SampleA"))
 
 r = api.real_sample.start("optics", "capillary", "standard", feature_x=0.5, feature_y=1.0, feature_height=0.3)
-api.gold_frame.start("capillary", gold_height=0.05)
-plan = api.gold_frame.plan()["lines"]
+print(api.real_sample.guide())
 ```
 
 Every method returns a JSON-friendly dict (images as PNG bytes under `image_png`) or raises `APIError` with a message
-for the user. Code: `src/quickalignment/agent/` (`alignment.py`, `real_sample.py`, `gold_frame.py`, `photos.py`,
+for the user. Code: `src/quickalignment/agent/` (`alignment.py`, `real_sample.py`, `photos.py`,
 `workflow.py` = the instructions the agent follows, `mcp_server.py`). Tests: `tests/test_agent.py`.
 
 ## Tools
+
+The same list, with the arguments, is in [`src/quickalignment/agent/API.md`](../src/quickalignment/agent/API.md) (generated).
+
 **General**
 
 | tool | what it does |
 |---|---|
 | `workflow` | How to lead the user through alignment or calibration (read when unsure). |
-| `status` | What each tool (alignment, real-sample calibration, gold frame) is doing now. |
+| `status` | What each tool (alignment, real-sample calibration) is doing now. |
 
 **Find samples (QuickAlignment)**
 
@@ -120,6 +124,7 @@ for the user. Code: `src/quickalignment/agent/` (`alignment.py`, `real_sample.py
 | `align_add_sample` | Add a rectangular sample (plate mm). |
 | `align_add_sample_from_photo` | Add a sample from its corners read on the plate photo (4 corners, or 2 opposite corners). |
 | `align_update_sample` | Change a sample (centre, size, height, name). |
+| `align_check_height` | Height check: SN read when the sample top surface is on the camera reference line (analyzer focal plane) at SRn ref, SRz 0 gives its height H; bring_to_beam then keeps this SN for its targets. |
 | `align_remove_sample` | Remove a sample. |
 | `align_clear_samples` | Remove all samples. |
 | `align_add_device` | Add a device on a substrate at plate (x, y) mm or at a pixel of a registered photo (plate or microscope). |
@@ -128,23 +133,25 @@ for the user. Code: `src/quickalignment/agent/` (`alignment.py`, `real_sample.py
 | `align_samples` | The samples and devices with their warnings. |
 | `align_sample_positions` | ST / SZ / SN of every sample and device at the start rotation (SRn ref, SRz 0, piezo centred). |
 | `align_set_position` | The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits. |
-| `align_bring_to_beam` | ST / SZ putting a target on the beam with SN kept (correct_sn: also SN, onto the analyzer focus). |
+| `align_bring_to_beam` | ST / SZ putting a target on the beam with SN kept (height-checked sample: the SN of its check; correct_sn: also SN, onto the analyzer focus). |
 | `align_beam_on` | What the beam hits at these positions and the optic focus position. |
-| `align_found_here` | A target was found on the beam in the analyzer focus at these positions: move its sample there. |
+| `align_found_here` | A target was found on the beam at these positions: the y (SZ) shift moves the whole plate in the holder (plate offset, all samples), x and H correct its sample (at_focus false: SN not corrected, H kept; configuration: positions read with an older configuration: the sample moves, H kept). |
 | `align_rotate` | New ST / SZ / SN and optic position after turning SRn / SRz, keeping the point now on the beam. |
 | `align_align_edge` | SRn turning an edge (two points: photo px, or plate mm with plate_mm=true) along or across the slit. |
 | `align_bz_angles` | SRn / SRz putting a hexagonal Brillouin-zone point at the slit centre (from a measured map's angles). |
+| `align_bz_point_to` | SRn / SRz putting a K / M point read on a map at chosen analyzer angles at another hv (Γ optional; keep_srn: turn SRz only). |
 | `align_collision_check` | Does the plate touch the analyzer / optic at these positions; collision-free motor ranges. |
 | `align_save_session` | Save the plate (samples, devices, stage) as a session file. |
 | `align_load_session` | Load a QuickAlignment session file. |
 
-**Real-sample calibration**
+**Real-sample calibration (RealSampleCalibration)**
 
 | tool | what it does |
 |---|---|
 | `rsc_guide` | Real-sample calibration: where it stands and what to do next. |
 | `rsc_start` | Start a real-sample calibration with one reference feature. |
 | `rsc_status` | The sets, what is measured, where the feature is expected. |
+| `rsc_read_spem` | Motor and optic positions (ST, SZ, SN, SRn, SRz, ZPS, CPS, hv, scanned axes) recorded in a SPEM map file. |
 | `rsc_add_set` | Another measurement set at other angles. |
 | `rsc_measure_set` | The values read for a set. |
 | `rsc_fit` | Fit the constants; predicts a round of test points. |
@@ -152,19 +159,3 @@ for the user. Code: `src/quickalignment/agent/` (`alignment.py`, `real_sample.py
 | `rsc_answer_test` | A test point: found at the prediction, or the real ST, SZ (and optic). |
 | `rsc_change_test_angles` | Other SRn / SRz for an open test point. |
 | `rsc_save` | Save the configuration in configs/ (only when the user asks). |
-
-**Gold-frame calibration**
-
-| tool | what it does |
-|---|---|
-| `gfc_guide` | Gold-frame calibration: where it stands and what to do next. |
-| `gfc_start` | Start a gold-frame calibration. |
-| `gfc_status` | Files loaded, SN points, fit state. |
-| `gfc_plan` | The SZ lines to measure (checked against ranges and collisions); CSV. |
-| `gfc_add_files` | Load measured .nxs (or simulated .npz) files. |
-| `gfc_remove_file` | Unload a file. |
-| `gfc_set_sn_points` | Optional SN points: [{srn, srz, st, sz, sn}] or a CSV. |
-| `gfc_fit` | Fit every edge of every line; constants, change, quality checks. |
-| `gfc_plot` | The data with the fitted edges (PNG). |
-| `gfc_save` | Save the configuration in configs/ (only when the user asks). |
-| `gfc_simulate_example` | Write a simulated measurement (known faults) to try the steps without beam time. |

@@ -173,6 +173,15 @@ the match.
 
 The accuracy is that of the plate photo (corner clicks, 0.1–0.3 mm) plus the point matching.
 
+#### Height check (H not known)
+
+The height H of a sample is often not known or not measured. Below the table, *Height check*: drive the sample top
+surface onto the **camera reference line** (the analyzer focal plane) at SRn = 120°, SRz = 0°, choose the sample, type
+the **SN read there** and press **Correct H**. H is computed from this SN and SN_f of the configuration (by eye: about
+±0.05 mm); the line below lists the samples checked. *Bring target onto the beam* then keeps this SN for the targets of
+that sample (exact at SRn = 120°, SRz = 0°), and the start positions mark it *(H checked)*. Typing H by hand in the
+table drops the check.
+
 When all samples are drawn, press **Samples placed → Stage**.
 
 ## Stage & Optics tab: going to a sample
@@ -219,11 +228,18 @@ ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back
 The photo (or the drawing) is good to 0.1–0.3 mm, so a device is usually found a little away from its listed
 position. Once it is really **on the beam and in the analyzer focus**, enter the positions, choose the device under
 *Found* and press **Found here: correct its sample**. The window asks for confirmation and gives the error of the
-drawing (Δx, Δy on the plate, ΔH in height); *Yes* moves the sample with all its devices; the other samples stay.
-All predictions then use the corrected position (saved with the session); the list of start positions is updated.
+drawing (Δx, Δy on the plate, ΔH in height), then *Yes* applies it in two parts:
+
+- **Δy (SZ)** is taken as the **plate** sitting at another height in the sample holder (it does not always go in at the
+  same height): the whole plate moves, so the SZ of **every** sample changes by the same amount. The start positions
+  show the *plate offset*; above 2.5 mm you are warned to check that the right sample was found. Choosing another
+  plate resets it.
+- **Δx and ΔH** correct only this sample (with all its devices); the other samples stay.
+
+All predictions then use the corrected positions (saved with the session); the list of start positions is updated.
 
 In the example D1 is found at ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°): it was drawn 0.20 mm too
-far right and 0.27 mm too high. A correction above 0.3 mm, or the same shift for every sample, suggests that the
+far right, and the plate is 0.27 mm off in y (it was drawn 0.27 mm too high). A Δx or ΔH above 0.3 mm, or the same ST shift for every sample, suggests that the
 configuration is outdated: tell the beamline staff. Use *Found here* at SRz = 0° when you can: there SN kept means
 "in the analyzer focus"; after an SRz turn with SN kept the point is usually not in the analyzer focus, and ΔH would
 be wrong.
@@ -375,7 +391,7 @@ first use of a new kind of measurement, check that the point appears where the a
 | *Collision: the plate would touch …* | at that position the plate (or a sample, a screw) would hit the optic or the analyzer; nothing is changed: choose another position, or move the optic back |
 | *… in the analyzer acceptance cone: it would shadow the electrons* | the optic stands in the path of the electrons to the analyzer; move it out |
 | *… µm from the analyzer focus* (red) | after an SRz turn the point left the focal plane: tick *Correct SN* |
-| *Correct the sample position?* | *Found here*: check the positions and the device, *Yes* moves the sample |
+| *Correct the plate / sample position?* | *Found here*: check the positions and the device; *Yes* moves the plate by Δy (all samples) and the sample by Δx, ΔH |
 | *Found here* moves a sample by > 0.3 mm | the drawing was off, or the configuration is outdated (motors re-homed): ask the staff |
 | *The beam misses the plate* | ST / SZ do not put the beam on the plate |
 | *Check the input: Γ–K on the map is …* | lattice constant, point or photon energy does not match the map |

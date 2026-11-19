@@ -182,6 +182,15 @@ quand un détail s'y prête, vérifie la correspondance.
 La précision est celle de la photo de la plaquette (clics des coins, 0,1–0,3 mm) plus celle de la mise en
 correspondance.
 
+#### Contrôle de hauteur (H inconnue)
+
+La hauteur H d'un échantillon est souvent inconnue ou non mesurée. Sous le tableau, *Height check* : amener la surface
+de l'échantillon sur la **ligne de référence de la caméra** (plan focal de l'analyseur) à SRn = 120°, SRz = 0°,
+choisir l'échantillon, entrer le **SN lu à cet endroit** et appuyer sur **Correct H**. H est calculée à partir de ce SN
+et du SN_f de la configuration (à l'œil : environ ±0,05 mm) ; la ligne en dessous liste les échantillons contrôlés.
+*Bring target onto the beam* garde ensuite ce SN pour les cibles de cet échantillon (exact à SRn = 120°, SRz = 0°), et
+les positions de départ le marquent *(H checked)*. Entrer H à la main dans le tableau annule le contrôle.
+
 Une fois les échantillons dessinés, appuyer sur **Samples placed → Stage**.
 
 ## Onglet Stage & Optics : aller sur un échantillon
@@ -232,13 +241,20 @@ pour repère).
 La photo (ou le dessin) est juste à 0,1–0,3 mm près : un dispositif se trouve donc en général un peu à côté de sa
 position listée. Une fois qu'il est vraiment **sous le faisceau et au foyer de l'analyseur**, entrer les positions,
 choisir le dispositif sous *Found* et appuyer sur **Found here: correct its sample**. La fenêtre demande confirmation
-et donne l'erreur du dessin (Δx, Δy sur la plaquette, ΔH en hauteur) ; *Yes* déplace l'échantillon avec tous ses
-dispositifs, les autres restent. Toutes les prédictions utilisent ensuite la position corrigée (enregistrée avec la
-session) ; la liste des positions de départ est mise à jour.
+et donne l'erreur du dessin (Δx, Δy sur la plaquette, ΔH en hauteur) ; *Yes* l'applique en deux parties :
+
+- **Δy (SZ)** est attribué à la **plaquette**, entrée à une autre hauteur dans le porte-échantillon (elle n'entre pas
+  toujours à la même hauteur) : toute la plaquette se déplace, le SZ de **tous** les échantillons change d'autant. Les
+  positions de départ affichent le *plate offset* ; au-delà de 2,5 mm, un avertissement demande de vérifier que c'est
+  le bon échantillon. Choisir une autre plaquette le remet à zéro.
+- **Δx et ΔH** ne corrigent que cet échantillon (avec tous ses dispositifs) ; les autres restent.
+
+Toutes les prédictions utilisent ensuite les positions corrigées (enregistrées avec la session) ; la liste des
+positions de départ est mise à jour.
 
 Dans l'exemple D1 est trouvé à ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°) : il était dessiné
-0,20 mm trop à droite et 0,27 mm trop haut. Une correction de plus de 0,3 mm, ou le même décalage pour tous les
-échantillons, suggère une configuration périmée : prévenir le personnel de la ligne. Utiliser *Found here* à
+0,20 mm trop à droite, et décalé de 0,27 mm en y (dessiné trop haut), pris comme décalage de la plaquette. Un Δx ou ΔH de plus de 0,3 mm, ou le même
+décalage en ST pour tous les échantillons, suggère une configuration périmée : prévenir le personnel de la ligne. Utiliser *Found here* à
 SRz = 0° quand c'est possible : là, SN gardé veut dire « au foyer de l'analyseur » ; après une rotation SRz avec SN
 gardé, le point n'est en général pas au foyer de l'analyseur, et ΔH serait faux.
 
@@ -396,7 +412,7 @@ lors d'un nouveau type de mesure, vérifier que le point apparaît là où l'age
 | *Collision: the plate would touch …* | à cette position la plaquette (ou un échantillon, une vis) heurterait l'optique ou l'analyseur ; rien n'est changé : choisir une autre position, ou reculer l'optique |
 | *… in the analyzer acceptance cone: it would shadow the electrons* | l'optique est sur le trajet des électrons vers l'analyseur ; la retirer |
 | *… µm from the analyzer focus* (rouge) | après une rotation SRz le point a quitté le plan focal : cocher *Correct SN* |
-| *Correct the sample position?* | *Found here* : vérifier les positions et le dispositif, *Yes* déplace l'échantillon |
+| *Correct the plate / sample position?* | *Found here* : vérifier les positions et le dispositif ; *Yes* déplace la plaquette de Δy (tous les échantillons) et l'échantillon de Δx, ΔH |
 | *Found here* déplace un échantillon de plus de 0,3 mm | dessin faux, ou configuration périmée (moteurs réinitialisés) : demander au personnel |
 | *The beam misses the plate* | ST / SZ ne mettent pas le faisceau sur la plaquette |
 | *Check the input: Γ–K on the map is …* | constante de réseau, point ou énergie ne correspondent pas à la carte |

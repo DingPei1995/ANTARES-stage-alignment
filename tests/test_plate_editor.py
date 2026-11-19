@@ -719,6 +719,12 @@ def test_height_check_then_bring_to_beam_keeps_its_sn(window, monkeypatch):
     monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: QtWidgets.QMessageBox.Yes)
     ed.confirm_samples_placed()
     assert "(H checked)" in st.start_label.text()
+    # the Correct H button uses the typed SN (its clicked(bool) used to arrive as sn = False, i.e. SN 0)
+    ed.check_sn.setValue(sn_f + 0.7)
+    next(b for b in ed.findChildren(QtWidgets.QPushButton) if b.text() == "Correct H").click()
+    assert s.sn_checked == pytest.approx(sn_f + 0.7) and s.height == pytest.approx(0.7)
+    ed.check_sn.setValue(sn_f + 0.8)
+    ed.apply_height_check()
     # turned, with another SN in the field: the SN of the check is kept, no "Correct SN?" prompt
     m = st.motors.value()
     st.motors.set_value(MotorPositions(st=m.st, sn=sn_f + 2.0, sz=m.sz, srn=140.0, srz=-10.0, pix=m.pix, piy=m.piy))

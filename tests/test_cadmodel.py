@@ -8,7 +8,7 @@ pytest.importorskip("scipy")
 from quickalignment.cadmodel.build import DATA, split_triangles  # noqa: E402
 from quickalignment.cadmodel.frame import F_CAD, R_CAD_TO_LAB, cad_dir_to_lab, cad_to_lab  # noqa: E402
 from quickalignment.cadmodel.trimesh_ops import point_triangle, segment_segment, triangle_triangle  # noqa: E402
-from quickalignment.core.stage import N_HAT, T_HAT, Z_HAT  # noqa: E402
+from quickalignment.core.stage import N_HAT, T_HAT, Z_HAT, MotorPositions  # noqa: E402
 
 TRI = np.array([[0.0, 0, 0], [10, 0, 0], [0, 10, 0]])
 
@@ -223,8 +223,10 @@ def test_check_move_finds_a_collision_on_the_way(model):
     assert calm["first_hit"] is None
 
 
-def test_load_stage_config_shifts_a_gating_configuration(tmp_path):
+def test_load_stage_config_shifts_a_gating_configuration(tmp_path, monkeypatch):
     import json
+    from quickalignment.core.geometry import PLATE_SEAT_V
+    monkeypatch.setitem(PLATE_SEAT_V, "gating", 1.0)  # the mechanism (default 0 since 2026-11-19)
     from quickalignment.cadmodel.model import load_stage_config
     cfg = {"st0": -0.6773, "sz0": 41.143, "srn_axis_v": -0.1195}
     p = tmp_path / "c.json"
@@ -246,9 +248,87 @@ def test_gating_layout_drawn_higher_in_the_holder(model):
     from quickalignment.core.geometry import GATING_PLATE, STANDARD_PLATE, SampleLayout
     std = model.layout_part(SampleLayout(plate=STANDARD_PLATE))
     gat = model.layout_part(SampleLayout(plate=GATING_PLATE))
-    # the standard plate bottom (-7.75) is where the drawn plate is; the gating block bottom (-8.75) 1 mm higher
+    # the standard plate bottom (-7.75) is where the drawn plate is; the gating plate sits like it (seat 0, measured
+    # 2026-11-19), its block reaching 1 mm lower; with a seat it is drawn that much higher
     assert std.tri[..., 1].min() == pytest.approx(-7.75)
-    assert gat.tri[..., 1].min() == pytest.approx(-8.75 + 1.0)
+    assert gat.tri[..., 1].min() == pytest.approx(-8.75)
+    model.seat_v["gating"] = 1.0
+    try:
+        assert model.layout_part(SampleLayout(plate=GATING_PLATE)).tri[..., 1].min() == pytest.approx(-8.75 + 1.0)
+    finally:
+        model.seat_v["gating"] = 0.0
+
+
+def _gating_holder(tmp_path, seat=None):
+    import json
+    from quickalignment.cadmodel.model import load_stage_config
+    cfg = {"st0": -0.6773, "sz0": 41.143, "sn_f": -0.798, "srn_axis_u": 0.1033, "srn_axis_v": -0.1195,
+           "srz_offset_t": -0.0096, "srz_offset_n": 2.775}
+    p = tmp_path / "c.json"
+    p.write_text(json.dumps({"stage_config": cfg, "check": {"plate": "gating"}}), encoding="utf-8")
+    return load_stage_config(p, seat=seat)
+
+
+def _same_line(a, b):
+    d = b.point - a.point
+    return np.allclose(np.cross(a.direction, b.direction), 0, atol=1e-9) and \
+        np.allclose(np.cross(d, a.direction), 0, atol=1e-9)
+
+
+@needs_data
+def test_rotation_axes_are_fixed_to_the_stage(tmp_path):
+    from quickalignment.cadmodel.model import CadCollisionModel
+    model = CadCollisionModel(holder=_gating_holder(tmp_path))
+    m0 = model.m0
+    ax0 = model.rotation_axes(m0)
+    # SRn and the piezo turn / move the plate about the axes, not the axes
+    ax = model.rotation_axes(replace(m0, srn=m0.srn + 30.0, pix=m0.pix + 500.0, piy=m0.piy - 300.0))
+    for name in ("SRn", "SRz"):
+        for which in ("config", "cad"):
+            assert np.allclose(ax[name][which].point, ax0[name][which].point)
+    # ST / SZ carry them
+    ax = model.rotation_axes(replace(m0, st=m0.st + 1.0, sz=m0.sz + 2.0))
+    assert np.allclose(ax["SRn"]["config"].point - ax0["SRn"]["config"].point, T_HAT + 2 * Z_HAT)
+    # SRz turns the SRn axis about the SRz axis, which stays
+    ax = model.rotation_axes(replace(m0, srz=-20.0))
+    assert _same_line(ax["SRz"]["config"], ax0["SRz"]["config"])
+    assert ax["SRn"]["config"].direction @ ax0["SRn"]["config"].direction == pytest.approx(np.cos(np.radians(20)))
+    # the SRn axis is where the stage really turns the plate: a plate point on it does not move with SRn
+    c = model.stage.config
+    p = model.stage.plate_to_lab(m0, c.srn_axis_u, c.srn_axis_v, 3.0)
+    assert np.allclose(model.stage.plate_to_lab(replace(m0, srn=150.0), c.srn_axis_u, c.srn_axis_v, 3.0), p)
+    assert _same_line(ax0["SRn"]["config"], type(ax0["SRn"]["config"])(p, ax0["SRn"]["config"].direction))
+
+
+@needs_data
+def test_axes_and_seat_of_the_gating_plate(tmp_path):
+    from quickalignment.cadmodel.model import CAD_SRN_AXIS_UV, CAD_SRZ_AXIS_UW, CadCollisionModel
+    from quickalignment.core.geometry import GATING_PLATE, SampleLayout
+    assert CAD_SRN_AXIS_UV == pytest.approx((0.0, -0.25)) and CAD_SRZ_AXIS_UW == pytest.approx((0.0, 6.72))
+    sm = MotorPositions(st=-0.5, sn=0.2, sz=41.0, srn=130.0, srz=-10.0)
+    a, b = (CadCollisionModel(holder=_gating_holder(tmp_path, s)) for s in (1.0, 0.4))
+    ra, rb = a.rotation_axes(sm), b.rotation_axes(sm)
+    # the calibrated axes are where the measurements put them, whatever the seat; the holder (CAD) moves with it
+    for name in ("SRn", "SRz"):
+        assert _same_line(ra[name]["config"], rb[name]["config"])
+    assert ra["SRn"]["dv"] - rb["SRn"]["dv"] == pytest.approx(0.6)
+    assert ra["SRn"]["dv"] == pytest.approx(-0.1195 + 1.0 + 0.25)
+    assert ra["SRz"]["dn"] == pytest.approx(2.775 - (5.0 - 6.72)) and ra["SRz"]["dt"] == pytest.approx(-0.0096)
+    # the plate of a layout sits at the seat of the configuration, plus the offset found ("found here")
+    lay = SampleLayout(plate=GATING_PLATE, plate_offset_v=0.3)
+    assert b.layout_part(lay).tri[..., 1].min() == pytest.approx(-8.75 + 0.4 + 0.3)
+
+
+def test_cad_rotation_axes_from_the_rings():
+    from quickalignment.cadmodel.build import EXPORT, load_stl
+    if not (EXPORT / "body_519.stl").exists():
+        pytest.skip("NX export not here")
+    srn = load_stl(EXPORT / "body_519.stl").reshape(-1, 3)  # full SRn ring (axis (1, 0, 1)/sqrt2 in CAD)
+    srz = load_stl(EXPORT / "body_754.stl").reshape(-1, 3)  # full SRz rotor ring (vertical)
+    c_srn = cad_to_lab((srn.min(0) + srn.max(0)) / 2)
+    c_srz = cad_to_lab((srz.min(0) + srz.max(0)) / 2)
+    assert c_srn @ T_HAT == pytest.approx(0, abs=0.01) and c_srn @ Z_HAT == pytest.approx(-2.90, abs=0.01)
+    assert c_srz @ T_HAT == pytest.approx(0, abs=0.01) and c_srz @ N_HAT == pytest.approx(0, abs=0.01)
 
 
 @needs_data

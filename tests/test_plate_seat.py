@@ -1,15 +1,26 @@
 import numpy as np
 import pytest
 
-from quickalignment.core.geometry import plate_seat_v
+from quickalignment.core.geometry import PLATE_SEAT_V, plate_seat_v
 from quickalignment.core.stage import MotorPositions, StageConfig, StageModel, config_for_plate
 
 
-def test_config_for_plate_moves_the_plate_frame_with_the_seat():
+@pytest.fixture
+def seat_1mm(monkeypatch):
+    """The mechanism with a gating plate seated 1 mm higher (the default is 0 since 2026-11-19)."""
+    monkeypatch.setitem(PLATE_SEAT_V, "gating", 1.0)
+
+
+def test_gating_plate_sits_like_the_standard_plate():
+    # measured 2026-11-19: +0.014 / +0.077 mm (pin springs back), not the 1.0 mm of the drawing
+    assert plate_seat_v("gating") == 0.0 and plate_seat_v("standard") == 0.0 and plate_seat_v(None) == 0.0
+
+
+def test_config_for_plate_moves_the_plate_frame_with_the_seat(seat_1mm):
     gating = StageConfig(st0=-0.68, sz0=41.143, sn_f=-0.8, srn_axis_u=0.10, srn_axis_v=-0.12, srz_offset_t=-0.01,
                          srz_offset_n=2.775)
     seat = plate_seat_v("gating")
-    assert seat == 1.0 and plate_seat_v("standard") == 0.0 and plate_seat_v(None) == 0.0
+    assert seat == 1.0
     standard = config_for_plate(gating, seat, 0.0)
     assert standard.sz0 == pytest.approx(gating.sz0 + seat) and standard.srn_axis_v == pytest.approx(-0.12 + seat)
     assert (standard.st0, standard.sn_f, standard.srz_offset_n) == (gating.st0, gating.sn_f, gating.srz_offset_n)
@@ -34,7 +45,7 @@ def _record(plate):
                                              (None, "standard", 0.0), ("gating", "standard", 1.0),
                                              ("standard", "gating", -1.0), (None, "gating", -1.0),
                                              ("gating", "custom", 1.0)])
-def test_record_config_for_the_plate_mounted(made, mounted, d):
+def test_record_config_for_the_plate_mounted(made, mounted, d, seat_1mm):
     r = _record(made)
     c = r.config_for(mounted)
     assert c.sz0 == pytest.approx(41.2 + d) and c.srn_axis_v == pytest.approx(-0.05 + d)
@@ -55,10 +66,13 @@ def test_real_configs_record_their_plate():
                  "calibration_2026-11-15_151356_zone_plate.json"):
         assert recs[name].plate == "gating"
         assert recs[name].config_for("gating") == recs[name].config
-        assert recs[name].config_for("standard").sz0 == pytest.approx(recs[name].config.sz0 + 1.0)
+        assert recs[name].config_for("standard") == recs[name].config  # same seat (2026-11-19)
+    new = recs.get("calibration_2026-11-19_123901_zone_plate.json")
+    if new is not None:
+        assert new.plate == "standard" and new.config_for("gating") == new.config
 
 
-def test_alignment_agent_uses_the_plate_correction(tmp_path):
+def test_alignment_agent_uses_the_plate_correction(tmp_path, seat_1mm):
     import json
     from quickalignment.agent.alignment import AlignmentSession
     rec = {"created": "2026-11-15 15:13:56", "stage_config": {"st0": -0.8, "sz0": 41.2},

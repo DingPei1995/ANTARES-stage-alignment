@@ -51,7 +51,7 @@ into ST0, SZ0 and the axes.
 - Focusing optic aligned and focused (capillary or zone plate + OSA). The configuration is saved for that optic.
 - Total-intensity SPEM signal (`heason/total_int`, or the MBS `image32` summed): no angle or energy resolution needed.
 - SZ fly scans with steps down to 0.02 mm; ST, SN, SRn, SRz moved between lines.
-- Motor ranges used by the program: ST −9 … 9 mm, SN −30 … 65 mm, SZ 35 … 45 mm.
+- Motor ranges used by the program: ST −9 … 9 mm, SN −12 … 65 mm, SZ 35 … 45 mm.
 
 **Software.** `GoldFrameCalibration/GoldFrameCalibration.py` (double-click; Windows: `.pyw`) on a PC with the
 repository and `pip install -r requirements.txt` (PyQt5, numpy, matplotlib, h5py). It reads the ANTARES `.nxs` files

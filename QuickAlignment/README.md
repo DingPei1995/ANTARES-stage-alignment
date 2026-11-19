@@ -133,11 +133,12 @@ care of it.
 The sign conventions between the stage and the ARPES viewer contour (`AnalyzerGeometry`) are to be checked on the
 first real use: after turning, the point should appear where the preview shows it.
 
-Motor travel ranges (`MOTOR_SPECS` in `src/quickalignment/core/motors.py`): ST −9 … 9, SN −30 … 65, SZ 35 … 45 mm.
+Motor travel ranges (`MOTOR_SPECS` in `src/quickalignment/core/motors.py`): ST −9 … 9, SN −12 … 65, SZ 35 … 45 mm.
 The motor fields do not accept values outside them; *Bring target onto the beam*, *Correct SN* and the Rotate tab warn when a
 position would be out of range (e.g. at SRn = 120 a point more than 5 mm above or below the plate centre needs
-SZ outside 35 … 45). SN = SN_f (≈ 0) puts the plate surface in the analyzer focal plane; below it the real limit is a
-collision, given by the anti-collision check (the −30 only keeps the field short of the analyzer, 30 mm away).
+SZ outside 35 … 45). SN = SN_f (≈ 0) puts the plate surface in the analyzer focal plane; below it a collision with the
+optic can come before the SN travel limit (−12), given by the anti-collision check; the analyzer front, 35 mm away, is
+beyond the travel.
 
 ![Rotate sample tab](docs/images/app_rotate_tab.png)
 
@@ -146,13 +147,16 @@ collision, given by the anti-collision check (the −30 only keeps the field sho
 The plate (back plate, tab, riser, contact block, screws, samples, as boxes sampled on their faces every 0.25 mm)
 is checked against simple solids:
 
-- **analyzer (MBS A1)**: a truncated cone on the analyzer axis, front 30 mm from the focal plane, outer radius
-  10 mm at the front (the opening must pass the ±15° lens acceptance), 35° cone (estimate);
+- **analyzer (MBS A1)**: from the lens drawing (Detail A): front face 35 mm from the sample centre (the focus), Ø52
+  nose 15 mm long, Ø150 body, all metal at least 9.1 mm from the 45° line through the sample centre. Modelled as
+  that 45° envelope: a truncated cone on the analyzer axis, front 35 mm from the focus, outer radius 22.13 mm
+  (Ø44.3) at the front, widening at 45° to the Ø150 body (length 52.87 mm); on the safe side by up to 11 mm across
+  the axis around the end of the nose;
 - **zone plate + OSA**: thin plates across the beam. Zone plate (10 × 10 mm, 0.5 mm thick, placeholder size): working
-  distance 26.613 mm at 100 eV; the focal length grows with the photon energy (f = D Δr / λ), so at 95 eV it is
-  25.28 mm. OSA: the copper shield just in front of the plate, estimated on the design view at 100 eV (no scale; the
+  distance = focal length, proportional to the photon energy (f = D Δr / λ); the ZPS energy coefficient of the
+  beamline, −0.256 mm/eV (ZPS 1:1 with the lens), gives f = 0.256 E: 24.32 mm at 95 eV. OSA: the copper shield just in front of the plate, estimated on the design view at 100 eV (no scale; the
   plate and the zone plate distance as references give 1.3 … 5.4 mm): 3.5 mm before the focus where it crosses the
-  beam. Its top view, from a photo of the shield in use, is a bent sheet (`points`: a polyline, 0.2 mm thick, 20 mm
+  beam, at the OSA working position (S 80, X 0.5, Z 26.63). Its top view, from a photo of the shield in use, is a bent sheet (`points`: a polyline, 0.2 mm thick, 20 mm
   tall) of four pieces, from the sample side: (1) the shortest, 1 mm, parallel to the plate surface about 1.7 mm in
   front of it; (2) parallel to the zone plate, across the beam (the aperture), the beam through its middle, 2.3 mm
   long; (3) bent upstream on the analyzer side, 20° off the beam axis, so that it stays out of
@@ -189,10 +193,10 @@ A configuration file can give its own solids (missing parts keep the defaults of
 
 ```json
 "collision": {"margin": 0.1,
-              "analyzer": {"name": "analyzer (MBS A1)", "distance": 30, "tip_radius": 10, "half_angle": 35, "length": 150},
+              "analyzer": {"name": "analyzer (MBS A1)", "distance": 35, "tip_radius": 22.13, "half_angle": 45, "length": 52.87},
               "optics": [{"name": "OSA", "distance": 3.5, "points": [[0.71, -1.86], [0, -1.15], [0, 1.15], [4.13, 2.65], [6.74, 3.35]],
                           "thickness": 0.2, "height": 20, "moves": false},
-                         {"name": "zone plate", "distance": 25.28, "tip_radius": 5, "length": 0.5, "square": true}]}
+                         {"name": "zone plate", "distance": 24.32, "tip_radius": 5, "length": 0.5, "square": true}]}
 ```
 
 Not modelled: the sample holder below the plate, the cryostat and shields, the OSA / zone plate mounts beside the
@@ -242,7 +246,10 @@ Both plates share the same back plate (18 × 15.5 × 1.1 mm Ta with tab), which 
   below it a 6 mm contact block (3 gold pads, 4 screws, top ≈ 5.2 mm, screw heads ≈ 6.0 mm), reaching 1 mm below the plate.
 - **Custom** (*Custom plate* in the plate dialog): the standard back plate without its raised part, carrying a
   block centred left–right; enter its length (x), width (y), centre y and height (measured from the back face of
-  the plate, like the 5.0 mm of the standard plate). Samples go on the block; the block is saved with the session.
+  the plate, like the 5.0 mm of the standard plate; **at least 4.5 mm**: the sample holder has a part standing out
+  below the plate that a lower block would bring towards the OSA / capillary; 3.5 and 4.0 mm touch the OSA in the
+  anti-collision check, 4.5 mm is free).
+  Samples go on the block; the block is saved with the session.
   SN keeps referring to the standard plate: the block top is in focus at `SN = SN_f + (h − 5.0)`, a sample on it at
   `SN = SN_f + (h − 5.0) + H`.
 

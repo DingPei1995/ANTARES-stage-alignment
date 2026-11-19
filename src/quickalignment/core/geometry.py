@@ -118,10 +118,12 @@ PLATES = {p.key: p for p in (STANDARD_PLATE, GATING_PLATE)}
 
 # How much higher (+v, mm) each plate sits in the sample holder than the standard plate, at the same motor positions.
 # The gating plate's ceramic contact block reaches 1 mm below the plate bottom (v -8.75 against -7.75) and rests on
-# the pin of the holder, so the whole plate sits higher (user, 2026-11-18; 1.0 mm from the drawing, kept by the
-# user; not measured at the beamline). A configuration fitted with one plate needs this SZ shift for another (stage.config_for_plate).
+# the pin of the holder; 1.0 mm higher from the drawing (2026-11-18), but the pin springs back: measured 2026-11-19
+# (device on the standard plate found with the zone plate against the gating-plate configurations of 2026-11-15 / -17)
+# the gating plate sat only +0.014 / +0.077 mm higher, within the photo and seating scatter, so 0 (user, 2026-11-19).
+# A configuration fitted with one plate needs this SZ shift for another (stage.config_for_plate).
 # Custom plates sit like the standard one.
-PLATE_SEAT_V = {"standard": 0.0, "gating": 1.0}
+PLATE_SEAT_V = {"standard": 0.0, "gating": 0.0}
 
 
 def plate_seat_v(key: str | None) -> float:

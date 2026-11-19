@@ -4,7 +4,7 @@ import pytest
 from quickalignment.core.geometry import Sample, SampleLayout
 from quickalignment.alignment.rotation import (
     AnalyzerGeometry, align_direction, analyzer_angles, emission_in_plate, fit_srn_axis, onto_line, plate_to_lab_dir,
-    relocate, to_center,
+    recentre_piezo, relocate, to_center,
 )
 from quickalignment.core.stage import MotorPositions, OpticsCalibration, StageConfig, StageModel
 
@@ -219,3 +219,26 @@ def test_relocate_to_focus_within_motor_limits():
     assert near.new.sn == pytest.approx(free.new.sn - 0.03)
     assert (near.new.st, near.new.sz) == pytest.approx((free.new.st, free.new.sz))
     assert near.focus_distance == pytest.approx(0.03)
+
+
+def test_recentre_piezo():
+    """Sample seen with the piezo off centre: ST / SZ / SN that show it with the piezo centred."""
+    model = StageModel(StageConfig(srn_axis_u=1.2, srn_axis_v=-0.8, srz_offset_n=8.0))
+    optics = OpticsCalibration(optic_sign=-1)
+    # SRn 120, SRz 0: the piezo moves the plate in the ST / SZ plane, PIX like -ST, PIY like -SZ
+    found = MotorPositions(st=1.0, sn=3.0, sz=40.5, srn=120.0, srz=0.0, pix=160.0, piy=160.0)
+    p = recentre_piezo(model, found, -4.0, optics)
+    assert (p.new.pix, p.new.piy) == (150.0, 150.0)
+    assert p.new.st == pytest.approx(1.010) and p.new.sz == pytest.approx(40.490) and p.new.sn == pytest.approx(3.0)
+    assert p.beam_shift == pytest.approx(0.0, abs=1e-12) and p.optic_new == pytest.approx(-4.0)
+
+    # rotated: the point seen at the found position comes back to the same place, or slides along the beam (SN kept)
+    found = MotorPositions(st=0.4, sn=2.0, sz=39.7, srn=137.0, srz=12.0, pix=95.0, piy=230.0)
+    x = (0.7, -1.1, 5.3)
+    seen = model.plate_to_lab(found, *x)
+    p = recentre_piezo(model, found, -4.0, optics)
+    assert np.allclose(model.plate_to_lab(p.same_point, *x), seen, atol=1e-12)
+    now = model.plate_to_lab(p.new, *x)
+    assert p.new.sn == pytest.approx(found.sn) and abs(p.beam_shift) > 1e-3
+    assert np.allclose(now - seen, [0.0, p.beam_shift, 0.0], atol=1e-12)
+    assert p.optic_new == pytest.approx(-4.0 - p.beam_shift)

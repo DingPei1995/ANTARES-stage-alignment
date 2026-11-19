@@ -495,6 +495,23 @@ def test_rotation_tab(window):
     panel.compute()  # a new computation starts again with SN kept
     assert not panel.correct_sn.isChecked() and panel.chosen() is panel.result
 
+    # 4. found there with the piezo off centre: ST / SZ / SN and the optic that show it with the piezo centred
+    r = panel.result
+    box = panel.piezo
+    assert box.pix.value() == 150 and box.optic.value() == pytest.approx(r.optic_new, abs=1e-4)
+    box.pix.setValue(170.0)
+    box.piy.setValue(140.0)
+    box.compute()
+    p = box.result
+    assert (p.found.st, p.found.sz, p.found.srz) == (r.new.st, r.new.sz, r.new.srz) and p.found.pix == 170
+    assert (p.new.pix, p.new.piy) == (150, 150) and p.new.sn == pytest.approx(r.new.sn)
+    assert "found" in box.label.text()
+    box.send()
+    assert st.motors.value().st == pytest.approx(p.new.st, abs=1e-4) and st.motors.value().pix == 150
+    assert st.optic_pos.value() == pytest.approx(p.optic_new, abs=1e-4)
+    panel.compute()  # a new position: the piezo entries start again at the centre
+    assert box.result is None and box.pix.value() == 150
+
 
 def test_quick_sample_rotation_tab(window):
     """Earlier steps skipped: a sample found on the beam in focus, nothing placed. The optic position (working
@@ -527,6 +544,16 @@ def test_quick_sample_rotation_tab(window):
     assert panel.result.new.sn == pytest.approx(m.sn, abs=1e-4)  # SN kept by default
     s = win.editor.layout_model.samples[0]
     assert (s.u, s.v, s.height) == (-4, 4, 0.525) and win.editor.layout_model.plate_offset_v == 0.4  # untouched
+    # 4. found at the new position with the piezo off centre: corrected, nothing sent to the Stage tab
+    box, r, before = panel.piezo, panel.result, st.motors.value()
+    assert box.send_button.isHidden()
+    box.pix.setValue(135.0)
+    box.piy.setValue(225.0)
+    box.compute()
+    p = box.result
+    assert (p.found.st, p.found.sz, p.found.pix, p.found.piy) == (r.new.st, r.new.sz, 135, 225)
+    assert (p.new.pix, p.new.piy) == (150, 150) and p.new.sn == pytest.approx(r.new.sn)
+    assert box.send_button.isHidden() and st.motors.value() == before
     # an optic position far off: not on the plate, reported, no result
     panel.measured_optic.setValue(panel.measured_optic.value() + 500.0)
     panel.compute()

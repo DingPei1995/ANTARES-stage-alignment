@@ -195,9 +195,12 @@ ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back
 3. **Focusing optic**: *Type* is the optic in use (zone plate + OSA, or capillary); enter the optic position; press
    **Update schematic & optics**. The schematic shows the beam, the analyzer focus, the optic and the position
    **needed** for focus on the illuminated surface (in the picture the capillary is at 60.04, 59.6926 is needed).
-   *Use required position* copies it into the field.
-4. After focusing by hand, **Set as optics reference** takes the current state as the optics reference for this
-   session.
+4. **Move found sample to analyzer focal plane**: once a sample is found on the beam and focused by hand, enter the
+   stage positions and the optic position (ZPS / CPS) where it is in focus and press it. With the configuration's
+   optics reference, the optic position tells where along the beam the sample surface is; SN (ST compensating, so
+   the point stays on the beam) brings it onto the analyzer focal plane and the optic is moved to keep it in focus.
+   The line under the motors gives the new ST, SZ, SN, ΔSN and optic position, and where the point is on the plate.
+   Refused, with nothing changed, if a motor would leave its range or the plate would touch something.
 
 **The schematic** (redrawn only with *Update schematic & optics*):
 
@@ -244,7 +247,8 @@ watch the camera.
 
 1. **Current position**: the positions with the point of interest on the beam and in focus, and the optic position
    (*From Stage tab* copies them).
-2. **Wanted angles**: the new SRn and SRz (or use *Find angles for a BZ point…*, next sections).
+2. **Wanted angles**: the new SRn and SRz (for a Brillouin-zone point, ask the agent: see
+   [below](#finding-the-angles-for-a-brillouin-zone-point)).
 3. **Compute new position**: ST and SZ with the piezo centred and **SN kept**, and the optic position that refocuses
    (the table gives *now*, *new* and the change Δ). The point followed is the plate point under the beam at the
    current position (*Point:* line: what lies there and its plate x, y). The text says how far the point then is from the analyzer focus, *downstream* (further along the
@@ -302,57 +306,30 @@ tab, a tick box.
 
 ## Finding the angles for a Brillouin-zone point
 
-Under *Wanted angles*, **Find angles for a BZ point…** answers the question *"how much do I turn SRn and SRz so that
-K is at the centre of the slit, the slit runs along Γ–K and the deflector stays near 0?"* for 2-D hexagonal crystals.
+For 2-D hexagonal crystals, the question *"how much do I turn SRn and SRz so that K is at the centre of the slit,
+the slit runs along Γ–K and the deflector stays near 0?"* is answered by the **agent** (tools `align_bz_angles` and
+`align_bz_point_to`; there is no window for it in the program). Give it, read on the contour of a map in ARPES viewer
+(θ = deflector angle, contour x; φ = angle along the slit, contour y): the SRn / SRz and photon energy of the map,
+the angles of **Γ** and of **one K or M point**, the in-plane lattice constant a, the wanted point and slit direction,
+and the photon energy of the new measurement. Then enter the SRn / SRz it gives under *Wanted angles*.
 
-![BZ point: reachable](images/guide/bz_reachable.png)
-
-**What to enter** (read on the contour of a map in ARPES viewer; θ = deflector angle, contour x; φ = angle along the
-slit, contour y):
-
-1. **The map**: SRn and SRz at which it was measured (*From current position* takes them from the Rotate tab), its
-   photon energy, the angles of **Γ** and of **one K or M point**.
-2. **Crystal**: the in-plane lattice constant a (presets: graphene 2.46 Å, WSe2 3.282 Å, WS2, MoSe2, MoS2, hBN).
-3. **Wanted**: the point (Γ, K or K′, only K, only K′, M), the **slit direction** (Γ–K, K–M, Γ–M, M–K), the photon
-   energy of the new measurement, E − E_F of the point (e.g. −1.0 for the valence band top of WSe2 at K) and the work
-   function (4.5 eV).
-
-Press **Compute**. Below the inputs, *Γ–K on the map* compares the measured distance with the lattice constant (a
-difference above 10 % means a wrong number, point or photon energy) and gives the tilt of the sample on the plate
-(taken into account in the result).
-
-**Result**: *Reachable* when, with the deflector at 0, the point is within |θ| ≤ 5° and |φ| ≤ 5° of the slit centre,
-the slit within 2° of the wanted line, with SRn 60 … 180° and SRz −25 … +10°. The table lists every equivalent
-point and both turning senses; the first row is the recommended one (SRz ≤ 0 first: the beam is then closer to the
-surface normal and the spot smaller; then the smallest turn). *Beam to normal* is the incidence angle, 45° + SRz.
-
-**Preview**: left, the map you will measure at the proposed angles (deflector across, slit angle up; the deflector
-has gaps beyond ±8° and stops at ±12°; the green box is the accepted ±5°). Right, the 2-D zone in momentum,
-oriented like your current map, with the current map (dashed) and the new analyzer window and slit (orange).
-
-**Use these angles** writes SRn / SRz into *Wanted angles* and computes the new position. Set the deflector to 0
-(and the photon energy, if it changed).
+The point is *reachable* when, with the deflector at 0, it is within |θ| ≤ 5° and |φ| ≤ 5° of the slit centre, the
+slit within 2° of the wanted line, with SRn 60 … 180° and SRz −25 … +10° (SRz ≤ 0 preferred: the beam is then closer
+to the surface normal and the spot smaller).
 
 ### When it cannot be reached
 
 The manipulator has **no tilt axis**. A consequence: with a point at the slit centre and the deflector at 0, the
 slit always runs along the line from Γ to that point (Γ–K for K). A slit *across* it (K–M, M–K) needs the deflector
-at the emission angle of the point (15–20° at 95 eV), which the analyzer cannot do well:
+at the emission angle of the point (15–20° at 95 eV), which the analyzer cannot do well. The **radial alternative**:
+K at the centre with the slit along Γ–K; the deflector direction then runs along K–M, so a short **deflector map**
+(|θ| ≤ 5°) gives the K–M cut through K with little distortion.
 
-![BZ point: zone-edge cut](images/guide/bz_zone_edge.png)
-
-The window then proposes the **radial alternative**: K at the centre with the slit along Γ–K; the deflector
-direction then runs along K–M, so a short **deflector map** (|θ| ≤ 5°) gives the K–M cut through K with little
-distortion. *Show the radial alternative* switches to it.
-
-When the emission angle is too large for the SRz range, the window gives the **photon energies** at which the point
-is reachable:
-
-![BZ point: more photon energy needed](images/guide/bz_photon_energy.png)
+When the emission angle is too large for the SRz range, a higher photon energy may make the point reachable:
 
 - ANTARES: 30–180 eV with the **capillary**; the **zone plate works at 95 eV only**. Changing the photon energy with
   the zone plate means changing to the capillary (realignment, capillary configuration).
-- If SRn is the limit, the window says by how much to **turn the sample on the plate** when remounting it.
+- If SRn is the limit, the sample has to be **turned on the plate** when remounting it.
 - If nothing works, the sample has to be remounted, or another, equivalent point chosen.
 
 | example (E_F, work function 4.5 eV) | emission angle of K at 30 / 95 / 180 eV | K, slit along Γ–K |
@@ -361,7 +338,7 @@ is reachable:
 | graphene, a = 2.46 Å, Γ–K = 1.70 Å⁻¹ | 41.2° / 20.4° / 14.5° | 95 eV: SRz ≈ −20°; 30 eV: not reachable (needs ≥ ~61 eV) |
 
 The signs between the stage and the ARPES viewer contour have been checked once (deflector sign, 2026-09); on the
-first use of a new kind of measurement, check that the point appears where the preview shows it.
+first use of a new kind of measurement, check that the point appears where the agent says it will.
 
 ## Sessions, plate and configuration
 
@@ -386,7 +363,7 @@ first use of a new kind of measurement, check that the point appears where the p
    (camera, photoemission map).
 4. *Found here*: correct its position. The others now come out right too.
 5. Measure a map at SRn = 120°, SRz = 0°; read Γ and one K / M point in ARPES viewer.
-6. *Find angles for a BZ point…* → *Use these angles* → *Compute new position* (tick *Correct SN* if the point is
+6. Ask the agent for the BZ point angles → *Wanted angles* → *Compute new position* (tick *Correct SN* if the point is
    more than 50 µm from the analyzer focus) → *Send to Stage & Optics tab*.
 7. Save the session.
 

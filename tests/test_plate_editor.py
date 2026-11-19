@@ -150,7 +150,7 @@ def test_devices_follow_substrate_and_edges(window):
     assert ed.dev_table.rowCount() == 0 and not ed.device_items
 
 
-def test_stage_panel_bring_to_focus_and_optics(window):
+def test_stage_panel_bring_to_focus_and_optics(window, monkeypatch):
     ed, st = window.editor, window.stage
     s = ed.add_sample(Sample("Sub", u=2, v=-1, length=4, width=4, height=0.5))
     ed.add_device(s, Device("D1", "left", 1.0, "bottom", 1.0, 0.5, 0.5))
@@ -171,9 +171,7 @@ def test_stage_panel_bring_to_focus_and_optics(window):
     assert st.last_result.required_optic_position == pytest.approx(0.0, abs=1e-3)
     assert "Optic position for focus on Sub/D1: " in st.result_label.text()
     assert "(entered: 3.0000)" in st.result_label.text()
-    st.use_required_optic()
-    assert st.optic_pos.value() == pytest.approx(0.0, abs=1e-3)
-
+    st.optic_pos.setValue(st.last_result.required_optic_position)
     st.motors.boxes["sn"].setValue(sn + 1.0)
     st.update_view()
     assert st.last_result.delta > 1.0
@@ -193,11 +191,28 @@ def test_stage_panel_bring_to_focus_and_optics(window):
     res = st.last_result
     assert res.delta < 0 and res.required_optic_position == pytest.approx(10.0 - res.delta, abs=1e-3)
 
-    # the user focuses by hand and takes this state as the optics reference
-    st.optic_pos.setValue(9.5)
-    st.set_optics_reference()
-    assert st.record.optics.optic_position == 9.5 and st.record.optics.motors.sn == pytest.approx(sn)
-    assert "in focus" in st.result_label.text()
+    # the sample is found in focus 0.2 mm downstream of the analyzer focus (optic position from the configuration's
+    # optics reference, sign -1): SN (ST compensating) brings it onto the analyzer focal plane, the optic follows
+    model = st.model()
+    found = st.motors.value()
+    found_optic = cal.position_for_focus(model, 0.2)
+    y = cal.focus_for_position(model, found_optic)
+    assert y == pytest.approx(0.2)
+    st.optic_pos.setValue(found_optic)
+    warnings = []
+    monkeypatch.setattr(QtWidgets.QMessageBox, "warning", lambda *a, **k: warnings.append(a[2]))
+    result = st.bring_found_to_focal_plane()
+    assert not warnings and result is not None
+    new, optic = result
+    # (the spin boxes hold 4 decimals)
+    assert new.sn - found.sn == pytest.approx(-y / 2 ** 0.5, abs=1e-4)
+    assert new.st - found.st == pytest.approx(y / 2 ** 0.5, abs=1e-4)
+    assert (new.sz, new.srn, new.srz) == (found.sz, found.srn, found.srz)
+    assert optic == pytest.approx(cal.position_for_focus(model, 0.0))
+    assert st.optic_pos.value() == pytest.approx(optic, abs=1e-4)
+    assert st.motors.value().sn == pytest.approx(new.sn, abs=1e-4)
+    assert cal.focus_for_position(model, optic) == pytest.approx(0.0, abs=1e-9)
+    assert "analyzer focal plane" in st.goto_label.text()
 
 
 def test_close_asks_nothing_and_writes_no_configuration(window, monkeypatch):

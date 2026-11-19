@@ -122,8 +122,8 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 1. 输入当前电机位置（绝对值，与控制系统一致）。PIX、PIY 是压电台：计算按输入值使用（上面的初始位置对应压电台居中）。
 2. 选择 **Target**，按 **Bring target onto the beam**：按输入的 SN、SRn、SRz、PIX、PIY 计算 ST、SZ（**SN 不变**，即日常实验的做法）。下方文字说明此时目标沿光束距分析器焦点多远（超过 50 µm 显示为红色：谱会畸变），以及消除该偏离所需的 ΔSN。只有当你判断偏离过大时，才按 **Correct SN**：计算把目标放到分析器焦点上的 SN、ST、SZ（见 [Correct SN](#correct-sn把该点放回分析器焦点)）。若某个电机会超出行程，或样品托会碰到聚焦元件或分析器，数值不会改变，并说明原因。图中在 SRn = 120°、SRz = 0° 下把 D1 移到光斑上：SN = 0 不变时它就在分析器焦点上。
-3. **聚焦元件**：*Type* 是所用元件（zone plate + OSA 或 capillary）；输入元件位置，按 **Update schematic & optics**。示意图显示光束、分析器焦点、聚焦元件，以及在被照表面上聚焦 **所需的** 位置（图中 capillary 在 60.04，需要 59.6926）。*Use required position* 把该位置填入输入框。
-4. 手动聚焦后，**Set as optics reference** 把当前状态作为本次 session 的光学参考。
+3. **聚焦元件**：*Type* 是所用元件（zone plate + OSA 或 capillary）；输入元件位置，按 **Update schematic & optics**。示意图显示光束、分析器焦点、聚焦元件，以及在被照表面上聚焦 **所需的** 位置（图中 capillary 在 60.04，需要 59.6926）。
+4. **Move found sample to analyzer focal plane**：找到样品并手动聚焦后，输入此时的样品台位置和聚焦元件位置（ZPS / CPS），按此按钮。程序根据配置文件中的光学参考，由元件位置算出样品表面沿光束的位置；移动 SN（ST 随之补偿，该点始终留在光束上）把它拉到分析器焦平面上，并移动聚焦元件使其保持聚焦。电机下方一行给出新的 ST、SZ、SN、ΔSN 和元件位置，以及该点在托上的位置。若某个电机会超出行程或样品托会碰到东西，则拒绝且不改变任何数值。
 
 **示意图**（只在按 *Update schematic & optics* 时重画）：
 
@@ -147,7 +147,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 ![Rotate sample 页](images/guide/rotate_tab.png)
 
 1. **Current position**：感兴趣的点位于光斑上且已聚焦时的位置及聚焦元件位置（*From Stage tab* 可直接复制）。
-2. **Wanted angles**：新的 SRn 和 SRz（或使用 *Find angles for a BZ point…*，见后面几节）。
+2. **Wanted angles**：新的 SRn 和 SRz（布里渊区高对称点的转角请问 agent，见[后文](#为布里渊区高对称点寻找转角)）。
 3. **Compute new position**：在压电台居中、**SN 不变** 的情况下给出 ST、SZ，以及重新聚焦所需的元件位置（表格列出 *now*、*new* 和变化量 Δ）。所跟踪的是当前位置下光斑所在的托上那一点（*Point:* 一行：该处是什么及其托坐标 x、y）。文字说明该点距离分析器焦点有多远、在 *downstream*（沿光束更远处）还是 *upstream*，以及按模型计算的当前距离（超过 50 µm 显示为红色：谱会畸变）。只转 SRn 时表面平面不变，转 SRz 时会改变。
 4. 只有当该点离焦点过远时，才勾选 **Correct SN**（每次重新计算都会恢复为不勾选；见下一节），可看到把该点放到 **分析器焦点上** 所需的 SN、ST、SZ 和元件位置。若电机行程不允许，则给出最接近的可达位置及其与焦点的距离。
 5. **Send to Stage & Optics tab** 采用所显示的结果（勾选时为修正后的结果）；超出行程或样品托会碰到东西时拒绝。
@@ -177,38 +177,18 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 ## 为布里渊区高对称点寻找转角
 
-在 *Wanted angles* 下，**Find angles for a BZ point…** 针对二维六角晶体回答这个问题：*"SRn 和 SRz 要转多少，才能让 K 点位于狭缝中心、狭缝沿 Γ–K、且 deflector 接近 0？"*
+对二维六角晶体，*"SRn 和 SRz 要转多少，才能让 K 点位于狭缝中心、狭缝沿 Γ–K、且 deflector 接近 0？"* 这个问题由 **agent** 回答（工具 `align_bz_angles` 和 `align_bz_point_to`；程序界面中没有对应窗口）。告诉它在 ARPES viewer 中 map 的 contour 上读到的内容（θ = deflector 角，contour 的 x；φ = 沿狭缝的角度，contour 的 y）：这张 map 的 SRn / SRz 和光子能量、**Γ** 和 **一个 K 或 M 点** 的角度、面内晶格常数 a、目标点和狭缝方向，以及新测量的光子能量。然后把得到的 SRn / SRz 填入 *Wanted angles*。
 
-![可以达到的情况](images/guide/bz_reachable.png)
-
-**需要输入的内容**（在 ARPES viewer 中 map 的 contour 上读取；θ = deflector 角，contour 的 x；φ = 沿狭缝的角度，contour 的 y）：
-
-1. **The map**：测这张 map 时的 SRn 和 SRz（*From current position* 从 Rotate 页读取）、光子能量，以及 **Γ** 和 **一个 K 或 M 点** 的角度。
-2. **Crystal**：面内晶格常数 a（预设：graphene 2.46 Å、WSe2 3.282 Å、WS2、MoSe2、MoS2、hBN）。
-3. **Wanted**：目标点（Γ、K 或 K′、只要 K、只要 K′、M）、**狭缝方向**（Γ–K、K–M、Γ–M、M–K）、新测量的光子能量、该点的 E − E_F（例如 WSe2 在 K 点价带顶取 −1.0）以及功函数（4.5 eV）。
-
-按 **Compute**。输入区下方的 *Γ–K on the map* 会把 map 上量到的距离与晶格常数比较（相差超过 10 % 说明某个数值、点或光子能量有误），并给出样品相对托的倾斜角（计算中已考虑）。
-
-**结果**：当 deflector 为 0 时该点距狭缝中心 |θ| ≤ 5°、|φ| ≤ 5°，狭缝与目标方向偏差在 2° 以内，且 SRn 在 60 … 180°、SRz 在 −25 … +10° 之内，即显示 *Reachable*。表格列出所有等价点和两种转向，第一行为推荐方案（优先 SRz ≤ 0：光更接近样品法线、光斑更小；其次转动量最小）。*Beam to normal* 为入射角，等于 45° + SRz。
-
-**预览**：左图为在建议角度下将测到的 map（横轴 deflector，纵轴狭缝角；deflector 超过 ±8° 有数据缺口，最大 ±12°；绿色框为允许的 ±5°）。右图为动量空间中的二维布里渊区，方向与当前 map 一致，虚线为当前 map 的范围，橙色为新的分析器窗口和狭缝。
-
-**Use these angles** 把 SRn / SRz 填入 *Wanted angles* 并计算新位置。请把 deflector 设为 0（如光子能量改变，也一并设置）。
+当 deflector 为 0 时该点距狭缝中心 |θ| ≤ 5°、|φ| ≤ 5°，狭缝与目标方向偏差在 2° 以内，且 SRn 在 60 … 180°、SRz 在 −25 … +10° 之内，即为 *可达*（优先 SRz ≤ 0：光更接近样品法线、光斑更小）。
 
 ### 达不到时
 
-样品台 **没有 tilt 轴**。因此当某点位于狭缝中心且 deflector 为 0 时，狭缝总是沿 Γ 到该点的方向（对 K 点即 Γ–K）。要让狭缝 *垂直* 于这一方向（K–M、M–K），deflector 需要转到该点的出射角（95 eV 时为 15–20°），分析器难以做好：
+样品台 **没有 tilt 轴**。因此当某点位于狭缝中心且 deflector 为 0 时，狭缝总是沿 Γ 到该点的方向（对 K 点即 Γ–K）。要让狭缝 *垂直* 于这一方向（K–M、M–K），deflector 需要转到该点的出射角（95 eV 时为 15–20°），分析器难以做好。**径向替代方案**：K 点在中心、狭缝沿 Γ–K；此时 deflector 方向正好沿 K–M，做一个小范围的 **deflector map**（|θ| ≤ 5°）即可得到穿过 K 点的 K–M 切面，畸变很小。
 
-![沿布里渊区边界的切面](images/guide/bz_zone_edge.png)
-
-此时窗口会给出 **径向替代方案**：K 点在中心、狭缝沿 Γ–K；此时 deflector 方向正好沿 K–M，做一个小范围的 **deflector map**（|θ| ≤ 5°）即可得到穿过 K 点的 K–M 切面，畸变很小。*Show the radial alternative* 可切换到该方案。
-
-当出射角超出 SRz 范围时，窗口会给出能达到该点的 **光子能量**：
-
-![需要提高光子能量](images/guide/bz_photon_energy.png)
+当出射角超出 SRz 范围时，提高光子能量可能使该点可达：
 
 - ANTARES：**capillary** 可用 30–180 eV；**zone plate 只能用 95 eV**。用 zone plate 时改变光子能量意味着换成 capillary（重新对光、使用 capillary 的配置）。
-- 若受 SRn 限制，窗口会给出重新 mount 时 **样品在托上应转的方向和角度**。
+- 若受 SRn 限制，重新 mount 时需要 **把样品在托上转一个角度**。
 - 若都不行，需要重新 mount 样品，或选择另一个等价点。
 
 | 例子（E_F，功函数 4.5 eV） | K 点在 30 / 95 / 180 eV 的出射角 | K 点、狭缝沿 Γ–K |
@@ -216,7 +196,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 | WSe2，a = 3.282 Å，Γ–K = 1.28 Å⁻¹ | 29.6° / 15.2° / 10.8° | 95 eV 可达，SRz ≈ −15° |
 | graphene，a = 2.46 Å，Γ–K = 1.70 Å⁻¹ | 41.2° / 20.4° / 14.5° | 95 eV：SRz ≈ −20°；30 eV 不可达（需约 61 eV 以上） |
 
-样品台与 ARPES viewer contour 之间的符号已经验证过一次（deflector 符号，2026-09）；第一次做新类型的测量时，请确认该点出现在预览所示位置。
+样品台与 ARPES viewer contour 之间的符号已经验证过一次（deflector 符号，2026-09）；第一次做新类型的测量时，请确认该点出现在 agent 给出的位置。
 
 ## Session、样品托与配置
 
@@ -233,7 +213,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 3. 用列出的 ST / SZ / SN（SRn = 120°，SRz = 0°）移到第一个样品或 device，用光斑找到它（相机、光电子 map）。
 4. *Found here*：修正它的位置，其他样品随之也会更准。
 5. 在 SRn = 120°、SRz = 0° 测一张 map；在 ARPES viewer 中读出 Γ 和一个 K / M 点。
-6. *Find angles for a BZ point…* → *Use these angles* → *Compute new position*（若该点距分析器焦点超过 50 µm，勾选 *Correct SN*）→ *Send to Stage & Optics tab*。
+6. 请 agent 给出布里渊区点的转角 → 填入 *Wanted angles* → *Compute new position*（若该点距分析器焦点超过 50 µm，勾选 *Correct SN*）→ *Send to Stage & Optics tab*。
 7. 保存 session。
 
 ## 提示信息与处理方法

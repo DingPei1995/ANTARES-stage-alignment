@@ -206,9 +206,13 @@ pour repère).
 3. **Optique** : *Type* est l'optique utilisée (zone plate + OSA, ou capillaire) ; entrer sa position et appuyer sur
    **Update schematic & optics**. Le schéma montre le faisceau, le foyer de l'analyseur, l'optique et la position
    **nécessaire** pour focaliser sur la surface éclairée (sur l'image le capillaire est à 60.04, il faut 59.6926).
-   *Use required position* la copie dans le champ.
-4. Après une focalisation à la main, **Set as optics reference** prend l'état actuel comme référence optique pour
-   cette session.
+4. **Move found sample to analyzer focal plane** : une fois un échantillon trouvé sous le faisceau et focalisé à la
+   main, entrer les positions de la platine et la position de l'optique (ZPS / CPS) où il est au foyer, puis appuyer.
+   Avec la référence optique de la configuration, la position de l'optique indique où se trouve la surface le long du
+   faisceau ; SN (ST compensant, le point reste sous le faisceau) l'amène dans le plan focal de l'analyseur et
+   l'optique suit pour rester au foyer. La ligne sous les moteurs donne les nouveaux ST, SZ, SN, ΔSN et la position
+   de l'optique, et où est le point sur la plaquette. Refusé, sans rien changer, si un moteur sortait de sa course ou
+   si la plaquette touchait quelque chose.
 
 **Le schéma** (redessiné seulement avec *Update schematic & optics*) :
 
@@ -257,7 +261,8 @@ Garder une distance de sécurité et surveiller la caméra.
 
 1. **Current position** : les positions avec le point d'intérêt sous le faisceau et au foyer, et la position de
    l'optique (*From Stage tab* les copie).
-2. **Wanted angles** : les nouveaux SRn et SRz (ou *Find angles for a BZ point…*, sections suivantes).
+2. **Wanted angles** : les nouveaux SRn et SRz (pour un point de la zone de Brillouin, demander à l'agent : voir
+   [plus bas](#trouver-les-angles-pour-un-point-de-la-zone-de-brillouin)).
 3. **Compute new position** : ST et SZ avec le piézo centré et **SN gardé**, et la position de l'optique qui
    refocalise (le tableau donne *now*, *new* et l'écart Δ). Le point suivi est le point de la plaquette sous le
    faisceau à la position actuelle (ligne *Point:* : ce qui s'y trouve et ses x, y). Le texte indique la distance du
@@ -319,60 +324,32 @@ entrés) ; dans l'onglet Rotate, une case à cocher.
 
 ## Trouver les angles pour un point de la zone de Brillouin
 
-Sous *Wanted angles*, **Find angles for a BZ point…** répond, pour les cristaux hexagonaux 2D, à la question
-*« de combien tourner SRn et SRz pour que K soit au centre de la fente, la fente selon Γ–K et le déflecteur proche de 0 ? »*
+Pour les cristaux hexagonaux 2D, la question *« de combien tourner SRn et SRz pour que K soit au centre de la fente,
+la fente selon Γ–K et le déflecteur proche de 0 ? »* est traitée par l'**agent** (outils `align_bz_angles` et
+`align_bz_point_to` ; le programme n'a pas de fenêtre pour cela). Lui donner, lus sur le contour d'une carte dans
+ARPES viewer (θ = angle du déflecteur, x du contour ; φ = angle le long de la fente, y du contour) : SRn / SRz et
+énergie de photon de la carte, les angles de **Γ** et d'**un point K ou M**, la constante de réseau dans le plan a,
+le point et la direction de fente voulus, et l'énergie de photon de la nouvelle mesure. Entrer ensuite les SRn / SRz
+obtenus dans *Wanted angles*.
 
-![Point de zone atteignable](images/guide/bz_reachable.png)
-
-**À entrer** (lu sur le contour d'une carte dans ARPES viewer ; θ = angle du déflecteur, x du contour ; φ = angle le
-long de la fente, y du contour) :
-
-1. **The map** : SRn et SRz de la mesure (*From current position* les prend dans l'onglet Rotate), son énergie de
-   photon, les angles de **Γ** et d'**un point K ou M**.
-2. **Crystal** : la constante de réseau dans le plan a (préréglages : graphène 2,46 Å, WSe2 3,282 Å, WS2, MoSe2,
-   MoS2, hBN).
-3. **Wanted** : le point (Γ, K ou K′, K seul, K′ seul, M), la **direction de la fente** (Γ–K, K–M, Γ–M, M–K),
-   l'énergie de photon de la nouvelle mesure, E − E_F du point (p. ex. −1,0 pour le haut de bande de valence de WSe2
-   en K) et le travail de sortie (4,5 eV).
-
-Appuyer sur **Compute**. Sous les entrées, *Γ–K on the map* compare la distance mesurée à la constante de réseau (un
-écart de plus de 10 % signale un nombre, un point ou une énergie faux) et donne l'inclinaison de l'échantillon sur la
-plaquette (prise en compte dans le résultat).
-
-**Résultat** : *Reachable* quand, déflecteur à 0, le point est à |θ| ≤ 5° et |φ| ≤ 5° du centre de la fente, la
-fente à moins de 2° de la ligne voulue, avec SRn 60 … 180° et SRz −25 … +10°. Le tableau donne tous les points
-équivalents et les deux sens de rotation ; la première ligne est la recommandée (d'abord SRz ≤ 0 : faisceau plus
-proche de la normale, spot plus petit ; puis la plus petite rotation). *Beam to normal* est l'angle d'incidence,
-45° + SRz.
-
-**Aperçu** : à gauche, la carte que vous mesurerez aux angles proposés (déflecteur en abscisse, angle de fente en
-ordonnée ; le déflecteur a des lacunes au-delà de ±8° et s'arrête à ±12° ; le cadre vert est le ±5° accepté). À
-droite, la zone 2D en impulsion, orientée comme votre carte actuelle, avec la carte actuelle (tirets) et la nouvelle
-fenêtre de l'analyseur et la fente (orange).
-
-**Use these angles** écrit SRn / SRz dans *Wanted angles* et calcule la nouvelle position. Mettre le déflecteur à 0
-(et l'énergie de photon, si elle a changé).
+Le point est *atteignable* quand, déflecteur à 0, il est à |θ| ≤ 5° et |φ| ≤ 5° du centre de la fente, la fente à
+moins de 2° de la ligne voulue, avec SRn 60 … 180° et SRz −25 … +10° (SRz ≤ 0 de préférence : faisceau plus proche de
+la normale, spot plus petit).
 
 ### Quand ce n'est pas atteignable
 
 Le manipulateur n'a **pas d'axe de tilt**. Conséquence : avec un point au centre de la fente et le déflecteur à 0, la
 fente est toujours selon la ligne de Γ à ce point (Γ–K pour K). Une fente *perpendiculaire* (K–M, M–K) demande le
-déflecteur à l'angle d'émission du point (15–20° à 95 eV), ce que l'analyseur fait mal :
+déflecteur à l'angle d'émission du point (15–20° à 95 eV), ce que l'analyseur fait mal. L'**alternative radiale** :
+K au centre, fente selon Γ–K ; la direction du déflecteur est alors selon K–M, et une courte **carte en déflecteur**
+(|θ| ≤ 5°) donne la coupe K–M passant par K avec peu de distorsion.
 
-![Coupe en bord de zone](images/guide/bz_zone_edge.png)
-
-La fenêtre propose alors l'**alternative radiale** : K au centre, fente selon Γ–K ; la direction du déflecteur est
-alors selon K–M, et une courte **carte en déflecteur** (|θ| ≤ 5°) donne la coupe K–M passant par K avec peu de
-distorsion. *Show the radial alternative* y passe directement.
-
-Quand l'angle d'émission est trop grand pour la plage de SRz, la fenêtre donne les **énergies de photon** auxquelles
-le point est atteignable :
-
-![Énergie de photon plus élevée nécessaire](images/guide/bz_photon_energy.png)
+Quand l'angle d'émission est trop grand pour la plage de SRz, une énergie de photon plus élevée peut rendre le point
+atteignable :
 
 - ANTARES : 30–180 eV avec le **capillaire** ; la **zone plate ne fonctionne qu'à 95 eV**. Changer d'énergie avec la
   zone plate signifie passer au capillaire (réalignement, configuration capillaire).
-- Si SRn est la limite, la fenêtre indique de combien **tourner l'échantillon sur la plaquette** au remontage.
+- Si SRn est la limite, il faut **tourner l'échantillon sur la plaquette** au remontage.
 - Si rien ne marche, il faut remonter l'échantillon ou choisir un autre point équivalent.
 
 | exemple (E_F, travail de sortie 4,5 eV) | angle d'émission de K à 30 / 95 / 180 eV | K, fente selon Γ–K |
@@ -381,7 +358,7 @@ le point est atteignable :
 | graphène, a = 2,46 Å, Γ–K = 1,70 Å⁻¹ | 41,2° / 20,4° / 14,5° | 95 eV : SRz ≈ −20° ; 30 eV : non (il faut ≳ 61 eV) |
 
 Les signes entre la platine et le contour d'ARPES viewer ont été vérifiés une fois (signe du déflecteur, 2026-09) ;
-lors d'un nouveau type de mesure, vérifier que le point apparaît là où l'aperçu le montre.
+lors d'un nouveau type de mesure, vérifier que le point apparaît là où l'agent l'annonce.
 
 ## Sessions, plaquette et configuration
 
@@ -407,7 +384,7 @@ lors d'un nouveau type de mesure, vérifier que le point apparaît là où l'ape
    faisceau (caméra, carte de photoémission).
 4. *Found here* : corriger sa position. Les autres tombent alors juste aussi.
 5. Mesurer une carte à SRn = 120°, SRz = 0° ; lire Γ et un point K / M dans ARPES viewer.
-6. *Find angles for a BZ point…* → *Use these angles* → *Compute new position* (cocher *Correct SN* si le point est à
+6. Demander à l'agent les angles du point de zone → *Wanted angles* → *Compute new position* (cocher *Correct SN* si le point est à
    plus de 50 µm du foyer) → *Send to Stage & Optics tab*.
 7. Enregistrer la session.
 

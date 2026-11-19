@@ -83,8 +83,9 @@ Positions here are **absolute motor values** (ST, SZ, SN, …, optic).
   SN/ST/SZ that put it on the analyzer focus.
 - **focusing optic** (zone plate + OSA or capillary, only along the beam): its absolute position is read
   from the configuration and can be typed in. The result gives the **absolute optic position** for focus
-  on the illuminated surface; *Use required position* copies it into the field. After focusing by hand,
-  *Set as optics reference* takes the current state as the optics reference for this session.
+  on the illuminated surface. *Move found sample to analyzer focal plane*: with a sample found on the beam and in
+  focus at the entered stage and optic (ZPS / CPS) positions, the configuration's optics reference gives where the
+  surface is along the beam; SN (ST compensating) brings it onto the analyzer focal plane and the optic follows.
 - schematic: top view (plate orientation, analyzer and its focal plane, beam, optic with its position and the
   position needed for focus) and the sample plane in front view (SRn rotation; beam spot, analyzer focus and
   SRn axis with a legend in the same colours; axes in absolute ST / SZ)
@@ -107,9 +108,9 @@ Gives the stage positions that keep a sample point on the beam when the sample i
    If a motor range does not allow it, the closest reachable position is given with its distance from the focus.
    *Send to Stage & Optics tab* takes the shown solution (refused if it is out of range).
 
-**Find angles for a BZ point…** (under *Wanted angles*; 2-D hexagonal crystals such as
-graphene, WSe2): which SRn / SRz bring Γ, K (or only K / only K′) or M to the slit centre with the deflector at 0
-and the slit along a high-symmetry line (Γ–K, K–M, Γ–M, M–K). Entered by hand, from a map in ARPES viewer
+**Angles for a BZ point** (agent only: `align_bz_angles`, `align_bz_point_to`; no window in the program; 2-D
+hexagonal crystals such as graphene, WSe2): which SRn / SRz bring Γ, K (or only K / only K′) or M to the slit centre
+with the deflector at 0 and the slit along a high-symmetry line (Γ–K, K–M, Γ–M, M–K). Given to the agent, from a map in ARPES viewer
 (θ = deflector, contour x; φ = angle along the slit, contour y): SRn / SRz and photon energy of the map, the angles
 of Γ and of one K or M point, the lattice constant (presets), the wanted point and line, the photon energy of the
 new measurement and E − E_F of the point (work function 4.5 eV). The sample may be mounted tilted: the Γ angles take
@@ -119,19 +120,15 @@ care of it.
   within 2° of the line, with SRn 60 … 180° and SRz −25 … +10° (`src/quickalignment/alignment/bz_target.py`). All equivalent points and both
   SRz senses are listed; SRz ≤ 0 is preferred (beam closer to the surface normal: 45° + SRz), then the smallest turn.
 - No tilt axis: with the point at the slit centre and the deflector at 0 the slit always runs along Γ–point
-  (Γ–K for K). A slit across it (K–M, M–K) needs the deflector at about the emission angle of the point; the window
-  then proposes the radial geometry, where the deflector runs along K–M, and a short deflector map (|θ| ≤ 5°).
+  (Γ–K for K). A slit across it (K–M, M–K) needs the deflector at about the emission angle of the point; the radial
+  geometry, where the deflector runs along K–M, with a short deflector map (|θ| ≤ 5°) is the alternative.
 - Not reachable: the photon energies (30 … 180 eV, capillary only; the zone plate works at 95 eV only) at which it
   is, or that the sample has to be remounted (turned on the plate by a given angle when SRn is the limit).
 - A check of the input: Γ–K (or Γ–M) on the map against the lattice constant, and the tilt of the sample.
-- Preview: the map at the proposed angles (BZ, deflector ranges: gaps beyond ±8°, max ±12°) and the 2-D zone in k
-  with the analyzer window, oriented like the current map.
-- *Use these angles* puts SRn / SRz into *Wanted angles* and computes the new position.
-
-![Find angles for a BZ point](docs/images/bz_target_dialog.png)
+- The SRn / SRz it gives go into *Wanted angles* of the Rotate sample tab.
 
 The sign conventions between the stage and the ARPES viewer contour (`AnalyzerGeometry`) are to be checked on the
-first real use: after turning, the point should appear where the preview shows it.
+first real use: after turning, the point should appear where the agent says it will.
 
 Motor travel ranges (`MOTOR_SPECS` in `src/quickalignment/core/motors.py`): ST −9 … 9, SN −12 … 65, SZ 35 … 45 mm.
 The motor fields do not accept values outside them; *Bring target onto the beam*, *Correct SN* and the Rotate tab warn when a

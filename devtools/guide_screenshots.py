@@ -32,10 +32,8 @@ from matplotlib.transforms import Bbox  # noqa: E402
 
 from quickalignment.core.calibration import CalibrationStore  # noqa: E402
 from quickalignment.core.geometry import STANDARD_PLATE, SampleLayout  # noqa: E402
-from quickalignment.alignment.rotation import AnalyzerGeometry, analyzer_angles, plate_to_lab_dir  # noqa: E402
 from quickalignment.core.session import Session  # noqa: E402
 from quickalignment.core.stage import MotorPositions, StageModel  # noqa: E402
-from quickalignment.alignment import bz_target as bt  # noqa: E402
 from quickalignment.ui._qt import QtCore, QtGui, QtWidgets  # noqa: E402
 
 USER_OUT = HERE / "QuickAlignment" / "docs" / "images" / "guide"
@@ -214,7 +212,8 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     f_st, f_sz, f_sn = st.model().reference_motors(1.51, 2.82, W)
     st.motors.set_value(MotorPositions(st=round(f_st, 4), sn=round(f_sn, 4), sz=round(f_sz, 4), srn=120, srz=0))
     st.update_view()
-    st.use_required_optic()
+    st.optic_pos.setValue(st.last_result.required_optic_position)
+    st.update_view()
     question = QtWidgets.QMessageBox.question
     QtWidgets.QMessageBox.question = grab_question(app, "found_here")
     st.correct_from_found()
@@ -245,46 +244,6 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     win.tabs.setCurrentWidget(st)
     save(win, "rotate_found", app)
     correct_sn_figure(kept, top_view(st))
-
-    # BZ window: graphene K, map at SRn 120 / SRz 0, 95 eV
-    QtWidgets.QMessageBox.information = staticmethod(lambda *a, **k: None)
-    model, geo = st.model(), AnalyzerGeometry()
-    m0 = MotorPositions(srn=120, srz=0)
-    a, hv = 2.46, 95.0
-    n = np.array([0.02, -0.015, 1.0])
-    n /= np.linalg.norm(n)
-    e1 = np.array([np.cos(np.radians(12)), np.sin(np.radians(12)), 0.0])
-    e1 -= (e1 @ n) * n
-    e1 /= np.linalg.norm(e1)
-    s = bt.gamma_k(a) / bt.k0(hv)
-    lab = plate_to_lab_dir(model, 120, 0)
-    gamma = analyzer_angles(geo, lab @ n)
-    ref = analyzer_angles(geo, lab @ (np.sqrt(1 - s * s) * n + s * e1))
-    rp.measured.set_value(MotorPositions(st=m.st, sn=m.sn, sz=m.sz, srn=120, srz=0))
-    rp.open_bz_target()
-    d = rp._bz_dialog
-    d.take_current()
-    d.material.setCurrentText("Graphene")
-    d.hv_map.setValue(hv)
-    d.hv.setValue(hv)
-    d.gamma_th.setValue(round(gamma[0], 2))
-    d.gamma_ph.setValue(round(gamma[1], 2))
-    d.ref_th.setValue(round(ref[0], 2))
-    d.ref_ph.setValue(round(ref[1], 2))
-    d.feature.setCurrentIndex(1)
-    d.line.setCurrentIndex(0)
-    d.compute()
-    save(d, "bz_reachable", app)
-    d.line.setCurrentIndex(1)
-    d.hv.setValue(60.0)
-    d.compute()
-    save(d, "bz_zone_edge", app)
-    d.hv.setValue(95.0)
-    d.line.setCurrentIndex(0)
-    d.hv.setValue(30.0)
-    d.compute()
-    save(d, "bz_photon_energy", app)
-    d.close()
 
     win.open_calibration()
     win.cal_dialog.store = store

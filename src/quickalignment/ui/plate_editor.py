@@ -433,6 +433,11 @@ class PlateEditor(QtWidgets.QWidget):
         dev_btn = QtWidgets.QPushButton("Add device")
         dev_btn.setToolTip("Add a device to the selected sample (it becomes a substrate)")
         dev_btn.clicked.connect(self.add_device_to_selected)
+        dev_photo_btn = QtWidgets.QPushButton("Device from photo…")
+        dev_photo_btn.setToolTip("Add devices to the selected substrate from a device photo, matched on its corners "
+                                 "and the devices\nalready on it (or on a plate photo used earlier in this run): the "
+                                 "samples need not be found again")
+        dev_photo_btn.clicked.connect(lambda: self.devices_from_photo())
         del_btn = QtWidgets.QPushButton("Delete selected")
         del_btn.clicked.connect(self.delete_selected)
         done_btn = QtWidgets.QPushButton("Samples placed → Stage")
@@ -484,7 +489,7 @@ class PlateEditor(QtWidgets.QWidget):
         form.addWidget(si)
         form.addStretch(1)
         buttons = QtWidgets.QHBoxLayout()
-        for b in (add_btn, photo_btn, dev_btn, del_btn):
+        for b in (add_btn, photo_btn, dev_btn, dev_photo_btn, del_btn):
             buttons.addWidget(b)
         buttons.addStretch(1)
         done_row = QtWidgets.QHBoxLayout()
@@ -674,6 +679,33 @@ class PlateEditor(QtWidgets.QWidget):
             QtWidgets.QMessageBox.information(self, "Add device", "Select exactly one sample (substrate) first.")
             return
         self.add_device(sel[0])
+
+    def devices_from_photo(self, sample: Sample | None = None):
+        """New devices on one substrate from a device photo (device_match.DeviceFromPhotoDialog); returns the dialog
+        (not run when `sample` is given: for tests) or None."""
+        from .device_match import DeviceFromPhotoDialog
+        if sample is None:
+            sel = self.selected_samples()
+            if len(sel) != 1 and len(self.layout_model.samples) == 1:
+                sel = list(self.layout_model.samples)
+            if len(sel) != 1:
+                QtWidgets.QMessageBox.information(self, "Device from photo", "Select the substrate (one sample) first.")
+                return None
+            sample, run = sel[0], True
+        else:
+            run = False
+        taken = {d.name for s in self.layout_model.samples for d in s.devices}
+        dialog = DeviceFromPhotoDialog(sample, self.layout_model.plate.key, taken, self)
+        if run and (dialog.exec_() if hasattr(dialog, "exec_") else dialog.exec()):
+            self.import_devices(sample, dialog.devices())
+        return dialog
+
+    def import_devices(self, sample: Sample, devices: list[Device]) -> None:
+        """Add devices to a substrate (names made unique on the plate)."""
+        for d in devices:
+            if any(d.name == o.name for s in self.layout_model.samples for o in s.devices):
+                d.name = self.layout_model.unique_device_name()
+            self.add_device(sample, d)
 
     def _on_sample_drawn(self, u0, v0, u1, v1) -> None:
         self.add_sample(

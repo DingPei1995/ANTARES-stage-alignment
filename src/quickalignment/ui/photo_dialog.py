@@ -26,6 +26,7 @@ import numpy as np
 
 from ._qt import QtCore, QtGui, QtWidgets
 from .device_match import DeviceMatchPanel, container
+from .photo_cache import PLATE, photo_cache
 from .photo_widgets import PhotoRegistration, array_to_qimage, lab_to_rgb
 from .plate_editor import COLOR_SAMPLE, cosmetic_pen
 from ..core.geometry import Device, PlateGeometry, Sample
@@ -51,6 +52,7 @@ class PhotoImportDialog(QtWidgets.QDialog):
         self.resize(1400, 920)
         self.plate = plate
         self.existing = list(existing or [])
+        self.source: str | None = None  # file of the plate photo (to remember it with its points)
         self.background: np.ndarray | None = None  # picked bare plate colour (Lab), None: automatic
         self.sample_colors: list[np.ndarray] = []  # picked sample colours (Lab)
         self.auto: list[Detection] = []  # found by colour
@@ -74,9 +76,18 @@ class PhotoImportDialog(QtWidgets.QDialog):
 
         open_btn = QtWidgets.QPushButton("Open photo…")
         open_btn.clicked.connect(self.open_photo)
-        reset_btn = QtWidgets.QPushButton("Clear points")
-        reset_btn.setToolTip("Remove the points clicked on the photo and start again")
-        reset_btn.clicked.connect(self.reg.clear_corners)
+        self.recent = QtWidgets.QComboBox()
+        self.recent.setToolTip("Plate photos already used while the program runs (kept until it exits), with the "
+                               "points clicked on them")
+        self.recent.activated.connect(self._on_recent)
+        self._fill_recent()
+        undo_btn = QtWidgets.QPushButton("Undo last point")
+        undo_btn.setToolTip("Remove the last point clicked on the photo (Ctrl+Z); the others stay")
+        undo_btn.clicked.connect(lambda: self.reg.undo_corner())
+        QtWidgets.QShortcut(QtGui.QKeySequence.Undo, self.reg, self.reg.undo_corner)
+        reset_btn = QtWidgets.QPushButton("Clear all points")
+        reset_btn.setToolTip("Remove all the points clicked on the photo and start again")
+        reset_btn.clicked.connect(lambda: self.reg.clear_corners())
         self.use_3d = QtWidgets.QCheckBox("3D correction")
         self.use_3d.setChecked(False)
         self.use_3d.setToolTip("For a photo not taken from straight above: click 8 points at two heights (the 4 "
@@ -195,6 +206,8 @@ class PhotoImportDialog(QtWidgets.QDialog):
 
         top = QtWidgets.QHBoxLayout()
         top.addWidget(open_btn)
+        top.addWidget(self.recent)
+        top.addWidget(undo_btn)
         top.addWidget(reset_btn)
         top.addWidget(self.use_3d)
         top.addWidget(self.file_label, 1)
@@ -276,11 +289,53 @@ class PhotoImportDialog(QtWidgets.QDialog):
         if path:
             self.load_photo(path)
 
-    def load_photo(self, path: str) -> bool:
+    def load_photo(self, path: str, remember: bool = True) -> bool:
         if not self.reg.load_photo(path):
             return False
         self.file_label.setText(path)
+        self.source = path
+        if remember:
+            photo_cache().add(PLATE, path)
+            self._fill_recent()
         return True
+
+    def _fill_recent(self) -> None:
+        photos = photo_cache().of_kind(PLATE, self.plate.key)
+        self.recent.blockSignals(True)
+        self.recent.clear()
+        self.recent.addItem("recent photos…" if photos else "no recent photo")
+        for c in photos:
+            self.recent.addItem(c.label, c)
+        self.recent.setEnabled(bool(photos))
+        self.recent.blockSignals(False)
+
+    def load_recent(self, c) -> bool:
+        """A photo used earlier in this run, with the points clicked on it then (when they were kept)."""
+        if not self.reg.load_photo(str(c.path)):
+            return False
+        self.source = c.source
+        self.file_label.setText(f"{c.source} (kept copy)")
+        if c.corners and c.plate == self.plate.key:
+            if self.use_3d.isChecked() != c.use_3d:
+                self.use_3d.setChecked(c.use_3d)
+            self.reg.set_corners(c.corners)
+        return True
+
+    def _on_recent(self, index: int) -> None:
+        c = self.recent.itemData(index)
+        if c is not None:
+            self.load_recent(c)
+        self.recent.setCurrentIndex(0)
+
+    def remember(self) -> None:
+        """Keep the photo with its points for this run (Device from photo, From photo again)."""
+        if self.source and self.reg.photo is not None:
+            photo_cache().remember_registration(self.source, self.plate.key, self.reg.corner_positions(),
+                                                self.reg.use_3d, self.reg.h)
+
+    def done(self, result: int) -> None:
+        self.remember()  # also on Cancel: the points clicked are not lost
+        super().done(result)
 
     def set_photo(self, rgb: np.ndarray) -> None:
         self.reg.set_photo(rgb)

@@ -168,6 +168,8 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv if argv is None else argv
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(argv)
     install_excepthook("QuickAlignment")
+    from .photo_cache import photo_cache
+    app.aboutToQuit.connect(photo_cache().clear)  # photos kept for this run (also deleted at exit)
     session, path = Session(), None
     if len(argv) > 1:
         try:

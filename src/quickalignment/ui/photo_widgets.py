@@ -419,6 +419,14 @@ class PhotoRegistration(QtWidgets.QWidget):
         self.corners = []
         self._registration_changed()
 
+    def undo_corner(self) -> bool:
+        """Remove the last point clicked (the others stay); False if there is none."""
+        if not self.corners:
+            return False
+        self.photo_scene.removeItem(self.corners.pop())
+        self._registration_changed()
+        return True
+
     def set_corners(self, points) -> None:
         """Place all four points (photo pixel coordinates)."""
         for c in self.corners:

@@ -9,6 +9,10 @@ photo. From these point pairs (2: rotation + scale + shift, 3: affine, 4 or
 more: perspective) the device photo is mapped onto the plate, and the devices
 clicked on it get plate coordinates. Devices have no height: they are on the
 surface of their substrate.
+
+Devices can also be added to a substrate already on the plate (DeviceFromPhotoDialog, "Device from photo…" in the
+Samples tab) without the plate photo: the left view then shows the substrate as drawn, and its corners and the devices
+already placed are the reference points (clicks snap to them).
 """
 
 from __future__ import annotations
@@ -18,20 +22,24 @@ from dataclasses import dataclass
 import numpy as np
 
 from ._qt import QtCore, QtGui, QtWidgets, Signal
+from .photo_cache import DEVICE, PLATE, photo_cache
 from .photo_widgets import CornerItem, ZoomView, array_to_qimage, read_photo
 from .plate_editor import cosmetic_pen
-from ..core.geometry import Rect
+from ..core.geometry import Device, Rect, Sample
 from ..alignment.photo import apply_homography, pair_transform, rectify
 
 Qt = QtCore.Qt
 
 COLOR_DEVICE = QtGui.QColor("#e00000")
 COLOR_SUBSTRATE = QtGui.QColor("#ff8c00")
+COLOR_FIXED = QtGui.QColor("#0060d0")  # devices already on the substrate (reference points)
 COLUMNS = ["Device", "on", "x (mm)", "y (mm)", "dx from left (mm)", "dy from bottom (mm)", "Status"]
 PAIRS, DEVICES = range(2)
 TRANSFORM_KIND = {2: "rotation + scale + shift", 3: "affine"}
 MAX_CROP_PX = 1600  # crop of the plate photo: at most this many pixels across
 MAX_PX_PER_MM = 100.0
+SNAP_PX = 12  # schematic view: a click this close (screen px) to a reference point snaps to it
+SNAP_MAX = 0.05  # ... but at most this fraction of the substrate size
 
 
 @dataclass
@@ -59,8 +67,12 @@ def container(substrates: list[tuple[str, Rect]], u: float, v: float) -> tuple[s
 class DeviceMatchPanel(QtWidgets.QWidget):
     changed = Signal()  # devices or instruction changed
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, schematic: bool = False):
         super().__init__(parent)
+        # schematic: no plate photo, the left view shows the substrate as drawn (corners, devices already placed)
+        self.schematic = schematic
+        self.fixed: list[tuple[str, float, float]] = []  # devices already placed: (name, u, v), reference points
+        self.taken_names: set[str] = set()  # device names already used on the plate
         self.photo1: np.ndarray | None = None
         self.h1: np.ndarray | None = None  # plate -> plate photo
         self.substrates: list[tuple[str, Rect]] = []
@@ -82,9 +94,17 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         self.substrate.currentIndexChanged.connect(lambda _: self._refresh_crop())
         open_btn = QtWidgets.QPushButton("Open device photo…")
         open_btn.clicked.connect(self.open_photo)
-        clear_btn = QtWidgets.QPushButton("Clear points")
-        clear_btn.setToolTip("Remove the matched points (the devices already marked stay where they are)")
-        clear_btn.clicked.connect(self.clear_pairs)
+        self.recent = QtWidgets.QComboBox()
+        self.recent.setToolTip("Device photos already used while the program runs (kept until it exits)")
+        self.recent.activated.connect(self._on_recent)
+        self._fill_recent()
+        undo_btn = QtWidgets.QPushButton("Undo last point")
+        undo_btn.setToolTip("Remove the last point clicked (Ctrl+Z); the others stay")
+        undo_btn.clicked.connect(lambda: self.undo_point())
+        QtWidgets.QShortcut(QtGui.QKeySequence.Undo, self, self.undo_point)
+        clear_btn = QtWidgets.QPushButton("Clear all points")
+        clear_btn.setToolTip("Remove all the matched points (the devices already marked stay where they are)")
+        clear_btn.clicked.connect(lambda: self.clear_pairs())
         self.pair_radio = QtWidgets.QRadioButton("mark the same point on both")
         self.device_radio = QtWidgets.QRadioButton("mark devices")
         self.pair_radio.setChecked(True)
@@ -127,6 +147,8 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         top.addWidget(QtWidgets.QLabel("substrate"))
         top.addWidget(self.substrate)
         top.addWidget(open_btn)
+        top.addWidget(self.recent)
+        top.addWidget(undo_btn)
         top.addWidget(clear_btn)
         top.addSpacing(12)
         top.addWidget(self.pair_radio)
@@ -196,6 +218,15 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         self._refresh_crop()
         self._fill_table()
 
+    def set_fixed(self, devices: list[tuple[str, float, float]]) -> None:
+        """Devices already on the substrate (name, plate u, v): drawn in blue, reference points for the matching."""
+        self.fixed = [(str(n), float(u), float(v)) for n, u, v in devices]
+        self._draw()
+
+    def _has_left(self) -> bool:
+        """The left view can be used: plate photo registered, or the schematic substrate."""
+        return self.current_substrate() is not None and (self.schematic or self.h1 is not None)
+
     def current_substrate(self) -> tuple[str, Rect] | None:
         i = self.substrate.currentIndex()
         return self.substrates[i] if 0 <= i < len(self.substrates) else None
@@ -207,7 +238,17 @@ class DeviceMatchPanel(QtWidgets.QWidget):
 
     def _refresh_crop(self) -> None:
         sub = self.current_substrate()
-        if sub is None or self.photo1 is None or self.h1 is None:
+        if sub is not None and self.schematic:
+            bounds, _ = crop_view(sub[1])
+            if bounds != self._crop_key:
+                self.crop_item.setPixmap(QtGui.QPixmap())
+                self.left_scene.setSceneRect(QtCore.QRectF(bounds[0], -bounds[3], bounds[2] - bounds[0],
+                                                           bounds[3] - bounds[1]))
+                self.left_view.fit()
+                self._crop_key = bounds
+            self.left_title.setText(f"<b>{sub[0]}</b> as drawn on the plate: its corners and the devices already "
+                                    "placed (blue) are reference points")
+        elif sub is None or self.photo1 is None or self.h1 is None:
             self.crop_item.setPixmap(QtGui.QPixmap())
             self.left_title.setText("<b>Plate photo</b> around the substrate (find the samples in tab 1 first)")
             self._crop_key = None
@@ -234,13 +275,34 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         if path:
             self.load_photo(path)
 
-    def load_photo(self, path: str) -> bool:
+    def load_photo(self, path: str, remember: bool = True) -> bool:
         rgb = read_photo(path, self)
         if rgb is None:
             return False
         self.set_photo(rgb)
         self.file_label.setText(path)
+        if remember:
+            photo_cache().add(DEVICE, path)
+            self._fill_recent()
         return True
+
+    def _fill_recent(self) -> None:
+        photos = photo_cache().of_kind(DEVICE)
+        self.recent.blockSignals(True)
+        self.recent.clear()
+        self.recent.addItem("recent photos…" if photos else "no recent photo")
+        for c in photos:
+            self.recent.addItem(c.label, c)
+        self.recent.setEnabled(bool(photos))
+        self.recent.blockSignals(False)
+
+    def _on_recent(self, index: int) -> None:
+        c = self.recent.itemData(index)
+        if c is not None and self.load_photo(str(c.path), remember=False):
+            photo_cache().add(DEVICE, c.source)  # newest first
+            self.file_label.setText(f"{c.source} (kept copy)")
+            self._fill_recent()
+        self.recent.setCurrentIndex(0)
 
     def set_photo(self, rgb: np.ndarray) -> None:
         """A new device photo: the devices marked so far keep their plate positions, the points start again."""
@@ -256,6 +318,18 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         self.clear_pairs()
 
     # -- point pairs ---------------------------------------------------------------
+    def undo_point(self) -> bool:
+        """Remove the last point clicked: the unmatched left point, else the right point of the last pair (its left
+        point then waits for a new right click). False if there is none."""
+        if len(self.left_pts) > len(self.right_pts):
+            self.left_scene.removeItem(self.left_pts.pop())
+        elif self.right_pts:
+            self.right_scene.removeItem(self.right_pts.pop())
+        else:
+            return False
+        self._match()
+        return True
+
     def clear_pairs(self) -> None:
         for it in self.left_pts:
             self.left_scene.removeItem(it)
@@ -278,12 +352,30 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         scene.addItem(item)
         item.setPos(x, y)
 
+    def _snap(self, u: float, v: float) -> tuple[float, float]:
+        """A device already placed (and, in the schematic view, a substrate corner) near a click; else the click."""
+        sub = self.current_substrate()
+        if sub is None:
+            return u, v
+        u0, v0, u1, v1 = sub[1]
+        points = ([(u0, v0), (u1, v0), (u1, v1), (u0, v1)] if self.schematic else []) + \
+            [(fu, fv) for _, fu, fv in self.fixed]
+        if not points:
+            return u, v
+        scale = self.left_view.transform().m11()
+        tol = min(SNAP_PX / scale if scale > 0 else 0.0, SNAP_MAX * max(u1 - u0, v1 - v0))
+        best = min(points, key=lambda p: np.hypot(p[0] - u, p[1] - v))
+        return best if np.hypot(best[0] - u, best[1] - v) <= tol else (u, v)
+
     def _on_left_click(self, x: float, y: float) -> None:
-        if self.current_substrate() is None or self.h1 is None:
+        if not self._has_left():
             return
         if self.device_radio.isChecked():
             self.add_device(x, -y)
-        elif len(self.left_pts) > len(self.right_pts):
+            return
+        u, v = self._snap(x, -y)
+        x, y = u, -v
+        if len(self.left_pts) > len(self.right_pts):
             self.left_pts[-1].setPos(x, y)  # the point is not matched yet: move it
         else:
             self._add_marker(self.left_scene, self.left_pts, x, y)
@@ -336,7 +428,7 @@ class DeviceMatchPanel(QtWidgets.QWidget):
 
     def instruction(self) -> str:
         sub = self.current_substrate()
-        if sub is None or self.h1 is None:
+        if not self._has_left():
             return "Find or draw the samples on the plate photo (tab 1) first."
         if self.photo2 is None:
             return f"Open a photo showing the devices of {sub[0]} (it need not show the substrate edges)."
@@ -347,14 +439,16 @@ class DeviceMatchPanel(QtWidgets.QWidget):
                     "to “mark the same point on both” to add or drag points.")
         n = len(self.left_pts)
         if n > len(self.right_pts):
-            return f"Click the same point {n} on the device photo (right)."
+            return f"Click the same point {n} on the device photo (right). A wrong point: Undo last point (Ctrl+Z)."
         more = "" if n < 2 else " Enough points: choose “mark devices”, or add more pairs for accuracy."
-        return (f"Click point {n + 1} on the left: a feature you also see on the device photo (paint dot, pattern "
-                f"corner, scratch), then the same point on the right. Wheel = zoom, middle drag = pan.{more}")
+        what = ("a corner of the substrate or a device already placed (blue; clicks snap to them)" if self.schematic
+                else "a feature you also see on the device photo (paint dot, pattern corner, scratch)")
+        return (f"Click point {n + 1} on the left: {what}, then the same point on the right. Wheel = zoom, middle "
+                f"drag = pan.{more}")
 
     # -- devices -------------------------------------------------------------------
     def add_device(self, u: float, v: float, px: tuple[float, float] | None = None) -> DevicePoint:
-        names = {d.name for d in self.devices}
+        names = {d.name for d in self.devices} | self.taken_names | {n for n, _, _ in self.fixed}
         i = 1
         while f"D{i}" in names:
             i += 1
@@ -401,9 +495,9 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         self.changed.emit()
 
     # -- drawing -------------------------------------------------------------------
-    def _cross(self, scene, x, y, name, selected, items) -> None:
+    def _cross(self, scene, x, y, name, selected, items, color=COLOR_DEVICE) -> None:
         r = 9 if selected else 6
-        pen = cosmetic_pen(COLOR_DEVICE, 2.5 if selected else 1.5)
+        pen = cosmetic_pen(color, 2.5 if selected else 1.5)
         for x0, y0, x1, y1 in ((-r, 0, r, 0), (0, -r, 0, r)):
             line = scene.addLine(x0, y0, x1, y1, pen)
             line.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations)
@@ -411,7 +505,7 @@ class DeviceMatchPanel(QtWidgets.QWidget):
             items.append(line)
         label = scene.addSimpleText(name)
         label.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations)
-        label.setBrush(QtGui.QBrush(COLOR_DEVICE))
+        label.setBrush(QtGui.QBrush(color))
         label.setPos(x, y)
         items.append(label)
 
@@ -422,15 +516,21 @@ class DeviceMatchPanel(QtWidgets.QWidget):
             self.right_scene.removeItem(it)
         self._left_items, self._right_items = [], []
         sub = self.current_substrate()
-        if sub is not None and self.h1 is not None:
+        if self._has_left():
             for name, (u0, v0, u1, v1) in self.substrates:
                 mine = name == sub[0]
                 item = self.left_scene.addRect(QtCore.QRectF(u0, -v1, u1 - u0, v1 - v0),
                                                cosmetic_pen(COLOR_SUBSTRATE if mine else "#909090", 2 if mine else 1))
                 self._left_items.append(item)
         selected = {i.row() for i in self.table.selectedIndexes()}
+        for name, u, v in self.fixed:
+            if self._has_left():
+                self._cross(self.left_scene, u, -v, name, False, self._left_items, COLOR_FIXED)
+            if self.t is not None:  # where the matching puts it on the device photo: a check of the points
+                (x, y), = apply_homography(np.linalg.inv(self.t), [(u, v)])
+                self._cross(self.right_scene, x, y, name, False, self._right_items, COLOR_FIXED)
         for row, d in enumerate(self.devices):
-            if sub is not None and self.h1 is not None:
+            if self._has_left():
                 self._cross(self.left_scene, d.u, -d.v, d.name, row in selected, self._left_items)
             if d.px is not None:
                 self._cross(self.right_scene, d.px[0], d.px[1], d.name, row in selected, self._right_items)
@@ -457,3 +557,79 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         if self.t is not None:
             u, v = apply_homography(self.t, [(x, y)])[0]
             self._show_cursor(float(u), float(v))
+
+
+class DeviceFromPhotoDialog(QtWidgets.QDialog):
+    """New devices on a substrate already on the plate, from a device photo: no need to find the samples again.
+
+    Left: the substrate as drawn (its corners and the devices already placed are the reference points), or a plate
+    photo used earlier in this run (registered then). Right: the device photo. The devices clicked are added to the
+    substrate; those already on it are not changed."""
+
+    def __init__(self, sample: Sample, plate_key: str | None = None, taken_names=(), parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Devices of {sample.name} from a photo")
+        self.resize(1300, 860)
+        self.sample = sample
+        self.panel = DeviceMatchPanel(schematic=True)
+        self.panel.taken_names = set(taken_names)
+        self.panel.set_substrates([(sample.name, sample.bounds())])
+        self.panel.set_fixed([(d.name, *d.position(sample)) for d in sample.devices])
+        self.panel.changed.connect(self._update)
+
+        self.plate_photo = QtWidgets.QComboBox()
+        self.plate_photo.addItem("none: the substrate as drawn", None)
+        for c in photo_cache().of_kind(PLATE, plate_key, registered=True):
+            self.plate_photo.addItem(f"plate photo {c.label}", c)
+        self.plate_photo.setToolTip("Left view: the substrate as drawn (its corners and devices are the reference "
+                                    "points), or a plate photo registered earlier in this run.\nWith a photo the "
+                                    "devices are placed where the photo shows them: if the substrate was moved since "
+                                    "(Found here), use the substrate as drawn.")
+        self.plate_photo.currentIndexChanged.connect(self._on_plate_photo)
+        self.plate_photo.setEnabled(self.plate_photo.count() > 1)
+
+        self.instruction = QtWidgets.QLabel()
+        self.instruction.setWordWrap(True)
+        self.instruction.setStyleSheet("font-weight: bold; color: #00609a;")
+        self.add_btn = QtWidgets.QPushButton("Add devices")
+        self.add_btn.setStyleSheet("font-weight: bold;")
+        self.add_btn.setAutoDefault(False)
+        self.add_btn.clicked.connect(self.accept)
+        cancel = QtWidgets.QPushButton("Cancel")
+        cancel.setAutoDefault(False)
+        cancel.clicked.connect(self.reject)
+
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(QtWidgets.QLabel("left view"))
+        row.addWidget(self.plate_photo, 1)
+        bottom = QtWidgets.QHBoxLayout()
+        bottom.addStretch(1)
+        bottom.addWidget(self.add_btn)
+        bottom.addWidget(cancel)
+        box = QtWidgets.QVBoxLayout(self)
+        box.addWidget(self.instruction)
+        box.addLayout(row)
+        box.addWidget(self.panel, 1)
+        box.addLayout(bottom)
+        self._update()
+
+    def _on_plate_photo(self, index: int) -> None:
+        c = self.plate_photo.itemData(index)
+        rgb = read_photo(str(c.path), self) if c is not None else None
+        self.panel.schematic = rgb is None
+        self.panel.set_source(rgb, None if rgb is None else c.h)
+
+    def _update(self) -> None:
+        self.instruction.setText(self.panel.instruction())
+        self.add_btn.setEnabled(bool(self.devices()))
+
+    def devices(self) -> list[Device]:
+        """The new devices on the substrate, placed relative to it (edges left / bottom)."""
+        u0, v0, u1, v1 = self.sample.bounds()
+        out = []
+        for p in self.panel.devices:
+            if u0 <= p.u <= u1 and v0 <= p.v <= v1:
+                d = Device(p.name)
+                d.set_position(self.sample, round(p.u, 3), round(p.v, 3))
+                out.append(d)
+        return out

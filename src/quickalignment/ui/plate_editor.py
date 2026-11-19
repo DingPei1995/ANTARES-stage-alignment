@@ -457,7 +457,8 @@ class PlateEditor(QtWidgets.QWidget):
         check_btn = QtWidgets.QPushButton("Correct H")
         check_btn.setToolTip("Set the sample height H from this SN. 'Bring target onto the beam' then keeps this\n"
                              "SN for its targets (right at SRn = 120°, SRz = 0°).")
-        check_btn.clicked.connect(self.apply_height_check)
+        # lambda: clicked(bool) would otherwise arrive as sn = False, i.e. SN 0, whatever was typed
+        check_btn.clicked.connect(lambda: self.apply_height_check())
         self.check_label = QtWidgets.QLabel()
         self.check_label.setWordWrap(True)
         self.check_label.setStyleSheet("color: #555;")

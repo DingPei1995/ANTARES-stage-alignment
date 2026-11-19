@@ -9,11 +9,15 @@ about it (rotation.relocate with `point`).
 
 The tab stands on its own: it reads the configuration in use and the plate mounted, and nothing else (no samples of
 the Samples tab, no "Found here" plate offset); it changes nothing in the other tabs.
+
+Step 4, as in the Rotate sample tab: the sample found at the new position with the piezo off centre gives the
+ST / SZ / SN and the optic that show it with the piezo centred (piezo_box.PiezoBox, without "Send to Stage").
 """
 
 from __future__ import annotations
 
 from ._qt import QtCore, QtWidgets
+from .piezo_box import PiezoBox
 from .stage_panel import FOCUS_WARNING, MOTOR_SPECS, TRAVEL, MotorForm, align_labels, out_of_range, set_range, spin
 from ..alignment.rotation import relocate
 from ..core.geometry import SampleLayout
@@ -106,6 +110,10 @@ class QuickRotationPanel(QtWidgets.QWidget):
         rb = QtWidgets.QVBoxLayout(res_box)
         for w in (self.locate_label, self.result_label, self.focus_label, self.correct_sn, self.corrected_label):
             rb.addWidget(w)
+        # -- 4. found off the piezo centre (nothing is sent to the Stage tab: this tab stays on its own) ----
+        self.piezo = PiezoBox("4. Sample seen off the piezo centre at the new position?", self.chosen, self.model,
+                              self.stage.calibration, self.optic_name, self._move_collisions)
+        self.correct_sn.toggled.connect(lambda *_: self.piezo.reset())
 
         align_labels(self.measured, of, gf)
         left = QtWidgets.QWidget()
@@ -116,6 +124,7 @@ class QuickRotationPanel(QtWidgets.QWidget):
         right = QtWidgets.QWidget()
         rv = QtWidgets.QVBoxLayout(right)
         rv.addWidget(res_box)
+        rv.addWidget(self.piezo)
         rv.addStretch(1)
         splitter = QtWidgets.QSplitter()
         splitter.addWidget(left)
@@ -143,6 +152,7 @@ class QuickRotationPanel(QtWidgets.QWidget):
         """Name the optic field after the optic of the configuration in use; say which configuration is used."""
         name = self.optic_name()
         self.optic_label.setText(f"{name[0].upper()}{name[1:]} position")
+        self.piezo.update_optic()
         record, plate = self.stage.record, self._plate_getter()
         optics = record.optics
         if optics.enabled:
@@ -161,6 +171,7 @@ class QuickRotationPanel(QtWidgets.QWidget):
 
     def apply_limits(self) -> None:
         self.measured.apply_limits()
+        self.piezo.apply_limits()
         set_range(self.new_srn, "srn")
         set_range(self.new_srz, "srz")
 
@@ -194,11 +205,13 @@ class QuickRotationPanel(QtWidgets.QWidget):
             self.result = self.corrected = None
             self.locate_label.setText(f"<span style='color:#b00'><b>{exc}</b></span>")
             self._show()
+            self.piezo.reset()
             return
         self.correct_sn.blockSignals(True)
         self.correct_sn.setChecked(False)
         self.correct_sn.blockSignals(False)
         self._show()
+        self.piezo.reset()
 
     def _table(self, r, names) -> str:
         rows = []
@@ -261,9 +274,12 @@ class QuickRotationPanel(QtWidgets.QWidget):
         self.corrected_label.setText(f"With SN corrected, the sample is {where}:"
                                      + self._table(c, ("st", "sz", "sn")) + self._collision_text(c))
 
-    def _collision_text(self, r) -> str:
+    def _move_collisions(self, new, optic_new, optic_now) -> str:
         """Anti-collision check of the configuration in use (plate and optic; read only)."""
-        hits = self.stage.move_collisions(r.new, r.optic_new, self.measured_optic.value())
+        return self.stage.move_collisions(new, optic_new, optic_now)
+
+    def _collision_text(self, r) -> str:
+        hits = self._move_collisions(r.new, r.optic_new, self.measured_optic.value())
         return COLLISION_STYLE.format(hits) if hits else ""
 
     def chosen(self):

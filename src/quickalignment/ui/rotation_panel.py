@@ -6,12 +6,16 @@
 3. the new ST / SZ with the piezo centred (PIX = PIY = 150 µm) and SN kept,
    with how far the point then is from the analyzer focus; optionally SN, ST,
    SZ and the optic are corrected to put the point on the analyzer focus (or
-   as close as the motor ranges allow).
+   as close as the motor ranges allow);
+4. if the sample is then found with the piezo off centre: the PIX / PIY where
+   it is seen give ST / SZ (SN kept) and the optic that show it with the piezo
+   centred.
 """
 
 from __future__ import annotations
 
 from ._qt import QtCore, QtWidgets
+from .piezo_box import PiezoBox
 from .stage_panel import (
     FOCUS_WARNING, MOTOR_SPECS, TRAVEL, MotorForm, align_labels, equal_row, out_of_range, set_range, spin,
 )
@@ -80,6 +84,7 @@ class RotationPanel(QtWidgets.QWidget):
                                    "On: SN, ST, SZ and the optic move so the point is on the analyzer focus\n"
                                    "(absolute: relies on the configuration's ST0 / SZ0 / SN_f and rotation axes).")
         self.correct_sn.toggled.connect(self._show)
+        self.correct_sn.toggled.connect(lambda *_: self.piezo.reset())
         self.corrected_label = QtWidgets.QLabel()
         self.corrected_label.setWordWrap(True)
         self.corrected_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -91,6 +96,11 @@ class RotationPanel(QtWidgets.QWidget):
         for w in (self.result_label, self.focus_label, self.correct_sn, self.corrected_label, send_btn):
             rb.addWidget(w)
 
+        # -- 4. sample found off the piezo centre ------------------------------------------
+        self.piezo = piezo_box = PiezoBox(
+            "4. Sample seen off the piezo centre at the new position?", self.chosen, self.stage.model,
+            self.stage.calibration, self.optic_name, self.stage.move_collisions, self._send_values)
+
         align_labels(self.measured, of, gf)
         left = QtWidgets.QWidget()
         lv = QtWidgets.QVBoxLayout(left)
@@ -100,6 +110,7 @@ class RotationPanel(QtWidgets.QWidget):
         right = QtWidgets.QWidget()
         rv = QtWidgets.QVBoxLayout(right)
         rv.addWidget(res_box)
+        rv.addWidget(piezo_box)
         rv.addStretch(1)
         splitter = QtWidgets.QSplitter()
         splitter.addWidget(left)
@@ -123,10 +134,12 @@ class RotationPanel(QtWidgets.QWidget):
         """Name the optic field after the optic of the configuration in use."""
         name = self.optic_name()
         self.optic_label.setText(f"{name[0].upper()}{name[1:]} position")
+        self.piezo.update_optic()
 
     def apply_limits(self) -> None:
         """Input ranges from the motor limits in use (Configuration window)."""
         self.measured.apply_limits()
+        self.piezo.apply_limits()
         set_range(self.new_srn, "srn")
         set_range(self.new_srz, "srz")
         if self._bz_dialog is not None:
@@ -167,6 +180,13 @@ class RotationPanel(QtWidgets.QWidget):
         self.correct_sn.setChecked(False)
         self.correct_sn.blockSignals(False)
         self._show()
+        self.piezo.reset()
+
+    def _send_values(self, new, optic) -> None:
+        self.stage.motors.set_value(new)
+        if optic is not None:
+            self.stage.optic_pos.setValue(optic)
+        self.stage.update_view()
 
 
     def _table(self, r, names) -> str:

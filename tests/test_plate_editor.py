@@ -134,10 +134,19 @@ def test_devices_follow_substrate_and_edges(window):
     assert d.dx == pytest.approx(3.0, abs=0.15) and d.dy == pytest.approx(1.5, abs=0.15)
     assert s.u == 1.0  # the substrate did not move
 
+    # the two delete buttons: "devices" leaves a selected substrate, "samples" leaves a selected device
+    ed.scene.clearSelection()
+    ed.items[id(s)].setSelected(True)
+    ed.delete_selected_devices()
+    assert s in ed.layout_model.samples and ed.dev_table.rowCount() == 1
+    ed.scene.clearSelection()
+    ed.device_items[id(d)].setSelected(True)
+    ed.delete_selected_samples()
+    assert s in ed.layout_model.samples and ed.dev_table.rowCount() == 1
     # deleting the substrate removes its devices
     ed.scene.clearSelection()
     ed.items[id(s)].setSelected(True)
-    ed.delete_selected()
+    ed.delete_selected_samples()
     assert ed.dev_table.rowCount() == 0 and not ed.device_items
 
 
@@ -486,6 +495,42 @@ def test_rotation_tab(window):
     panel.compute()  # a new computation starts again with SN kept
     assert not panel.correct_sn.isChecked() and panel.chosen() is panel.result
 
+
+def test_quick_sample_rotation_tab(window):
+    """Earlier steps skipped: a sample found on the beam in focus, nothing placed. The optic position (working
+    distance kept) gives where it is on the plate and its height, the rotation is about it; other tabs untouched."""
+    from quickalignment.core.stage import slide_to_sn
+    win, panel, st = window, window.quick_rotation, window.stage
+    tabs = [win.tabs.tabText(i) for i in range(win.tabs.count())]
+    assert tabs[-2:] == ["Rotate sample", "Quick sample rotation (without pre-setup)"]
+    assert "working distance" in panel.about.text() and "configuration in use" in panel.about.text()
+    st.record = replace(st.record, config=replace(st.record.config, srn_axis_u=1.2, srn_axis_v=-1.0, srz_offset_n=3.0))
+    # a sample elsewhere in the Samples tab and a "Found here" plate offset: not used here
+    layout = win.editor.layout_model.__class__(samples=[Sample("Mine", u=-4, v=4, length=1, width=1, height=0.525)])
+    layout.plate_offset_v = 0.4
+    win.editor.set_layout(layout)
+    model, cal = panel.model(), st.calibration()
+    assert model.config.sz0 != pytest.approx(st.model().config.sz0)  # no plate offset in this tab
+    point = (1.2, -2.5, model.plate.total_thickness + 0.31)
+    m = model.motors_for_target(*point, srn=120, srz=0, pix=120, piy=170)
+    m = slide_to_sn(m, m.sn + 0.15)  # SN not on the analyzer focus: the optic refocused
+    panel.measured.set_value(m)
+    panel.measured_optic.setValue(cal.position_for_focus(model, model.beam_position(m, *point)))
+    panel.new_srn.setValue(140.0)
+    panel.compute()
+    assert panel.located == pytest.approx(point, abs=1e-4)  # inputs rounded to 0.1 µm
+    assert panel.result.uvw == pytest.approx(point, abs=1e-4)
+    assert "x = 1.200 mm, y = -2.500 mm" in panel.locate_label.text() and "H = 0.310 mm" in panel.locate_label.text()
+    expected = model.motors_for_target(*point, srn=140.0, srz=0)
+    c = panel.corrected
+    assert [c.new.st, c.new.sz, c.new.sn] == pytest.approx([expected.st, expected.sz, expected.sn], abs=1e-3)
+    assert panel.result.new.sn == pytest.approx(m.sn, abs=1e-4)  # SN kept by default
+    s = win.editor.layout_model.samples[0]
+    assert (s.u, s.v, s.height) == (-4, 4, 0.525) and win.editor.layout_model.plate_offset_v == 0.4  # untouched
+    # an optic position far off: not on the plate, reported, no result
+    panel.measured_optic.setValue(panel.measured_optic.value() + 500.0)
+    panel.compute()
+    assert panel.located is None and panel.result is None and "check the positions" in panel.locate_label.text()
 
 def test_custom_plate_dialog_and_focus(window, monkeypatch):
     from quickalignment.core.geometry import custom_plate

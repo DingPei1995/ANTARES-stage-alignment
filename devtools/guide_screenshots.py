@@ -147,8 +147,8 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     win.show()
     editor = win.editor
 
-    # samples from a photo: the gating plate photo of the tests, colour picked on the substrate; the pieces of
-    # the small chip (broken up by the silver paint) merged by hand
+    # samples from a photo: the gating plate photo of the tests, a box drawn on the substrate (draw box on the
+    # plate model; colour detection is left to the assistant)
     sys.path.insert(0, str(HERE / "tests"))
     from test_photo_dialog import REAL_CORNERS, REAL_PHOTO
 
@@ -158,13 +158,8 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     photo.load_photo(str(REAL_PHOTO))
     photo.file_label.setText(REAL_PHOTO.name)
     photo.set_corners(REAL_CORNERS)
-    photo.pick_sample_color(3.65, 6.15)
+    photo.add_box(-1.85, -0.95, 5.5, 6.75)
     photo.table.item(0, NAME).setText("SampleA")
-    photo.table.clearSelection()
-    for row in range(1, photo.table.rowCount()):
-        photo.table.selectionModel().select(photo.table.model().index(row, 0),
-                                            QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
-    photo.merge_selected()
     photo.table.clearSelection()
     settle(app)
     photo.reg.photo_view.fit()

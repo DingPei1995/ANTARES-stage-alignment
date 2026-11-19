@@ -108,6 +108,23 @@ def test_relocate_tolerates_offset_errors():
     assert err(rel.new) < 0.2  # (rotation 15 deg) x (0.5 mm lever arm error)
 
 
+def test_focus_point_and_rotation_about_it():
+    """Quick sample rotation: the point at the optic focus (working distance kept) is the sample point."""
+    from quickalignment.core.stage import focus_point, slide_to_sn
+    model = StageModel(StageConfig(srn_axis_u=0.8, srz_offset_n=0.4))
+    cal = OpticsCalibration(optic_position=12.0, optic_sign=-1)
+    point = (2.0, -1.0, model.plate.total_thickness + 0.2)
+    m = slide_to_sn(model.motors_for_target(*point, srn=133, srz=-4), 0.3)
+    optic = cal.position_for_focus(model, model.beam_position(m, *point))
+    assert focus_point(model, m, cal, optic) == pytest.approx(point, abs=1e-9)
+    # rotation about the located point (no layout) = about the same sample placed on the plate
+    rel = relocate(model, SampleLayout(), m, 150.0, 0.0, cal, optic, point=point)
+    exp = relocate(model, SampleLayout(samples=[Sample("T", u=2, v=-1, length=1, width=1, height=0.2)]), m, 150.0,
+                   0.0, cal, optic)
+    assert rel.target == "point at the optic focus" and exp.target == "T"
+    assert [rel.new.st, rel.new.sz, rel.new.sn] == pytest.approx([exp.new.st, exp.new.sz, exp.new.sn], abs=1e-9)
+    assert rel.optic_new == pytest.approx(exp.optic_new, abs=1e-9)
+
 def test_relocate_recentre_piezo():
     model = StageModel(StageConfig(srn_axis_u=0.5))
     layout = SampleLayout(samples=[Sample("A", length=6, width=6, height=0.5)])

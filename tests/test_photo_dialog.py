@@ -7,10 +7,11 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 qt = pytest.importorskip("quickalignment.ui._qt")
 from quickalignment.core.geometry import GATING_PLATE, STANDARD_PLATE, Sample, SampleLayout  # noqa: E402
-from quickalignment.ui.photo_dialog import BY_PLATE, BY_SAMPLE, PhotoImportDialog  # noqa: E402
+from quickalignment.ui.photo_dialog import PhotoImportDialog  # noqa: E402
+from quickalignment.ui.photo_widgets import STEP_COLORS  # noqa: E402
 from quickalignment.ui.plate_editor import PlateEditor  # noqa: E402
 
-from quickalignment.alignment.photo import apply_homography  # noqa: E402
+from quickalignment.alignment.photo import apply_homography, detect_samples, rgb_to_lab  # noqa: E402
 from test_photo import PHOTO_CORNERS, SAMPLES, synthetic_photo  # noqa: E402
 
 QtCore, QtWidgets = qt.QtCore, qt.QtWidgets
@@ -26,15 +27,32 @@ def app():
     return QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
 
-def test_dialog_finds_and_returns_samples(app):
+def registered(plate=STANDARD_PLATE, height=0.5, existing=None, boxes=True):
+    """The dialog with the synthetic photo registered and, by default, a box drawn on each of its samples."""
     img, _ = synthetic_photo()
-    dlg = PhotoImportDialog(STANDARD_PLATE, 0.3, existing=["S1"])
-    assert dlg.mode.currentIndex() == BY_SAMPLE  # default: silver paint is not a sample
-    dlg.mode.setCurrentIndex(BY_PLATE)
+    dlg = PhotoImportDialog(plate, height, existing=existing)
     dlg.set_photo(img)
-    assert not dlg.add_btn.isEnabled()
     dlg.set_corners(PHOTO_CORNERS)
     assert dlg.rectified is not None
+    if boxes:
+        for rect, _ in SAMPLES:
+            dlg.reg.plateDragged.emit(*rect)  # drawn in the right view (draw box is on by default)
+    return dlg
+
+
+def test_no_colour_detection_in_window(app):
+    """Finding samples by colour is left to the assistant (align_detect_samples): the window only draws boxes."""
+    dlg = registered(boxes=False)
+    assert dlg.detections == [] and not dlg.add_btn.isEnabled()
+    assert not hasattr(dlg, "mode") and not hasattr(dlg, "threshold")
+    assert dlg.draw_btn.isChecked() and dlg.reg.plate_view.drag_enabled
+    assert dlg.draw_btn.text() == "Draw box on plate model (right side)"
+    assert [dlg.tabs.tabText(i).split()[:2] for i in range(2)] == [["Step", "1"], ["Step", "2"]]
+    assert [dlg.tabs.tabBar().tabTextColor(i).name() for i in range(2)] == list(STEP_COLORS)
+
+
+def test_dialog_returns_drawn_samples(app):
+    dlg = registered(height=0.3, existing=["S1"])
     assert len(dlg.detections) == 3 and dlg.add_btn.isEnabled()
     # delete one (not a sample), change the height of another
     dlg._select_row(1)
@@ -44,10 +62,10 @@ def test_dialog_finds_and_returns_samples(app):
     assert [s.name for s in samples] == ["S2", "S4"]  # S1 is taken on the plate
     assert samples[0].height == pytest.approx(0.7) and samples[1].height == pytest.approx(0.3)
     (u0, v0, u1, v1), _ = SAMPLES[0]
-    assert samples[0].u == pytest.approx((u0 + u1) / 2, abs=0.1)
-    assert samples[0].length == pytest.approx(u1 - u0, abs=0.15)
-    # threshold change keeps the edits of the rows
-    dlg.threshold.setValue(14)
+    assert samples[0].u == pytest.approx((u0 + u1) / 2, abs=0.05)
+    assert samples[0].length == pytest.approx(u1 - u0, abs=0.05)
+    # a new registration (points dragged) keeps the edits of the rows
+    dlg.set_corners(PHOTO_CORNERS)
     assert dlg.table.item(0, 5).text() == "0.700"
 
 
@@ -61,36 +79,32 @@ def test_bad_corner_order_reported(app):
 
 
 def test_merge_selected(app):
-    img, _ = synthetic_photo()
-    dlg = PhotoImportDialog(STANDARD_PLATE, 0.5)
-    dlg.mode.setCurrentIndex(BY_PLATE)
-    dlg.set_photo(img)
-    dlg.set_corners(PHOTO_CORNERS)
+    dlg = registered()
+    dlg.table.clearSelection()  # the last box drawn is selected
     dlg.table.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
     dlg.table.selectRow(0)
     dlg.table.selectRow(1)
     dlg.merge_selected()
     assert len(dlg.detections) == 2
-    d = next(x for x in dlg.detections if x.manual)
-    assert dlg.samples()[[x.manual for x in dlg.detections].index(True)].name == "S1"
-    # the merge is kept when the detection runs again
-    dlg.threshold.setValue(13)
-    assert len(dlg.detections) == 2 and any(x.manual for x in dlg.detections)
-    assert (d.u0, d.v1) == pytest.approx((-4.0, 4.0), abs=0.1) and (d.u1, d.v0) == pytest.approx((2.5, -1.0), abs=0.1)
+    d = next(x for x in dlg.detections if x.u0 < -3.9)
+    assert dlg.samples()[dlg.detections.index(d)].name == "S1"
+    assert (d.u0, d.v1) == pytest.approx((-4.0, 4.0), abs=0.05) and (d.u1, d.v0) == pytest.approx((2.5, -1.0), abs=0.05)
 
 
 def test_real_photo_by_sample_colour(app):
+    """Colour detection (kept for the assistant) on the photo registered in the window."""
     dlg = PhotoImportDialog(GATING_PLATE, 0.525)
     assert dlg.load_photo(str(REAL_PHOTO))
-    dlg.mode.setCurrentIndex(BY_PLATE)
     dlg.set_corners(REAL_CORNERS)
+    bounds = GATING_PLATE.riser_bounds()
     # differing from the bare plate also takes the silver paint: the substrate is merged with it
-    big = max(dlg.detections, key=lambda d: d.area)
+    big = max(detect_samples(dlg.rectified, bounds, 12.0).detections, key=lambda d: d.area)
     assert big.u0 < -5
     # picked on the black substrate: only the substrates are found
-    assert dlg.pick_sample_color(3.65, 6.15)
-    assert dlg.mode.currentIndex() == 1
-    big = max(dlg.detections, key=lambda d: d.area)
+    r = dlg.rectified
+    m = r.mask_of((3.5, 6.0, 3.8, 6.3)) & r.valid
+    picked = np.median(rgb_to_lab(r.pixels[m]), axis=0)
+    big = max(detect_samples(r, bounds, 20.0, sample_colors=[picked]).detections, key=lambda d: d.area)
     assert (big.u0, big.v0, big.u1, big.v1) == pytest.approx((-1.85, -0.95, 5.5, 6.75), abs=0.25)
     # the device found on the beam (fit of the capillary configuration) is on it
     assert big.u0 < 1.51 < big.u1 and big.v0 < 2.82 < big.v1
@@ -119,46 +133,39 @@ def test_reference_points_numbered_in_plate_view(app):
     for x, y in PHOTO_CORNERS[2:]:
         dlg.reg._on_photo_click(x, y)
     assert dlg.rectified is not None
-    # a click on the registered photo picks a sample colour there (default mode, no colour yet)
+    assert dlg.instruction.text().startswith("Step 1") and "draw a box" in dlg.instruction.text()
+    # a box drawn on the plate model; a click on the registered photo selects it
     (u0, v0, u1, v1), _ = SAMPLES[0]
+    dlg.reg.plateDragged.emit(u0, v0, u1, v1)
+    dlg.table.clearSelection()
     (x, y), = apply_homography(dlg.reg.h, [((u0 + u1) / 2, (v0 + v1) / 2)])
-    assert dlg.pick_sample_btn.isChecked()
     dlg.reg._on_photo_click(x, y)
-    assert len(dlg.sample_colors) == 1 and len(dlg.detections) == 1
-    d = dlg.detections[0]
-    assert (d.u0, d.v0, d.u1, d.v1) == pytest.approx((u0, v0, u1, v1), abs=0.1)
+    assert dlg._selected_rows() == [0]
     # cursor read-out in plate coordinates
     dlg.reg._show_cursor(-2.5, 3.0)
     assert "x =  -2.500" in dlg.reg.cursor_label.text() and "in S1" in dlg.reg.cursor_label.text()
 
 
-def test_draw_delete_kept_on_redetection(app):
-    img, _ = synthetic_photo()
-    dlg = PhotoImportDialog(STANDARD_PLATE, 0.5)
-    dlg.mode.setCurrentIndex(BY_PLATE)
-    dlg.set_photo(img)
-    dlg.set_corners(PHOTO_CORNERS)
+def test_draw_delete_and_remove_all(app):
+    dlg = registered()
     assert len(dlg.detections) == 3
     # delete a wrong box (selected by clicking on it)
     dlg.select_at(1.5, 0.0)
     assert dlg._selected_rows() == [1]
     dlg.delete_selected()
     assert len(dlg.detections) == 2
-    # draw a missing one by dragging in the right view
+    # draw tool off: a drag does not draw
+    dlg.draw_btn.setChecked(False)
+    assert not dlg.reg.plate_view.drag_enabled
     dlg.draw_btn.setChecked(True)
-    assert dlg.reg.plate_view.drag_enabled
     dlg.reg.plateDragged.emit(-5.0, -7.0, -3.02, -5.48)
-    drawn = [d for d in dlg.detections if d.manual]
-    assert len(drawn) == 1 and drawn[0].rect == pytest.approx((-5.0, -7.0, -3.0, -5.5))
-    assert dlg.table.item(dlg.detections.index(drawn[0]), 7).text() == "drawn"
-    assert dlg.table.columnCount() == 8 and dlg.table.horizontalHeaderItem(0).text() == "Name"
+    drawn = dlg.detections[-1]
+    assert drawn.rect == pytest.approx((-5.0, -7.0, -3.0, -5.5))
+    assert dlg.table.columnCount() == 7 and dlg.table.horizontalHeaderItem(0).text() == "Name"
     names = [s.name for s in dlg.samples()]
     assert len(names) == len(set(names)) == 3
-    # both edits survive a new detection, the names stay
-    dlg.threshold.setValue(15)
-    assert len(dlg.detections) == 3 and [s.name for s in dlg.samples()] == names
     dlg.undo_edits()
-    assert len(dlg.detections) == 3 and not any(d.manual for d in dlg.detections)
+    assert dlg.detections == []
 
 
 def test_zoom_kept_when_view_resizes(app):
@@ -187,11 +194,7 @@ class _Wheel:
 
 
 def test_devices_from_second_photo_by_point_pairs(app):
-    img, _ = synthetic_photo()
-    dlg = PhotoImportDialog(STANDARD_PLATE, 0.5)
-    dlg.mode.setCurrentIndex(BY_PLATE)
-    dlg.set_photo(img)
-    dlg.set_corners(PHOTO_CORNERS)
+    dlg = registered()
     panel = dlg.devices_panel
     assert [n for n, _ in panel.substrates] == ["S1", "S2", "S3"]
     (u0, v0, u1, v1), _ = SAMPLES[0]
@@ -202,7 +205,8 @@ def test_devices_from_second_photo_by_point_pairs(app):
     t_true = np.array([[c, -s_, -2.5], [s_, c, 3.0], [0, 0, 1]]) @ np.diag([1 / 200, -1 / 200, 1])
     panel.set_photo(np.full((500, 700, 3), 90, np.uint8))
     dlg.tabs.setCurrentIndex(1)
-    assert "point 1 on the left" in dlg.instruction.text()
+    assert "point 1 on the left" in dlg.instruction.text() and dlg.instruction.text().startswith("Step 1")
+    assert panel.pair_radio.text().startswith("Step 1") and panel.device_radio.text().startswith("Step 2")
     # pairs by clicking: left (plate photo crop, scene = (u, -v)) then right (device photo)
     plate_pts = [(-3.5, 2.5), (-1.5, 3.6), (-2.0, 2.2)]
     photo_pts = apply_homography(np.linalg.inv(t_true), plate_pts)
@@ -216,6 +220,7 @@ def test_devices_from_second_photo_by_point_pairs(app):
     assert "affine" in panel.match_label.text() and panel.rms < 1e-6
     # devices clicked on the device photo get plate coordinates
     panel.device_radio.setChecked(True)
+    assert dlg.instruction.text().startswith("Step 2") and STEP_COLORS[1] in dlg.instruction.styleSheet()
     target = (u0 + 0.8, v0 + 0.6)
     (x, y), = apply_homography(np.linalg.inv(t_true), [target])
     panel._on_right_click(x, y)

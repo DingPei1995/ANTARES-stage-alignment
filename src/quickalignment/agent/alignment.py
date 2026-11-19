@@ -461,8 +461,9 @@ class AlignmentSession:
                            f"{log.read_text(encoding='utf-8', errors='replace').strip()[-1500:] or 'no error text'}")
         return {"opened": True, "result_file": str(out), "log_file": str(log),
                 "tell_the_user": "A window 'Samples from a photo — manual annotation' is open with your photo, already "
-                                 "registered. Draw boxes on the samples (Draw box), delete or merge wrong ones, set the "
-                                 "names and heights H, add devices in tab 2 if needed, then press OK.",
+                                 "registered. Draw boxes on the samples (Draw box on plate model, on by default: "
+                                 "drag in the right view), delete or merge wrong ones, set the names and heights H, "
+                                 "add devices in the Step 2 tab if needed, then press OK.",
                 "next": "When the user says they are done, call load_annotation."}
 
     def load_annotation(self, path: str | None = None, wait: bool = False) -> dict:

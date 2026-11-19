@@ -12,6 +12,7 @@ from .calibration_dialog import CalibrationDialog
 from ..core.stage import OPTIC_TYPES
 from .plate_choice import ask_plate, ask_setup
 from .plate_editor import PlateEditor
+from .quick_rotation_panel import QuickRotationPanel
 from .rotation_panel import RotationPanel
 from .stage_panel import StagePanel, set_motor_limits
 
@@ -32,6 +33,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.editor.samplesPlaced.connect(self.go_to_stage)
         self.stage.layoutCorrected.connect(self._on_layout_corrected)
         self.rotation = RotationPanel(self.stage, lambda: self.editor.layout_model, self.editor.default_height)
+        # on its own: reads only the configuration in use and the plate mounted
+        self.quick_rotation = QuickRotationPanel(self.stage, lambda: self.editor.layout_model.plate)
         self.cal_dialog = CalibrationDialog(self.store, self.stage, self)
         self.cal_dialog.recordChanged.connect(self._on_record)
         self.cal_dialog.limitsChanged.connect(self._on_limits)
@@ -39,6 +42,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(self.editor, "Samples")
         self.tabs.addTab(self.stage, "Stage && Optics")
         self.tabs.addTab(self.rotation, "Rotate sample")
+        self.tabs.addTab(self.quick_rotation, "Quick sample rotation (without pre-setup)")
         self.setCentralWidget(self.tabs)
 
         bar = self.addToolBar("File")
@@ -77,6 +81,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_record(self, record: CalibrationRecord) -> None:
         self.stage.set_record(record)
         self.rotation.update_optic()
+        self.quick_rotation.update_optic()
         self._show_cal_label()
         self.stage.update_view()
 
@@ -90,6 +95,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_limits(self) -> None:
         self.stage.motors.apply_limits()
         self.rotation.apply_limits()
+        self.quick_rotation.apply_limits()
         self.stage.update_view()  # out-of-range and anti-collision readouts with the new limits
         self.statusBar().showMessage("New motor limits in use.")
 

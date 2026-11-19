@@ -29,6 +29,25 @@ COLOR_MODEL = QtGui.QColor("#00b4ff")
 COLOR_NEXT = QtGui.QColor("#e00000")
 COLOR_TODO = QtGui.QColor("#808080")
 DRAG_PX = 4  # a left press moved less than this is a click
+# the steps of a window (tabs, radio buttons): each in its own colour, in bold
+STEP_COLORS = ("#0060c0", "#c05000")
+
+
+def step_style(step: int) -> str:
+    """Style sheet of the label / button of step 1, 2: bold, in the step's colour."""
+    return f"font-weight: bold; color: {STEP_COLORS[(step - 1) % len(STEP_COLORS)]};"
+
+
+def color_tabs(tabs: QtWidgets.QTabWidget) -> None:
+    """Tabs named "Step 1 …", "Step 2 …": bold, each in its step's colour."""
+    # a bold font on the tab bar itself (not a style sheet): the tabs are sized for the bold text, none is cut
+    bar = tabs.tabBar()
+    font = bar.font()
+    font.setBold(True)
+    bar.setFont(font)
+    bar.setElideMode(Qt.ElideNone)
+    for i in range(tabs.count()):
+        tabs.tabBar().setTabTextColor(i, QtGui.QColor(STEP_COLORS[i % len(STEP_COLORS)]))
 
 
 def qimage_to_array(image: QtGui.QImage) -> np.ndarray:

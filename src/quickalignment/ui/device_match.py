@@ -23,7 +23,7 @@ import numpy as np
 
 from ._qt import QtCore, QtGui, QtWidgets, Signal
 from .photo_cache import DEVICE, PLATE, photo_cache
-from .photo_widgets import CornerItem, ZoomView, array_to_qimage, read_photo
+from .photo_widgets import CornerItem, ZoomView, array_to_qimage, read_photo, step_style
 from .plate_editor import cosmetic_pen
 from ..core.geometry import Device, Rect, Sample
 from ..alignment.photo import apply_homography, pair_transform, rectify
@@ -105,8 +105,13 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         clear_btn = QtWidgets.QPushButton("Clear all points")
         clear_btn.setToolTip("Remove all the matched points (the devices already marked stay where they are)")
         clear_btn.clicked.connect(lambda: self.clear_pairs())
-        self.pair_radio = QtWidgets.QRadioButton("mark the same point on both")
-        self.device_radio = QtWidgets.QRadioButton("mark devices")
+        self.pair_radio = QtWidgets.QRadioButton("Step 1  mark the same point on both")
+        self.pair_radio.setStyleSheet(step_style(1))
+        self.pair_radio.setToolTip("Match the device photo to the plate: click a point on the left, then the same "
+                                   "point on the right (at least 2 pairs)")
+        self.device_radio = QtWidgets.QRadioButton("Step 2  mark devices")
+        self.device_radio.setStyleSheet(step_style(2))
+        self.device_radio.setToolTip("Click on each device in the device photo (or on the left)")
         self.pair_radio.setChecked(True)
         self.pair_radio.toggled.connect(lambda _: self.changed.emit())
         self.file_label = QtWidgets.QLabel("no device photo")
@@ -250,7 +255,7 @@ class DeviceMatchPanel(QtWidgets.QWidget):
                                     "placed (blue) are reference points")
         elif sub is None or self.photo1 is None or self.h1 is None:
             self.crop_item.setPixmap(QtGui.QPixmap())
-            self.left_title.setText("<b>Plate photo</b> around the substrate (find the samples in tab 1 first)")
+            self.left_title.setText("<b>Plate photo</b> around the substrate (draw the samples in the Step 1 tab first)")
             self._crop_key = None
         else:
             bounds, px = crop_view(sub[1])
@@ -426,24 +431,28 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         self.match_label.setStyleSheet(f"color: {color};")
         self.match_label.setText(text)
 
+    def step(self) -> int:
+        """1: matching the photos (same point on both), 2: marking devices."""
+        return 2 if self.device_radio.isChecked() else 1
+
     def instruction(self) -> str:
         sub = self.current_substrate()
         if not self._has_left():
-            return "Find or draw the samples on the plate photo (tab 1) first."
+            return "Draw the samples on the plate photo (Step 1 tab) first."
         if self.photo2 is None:
             return f"Open a photo showing the devices of {sub[0]} (it need not show the substrate edges)."
         if self.device_radio.isChecked():
             if self.t is None:
-                return "Mark at least 2 point pairs first (“mark the same point on both”)."
-            return ("Click on each device in the device photo (or on the left). Name them in the table; switch back "
-                    "to “mark the same point on both” to add or drag points.")
+                return "Mark at least 2 point pairs first (Step 1: “mark the same point on both”)."
+            return ("Step 2: click on each device in the device photo (or on the left). Name them in the table; "
+                    "switch back to Step 1 “mark the same point on both” to add or drag points.")
         n = len(self.left_pts)
         if n > len(self.right_pts):
-            return f"Click the same point {n} on the device photo (right). A wrong point: Undo last point (Ctrl+Z)."
-        more = "" if n < 2 else " Enough points: choose “mark devices”, or add more pairs for accuracy."
+            return f"Step 1: click the same point {n} on the device photo (right). A wrong point: Undo last point (Ctrl+Z)."
+        more = "" if n < 2 else " Enough points: go to Step 2 “mark devices”, or add more pairs for accuracy."
         what = ("a corner of the substrate or a device already placed (blue; clicks snap to them)" if self.schematic
                 else "a feature you also see on the device photo (paint dot, pattern corner, scratch)")
-        return (f"Click point {n + 1} on the left: {what}, then the same point on the right. Wheel = zoom, middle "
+        return (f"Step 1: click point {n + 1} on the left: {what}, then the same point on the right. Wheel = zoom, middle "
                 f"drag = pan.{more}")
 
     # -- devices -------------------------------------------------------------------
@@ -620,6 +629,7 @@ class DeviceFromPhotoDialog(QtWidgets.QDialog):
         self.panel.set_source(rgb, None if rgb is None else c.h)
 
     def _update(self) -> None:
+        self.instruction.setStyleSheet(step_style(self.panel.step()))
         self.instruction.setText(self.panel.instruction())
         self.add_btn.setEnabled(bool(self.devices()))
 

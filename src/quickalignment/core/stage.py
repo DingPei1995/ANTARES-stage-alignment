@@ -368,6 +368,15 @@ def beam_on_layout(model: StageModel, m: MotorPositions, layout: SampleLayout) -
     return None, None, None, "misses the plate"
 
 
+def focus_point(model: StageModel, m: MotorPositions, cal: OpticsCalibration, optic_position: float) -> np.ndarray:
+    """Plate point (u, v, w) at the optic focus: where the sample point is when it was found on the beam and in
+    focus at the stage positions m with the optic at `optic_position`. The working distance of the optic stays, so
+    the optic position tells where along the beam the focus is (configuration's optics reference), and with it the
+    plate position and height of the point, without knowing the sample on the plate beforehand."""
+    y = cal.focus_for_position(model, optic_position)
+    return model.lab_to_plate(m, y * Y_HAT)
+
+
 def focus_correction(
     model: StageModel,
     m: MotorPositions,

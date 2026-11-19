@@ -438,8 +438,13 @@ class PlateEditor(QtWidgets.QWidget):
                                  "and the devices\nalready on it (or on a plate photo used earlier in this run): the "
                                  "samples need not be found again")
         dev_photo_btn.clicked.connect(lambda: self.devices_from_photo())
-        del_btn = QtWidgets.QPushButton("Delete selected")
-        del_btn.clicked.connect(self.delete_selected)
+        del_sample_btn = QtWidgets.QPushButton("Delete selected samples")
+        del_sample_btn.setToolTip("Delete the samples / substrates selected in this list or on the plate "
+                                  "(with their devices)")
+        del_sample_btn.clicked.connect(lambda: self.delete_selected_samples())
+        del_dev_btn = QtWidgets.QPushButton("Delete selected devices")
+        del_dev_btn.setToolTip("Delete the devices selected in this list or on the plate (their substrates stay)")
+        del_dev_btn.clicked.connect(lambda: self.delete_selected_devices())
         done_btn = QtWidgets.QPushButton("Samples placed → Stage")
         done_btn.setToolTip("When all samples are marked on the plate: go to the Stage && Optics tab,\n"
                             "which then lists where each sample is at the initial rotation.")
@@ -489,7 +494,7 @@ class PlateEditor(QtWidgets.QWidget):
         form.addWidget(si)
         form.addStretch(1)
         buttons = QtWidgets.QHBoxLayout()
-        for b in (add_btn, photo_btn, dev_btn, dev_photo_btn, del_btn):
+        for b in (add_btn, photo_btn, dev_btn, dev_photo_btn):
             buttons.addWidget(b)
         buttons.addStretch(1)
         done_row = QtWidgets.QHBoxLayout()
@@ -513,9 +518,18 @@ class PlateEditor(QtWidgets.QWidget):
         right.addLayout(buttons)
         right.addWidget(check_box)
         right.addLayout(done_row)
-        right.addWidget(QtWidgets.QLabel("<b>Samples / substrates</b>"))
+        sample_title = QtWidgets.QHBoxLayout()
+        sample_title.addWidget(QtWidgets.QLabel("<b>Samples / substrates</b>"))
+        sample_title.addStretch(1)
+        sample_title.addWidget(del_sample_btn)
+        right.addLayout(sample_title)
         right.addWidget(self.table, 3)
-        right.addWidget(QtWidgets.QLabel("<b>Devices</b> (dx, dy: distances from two substrate edges to the device centre)"))
+        dev_title = QtWidgets.QHBoxLayout()
+        dev_label = QtWidgets.QLabel("<b>Devices</b> (dx, dy: distances from two substrate edges to the device centre)")
+        dev_label.setWordWrap(True)
+        dev_title.addWidget(dev_label, 1)
+        dev_title.addWidget(del_dev_btn)
+        right.addLayout(dev_title)
         right.addWidget(self.dev_table, 2)
         right.addWidget(self.info)
         right.addWidget(self.cursor_label)
@@ -730,9 +744,17 @@ class PlateEditor(QtWidgets.QWidget):
         self.scene.removeItem(item.outline)
         self.scene.removeItem(item)
 
-    def delete_selected(self) -> None:
-        samples = self.selected_samples()
-        devices = [(s, d) for s, d in self.selected_devices() if s not in samples]
+    def delete_selected_samples(self) -> None:
+        """Delete the selected samples / substrates (with their devices); selected devices stay."""
+        self.delete_selected(samples=True, devices=False)
+
+    def delete_selected_devices(self) -> None:
+        """Delete the selected devices only; selected samples stay."""
+        self.delete_selected(samples=False, devices=True)
+
+    def delete_selected(self, samples: bool = True, devices: bool = True) -> None:
+        samples = self.selected_samples() if samples else []
+        devices = [(s, d) for s, d in self.selected_devices() if s not in samples] if devices else []
         # update the model first: removeItem() emits selectionChanged
         self._updating_table = True
         for s, d in devices:

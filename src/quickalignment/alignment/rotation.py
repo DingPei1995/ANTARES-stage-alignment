@@ -225,6 +225,7 @@ def relocate(
     default_height: float = 0.0,
     keep_sn: bool = False,
     limits: dict[str, tuple[float, float]] | None = None,
+    point: tuple[float, float, float] | None = None,
 ) -> Relocation:
     """Stage positions putting the measured sample point back on the beam after rotating to (srn, srz).
 
@@ -241,9 +242,18 @@ def relocate(
     orthonormal directions, so clamping each one gives the reachable position
     closest to the wanted one (with `to_analyzer_focus`: closest to the focus);
     `focus_distance` tells what is left.
+    `point`: the plate point (u, v, w) itself, e.g. located from the optic focus (stage.focus_point, Quick sample
+    rotation tab); the layout is then not used.
     """
-    hit, uv, w, target = beam_on_layout(model, measured, layout)
-    if hit is None or not any(target.split("/")[0] == s.name for s in layout.samples):
+    if point is not None:
+        u, v, w = (float(x) for x in point)
+        hit = model.beam_hit(measured, w)
+        if hit is None:
+            raise ValueError("The beam runs parallel to the plate at the measured position.")
+        uv, target = (u, v), "point at the optic focus"
+    else:
+        hit, uv, w, target = beam_on_layout(model, measured, layout)
+    if point is None and (hit is None or not any(target.split("/")[0] == s.name for s in layout.samples)):
         # not on a sample of the layout: plane at the given sample height
         w = model.plate.total_thickness + default_height
         hit = model.beam_hit(measured, w)
@@ -276,6 +286,32 @@ def relocate(
     return Relocation(measured, new, (u, v, w), target, optic_measured, optic_new, source,
                       focus_distance(model, new, u, v, w), focus_distance(model, measured, u, v, w),
                       model.beam_position(new, u, v, w))
+
+
+@dataclass
+class PiezoRecentre:
+    found: MotorPositions  # where the sample was found (piezo off centre)
+    new: MotorPositions  # piezo centred, SN kept: ST / SZ move, the point slides along the beam
+    same_point: MotorPositions  # piezo centred, ST / SN / SZ all move: the point stays where it was found
+    optic_found: float
+    optic_new: float  # optic refocused for `new`; `same_point` keeps `optic_found`
+    beam_shift: float  # mm the point moves along the beam with SN kept (+ = downstream)
+
+
+def recentre_piezo(model: StageModel, found: MotorPositions, optic_found: float, optics: OpticsCalibration) -> PiezoRecentre:
+    """ST / SZ (/ SN) that show the point seen at `found` (piezo off centre) with the piezo centred.
+
+    The rotations stay, so the piezo offset is a pure translation of the plate in the lab: ST, SN, SZ (orthonormal)
+    take it over exactly, the point stays where it is and the optic does not move (`same_point`). With SN kept (how
+    the stage is run) ST compensates the SN part, the point slides along the beam and the optic refocuses by it.
+    Only the rotation angles and the piezo directions enter, not ST0 / SZ0 / SN_f or the rotation axes."""
+    c = model.config
+    centred = replace(found, pix=c.pi_center, piy=c.pi_center)
+    d = model.plate_to_lab(found, 0.0, 0.0, 0.0) - model.plate_to_lab(centred, 0.0, 0.0, 0.0)
+    same = replace(centred, st=found.st + float(d @ T_HAT), sn=found.sn + float(d @ N_HAT), sz=found.sz + float(d @ Z_HAT))
+    new = slide_to_sn(same, found.sn)
+    shift = float(np.sqrt(2) * (new.sn - same.sn))  # slide_to_sn moves the stage sqrt2 * dSN along +y
+    return PiezoRecentre(found, new, same, float(optic_found), float(optic_found + optics.optic_sign * shift), shift)
 
 
 @dataclass
@@ -320,6 +356,7 @@ def fit_srn_axis(model: StageModel, positions: list[MotorPositions], w: float) -
 
 
 __all__ = [
-    "AnalyzerGeometry", "AxisFit", "RotationCandidate", "fit_srn_axis", "Relocation", "SLIT_ORIENTATIONS", "align_direction",
-    "analyzer_angles", "emission_in_plate", "emission_lab", "focus_distance", "onto_line", "relocate", "to_center", "wrap180",
+    "AnalyzerGeometry", "AxisFit", "PiezoRecentre", "RotationCandidate", "fit_srn_axis", "Relocation", "SLIT_ORIENTATIONS",
+    "align_direction", "analyzer_angles", "emission_in_plate", "emission_lab", "focus_distance", "onto_line", "recentre_piezo",
+    "relocate", "to_center", "wrap180",
 ]

@@ -127,7 +127,8 @@ class AlignmentSession:
              "plate": r.plate or "standard (not recorded)", "comment": r.comment}
             for r in records], "note": "Newest first; `start` uses the newest of the chosen optic. A configuration "
                                        "made with another plate than the one mounted is corrected for the plate "
-                                       "seat height (gating plate 1 mm higher in the holder: SZ0 shifted)."}
+                                       "seat height (PLATE_SEAT_V; gating and standard plates now both 0: the "
+                                       "pin springs back, measured 2026-11-19)."}
 
     def start(self, plate: str = "standard", optic: str | None = "capillary", custom_plate_mm: dict | None = None,
               configuration: str | None = None) -> dict:

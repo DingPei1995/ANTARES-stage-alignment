@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stage relocation after rotation</title>
+<script>
+window.MathJax = {
+  tex: { tags: 'ams', macros: { ST: '\\mathrm{ST}', SN: '\\mathrm{SN}', SZ: '\\mathrm{SZ}',
+         SRn: '\\mathrm{SRn}', SRz: '\\mathrm{SRz}', bm: ['\\boldsymbol{#1}', 1] } },
+  svg: { fontCache: 'global' }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<style>
+  @page { size: A4; margin: 18mm 18mm 16mm 18mm; }
+  body { font-family: "Cambria", "Georgia", serif; font-size: 10.5pt; line-height: 1.45; color: #111; margin: 0; }
+  h1 { font-size: 17pt; margin: 0 0 2pt 0; }
+  .sub { color: #555; font-size: 9.5pt; margin-bottom: 12pt; }
+  h2 { font-size: 12.5pt; margin: 16pt 0 4pt 0; border-bottom: 1px solid #bbb; padding-bottom: 2pt; }
+  h3 { font-size: 11pt; margin: 12pt 0 2pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0; font-size: 10pt; }
+  th, td { border: 1px solid #bbb; padding: 3pt 6pt; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; }
+  .box { border: 1.2px solid #333; padding: 4pt 10pt; margin: 8pt 0; background: #fafafa; }
+  .note { color: #444; font-size: 9.5pt; }
+  .tag { display: inline-block; font-size: 8.5pt; padding: 0 5pt; border-radius: 3pt; color: #fff; margin-left: 4pt; }
+  .t-axis { background: #2b6cb0; } .t-init { background: #b7791f; }
+  mjx-container[display="true"] { margin: 6pt 0 !important; }
+  mjx-container svg g, mjx-container svg use, mjx-container svg path { stroke: none !important; }
+  .pb { break-before: page; }
+</style>
+</head>
+<body>
+
+<h1>Recomputing ST, SZ, SN after a rotation (SRn, SRz)</h1>
+<div class="sub">ANTARES sample stage &mdash; closed-form version of <code>StageModel</code> / <code>relocate()</code> in QuickAlignment
+(<code>src/quickalignment/core/stage.py</code>, <code>alignment/rotation.py</code>). Verified numerically against the code.</div>
+
+<h2>Problem</h2>
+<p>A point of interest on the sample sits on the analyzer focus at the motor positions
+\((\ST_0, \SZ_0, \SN_0, \SRn_0, \SRz_0)\). Given new rotations \((\SRn_1, \SRz_1)\), find
+\((\ST_1, \SZ_1, \SN_1)\) that keep <em>the same sample point</em> on the focus.</p>
+
+<h2>Frames and conventions</h2>
+<ul>
+  <li>All vectors are written in the stage translation axes, ordered \((\ST, \SN, \SZ)\):
+    \(+\ST \parallel \hat t = (1,-1,0)/\sqrt2\), \(+\SN \parallel \hat n = (1,1,0)/\sqrt2\) (away from the analyzer),
+    \(+\SZ \parallel \hat z\) (up). \((\hat t, \hat n, \hat z)\) is right-handed.</li>
+  <li>Plate frame \((u, v, w)\): at \(\SRn = \SRn_\mathrm{ref}\), \(\SRz = 0\): \(u \parallel +\ST\), \(v \parallel +\SZ\),
+    \(w\) = height above the back face, pointing towards the analyzer (\(-\SN\)).</li>
+  <li>Mechanical stack, bottom to top: translations \(\to\) SRz \(\to\) SRn \(\to\) piezo \(\to\) plate.</li>
+</ul>
+
+<h3>Calibration parameters</h3>
+<table>
+  <tr><th>Symbol</th><th>Meaning</th><th>Type</th></tr>
+  <tr><td>\(\ST_c,\ \SZ_c\)</td><td>ST, SZ putting the plate centre on the focus</td><td>initial position</td></tr>
+  <tr><td>\(\SN_f\)</td><td>SN putting the reference surface \(w = 5\) mm (standard riser top) in the focal plane</td><td>initial position</td></tr>
+  <tr><td>\(\SRn_\mathrm{ref}\)</td><td>SRn with the plate vertical, tab up (120&deg;)</td><td>reference angle</td></tr>
+  <tr><td>\(\bm c = (c_u, c_v)\)</td><td>SRn axis position on the plate (plate frame, piezo centred)</td><td>rotation axis</td></tr>
+  <tr><td>\(\delta_t,\ \delta_n\)</td><td>SRz axis offset from the plate-surface centre line, along \(+\ST\) and \(+\SN\)</td><td>rotation axis</td></tr>
+  <tr><td>\(\bm\pi\)</td><td>piezo shift \(\bm\pi = \big(\mathrm{PIX}-150,\ -(\mathrm{PIY}-150)\big)/1000\) mm</td><td>&mdash;</td></tr>
+</table>
+
+<h3>Rotation matrices</h3>
+\[
+\alpha = \SRn - \SRn_\mathrm{ref}, \qquad
+R(\alpha) = \begin{pmatrix} \cos\alpha & -\sin\alpha \\ \sin\alpha & \cos\alpha \end{pmatrix}
+\quad\text{(in-plane, }(u,v)\text{)}
+\]
+\[
+\beta = \SRz, \qquad
+R_z(\beta) = \begin{pmatrix} \cos\beta & \sin\beta & 0 \\ -\sin\beta & \cos\beta & 0 \\ 0 & 0 & 1 \end{pmatrix}
+\quad\text{(in }(\ST,\SN,\SZ)\text{)}
+\]
+
+<h2>Formula</h2>
+
+<h3>Step 0 &mdash; which plate point is on the focus
+  <span class="tag t-init">initial positions</span><span class="tag t-axis">both axes</span></h3>
+<p>Lever arm of the focused point from the SRz axis at the old position, then back to the plate frame:</p>
+\[
+\bm D_0 = -\begin{pmatrix} \ST_0 - \ST_c + \delta_t \\ \SN_0 - \SN_f + \delta_n \\ \SZ_0 - \SZ_c \end{pmatrix},
+\qquad
+\bm d_0 = R_z(\beta_0)^{\mathsf T}\,\bm D_0
+\]
+\[
+\bm q_0 = \begin{pmatrix} d_{0,t} + \delta_t \\ d_{0,z} \end{pmatrix},
+\qquad
+w = 5 - \delta_n - d_{0,n},
+\qquad
+\bm r = R(-\alpha_0)\,(\bm q_0 - \bm c) + \bm c \;\; \big(= (u,v) + \bm\pi\big)
+\]
+
+<h3>Step 1 &mdash; SRn rotation about its axis <span class="tag t-axis">SRn axis</span></h3>
+\[
+\bm q_1 = R(\alpha_1)\,(\bm r - \bm c) + \bm c
+\]
+
+<h3>Step 2 &mdash; lever arm from the SRz axis <span class="tag t-axis">SRz axis</span></h3>
+\[
+\bm d_1 = \begin{pmatrix} q_{1,u} - \delta_t \\ (5 - w) - \delta_n \\ q_{1,v} \end{pmatrix}
+\]
+
+<h3>Step 3 &mdash; SRz rotation</h3>
+\[
+\bm D_1 = R_z(\beta_1)\,\bm d_1
+\]
+
+<h3>Step 4 &mdash; new translations</h3>
+<div class="box">
+\[
+\begin{pmatrix} \ST_1 \\ \SN_1 \\ \SZ_1 \end{pmatrix}
+= \begin{pmatrix} \ST_0 \\ \SN_0 \\ \SZ_0 \end{pmatrix} - \left(\bm D_1 - \bm D_0\right)
+\;\;\Longleftrightarrow\;\;
+\begin{cases}
+\ST_1 = \ST_c - \delta_t - D_{1,t} \\
+\SN_1 = \SN_f - \delta_n - D_{1,n} \\
+\SZ_1 = \SZ_c - D_{1,z}
+\end{cases}
+\]
+</div>
+
+<p><b>Optional: keep SN</b> (usual beamline practice):</p>
+\[
+\SN_1' = \SN_0, \qquad \ST_1' = \ST_1 + (\SN_1 - \SN_0)
+\]
+<p class="note">The point then slides along the beam by \(\sqrt2\,(\SN_1 - \SN_0)\), and the focusing optic refocuses on it.</p>
+
+<h2>Where each correction enters</h2>
+<table>
+  <tr><th style="width:24%">Parameter</th><th style="width:16%">Enters in</th><th>Effect</th></tr>
+  <tr><td>SRn axis \((c_u, c_v)\)</td><td>Steps 0, 1</td>
+      <td>Centre of the in-plane rotation. Matters only when SRn changes: if \(\alpha_1 = \alpha_0\), then \(\bm q_1 = \bm q_0\) and \(\bm c\) drops out.</td></tr>
+  <tr><td>SRz axis \((\delta_t, \delta_n)\)</td><td>Steps 0, 2</td>
+      <td>Lever arm \(\bm d\). Matters only when SRz changes: if \(\beta_1 = \beta_0\), then \(\bm D_1 - \bm D_0 = R_z(\beta)(\bm d_1 - \bm d_0)\) and \(\delta_t, \delta_n\) cancel.</td></tr>
+  <tr><td>Initial positions \(\ST_c, \SZ_c, \SN_f\)</td><td>Step 0 only</td>
+      <td>Not in the rotation itself. They fix where the plate, and so both axes, sit relative to the motor readings: which plate point \((u,v,w)\) is on the focus and how far it is from each axis. An error in \(\ST_c\) or \(\SZ_c\) therefore acts like an error in the axis position.</td></tr>
+  <tr><td>\(\SRn_\mathrm{ref}\)</td><td>\(\alpha\)</td><td>Zero of the SRn angle.</td></tr>
+  <tr><td>Piezo \((\mathrm{PIX}, \mathrm{PIY})\)</td><td>\(\bm r\)</td><td>Shifts the point on the plate before the SRn rotation.</td></tr>
+  <tr><td>Constant 5 mm</td><td>Steps 0, 2</td>
+      <td>Reference height that \(\SN_f\) refers to. For a sample of height \(H\) on a standard plate, \(w = 5 + H\), so \(5 - w = -H\).</td></tr>
+</table>
+
+</body>
+</html>

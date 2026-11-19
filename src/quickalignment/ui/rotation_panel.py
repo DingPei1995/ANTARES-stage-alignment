@@ -59,16 +59,10 @@ class RotationPanel(QtWidgets.QWidget):
         compute_btn.setMinimumHeight(34)
         compute_btn.setStyleSheet("font-weight: bold;")
         compute_btn.clicked.connect(self.compute)
-        bz_btn = QtWidgets.QPushButton("Find angles for a BZ point…")
-        bz_btn.setToolTip("Which SRn / SRz bring Γ, K or M (2-D hexagonal crystal) to the slit centre with the\n"
-                          "deflector at 0 and the slit along a high-symmetry line, from angles read on a map.")
-        bz_btn.clicked.connect(self.open_bz_target)
-        self._bz_dialog = None
         goal_box = QtWidgets.QGroupBox("2. Wanted angles")
         gf = QtWidgets.QFormLayout(goal_box)
         gf.addRow("SRn", self.new_srn)
         gf.addRow("SRz", self.new_srz)
-        gf.addRow(bz_btn)
         gf.addRow(compute_btn)
 
         # -- 3. result ---------------------------------------------------------------------
@@ -142,24 +136,6 @@ class RotationPanel(QtWidgets.QWidget):
         self.piezo.apply_limits()
         set_range(self.new_srn, "srn")
         set_range(self.new_srz, "srz")
-        if self._bz_dialog is not None:
-            set_range(self._bz_dialog.map_srn, "srn")
-            set_range(self._bz_dialog.map_srz, "srz")
-
-    def open_bz_target(self) -> None:
-        from .bz_target_dialog import BZTargetDialog
-
-        if self._bz_dialog is None:
-            self._bz_dialog = BZTargetDialog(self, self)
-        self._bz_dialog.show()
-        self._bz_dialog.raise_()
-        self._bz_dialog.activateWindow()
-
-    def set_wanted(self, srn: float, srz: float) -> None:
-        """Wanted angles from the BZ window; computes the new position."""
-        self.new_srn.setValue(srn)
-        self.new_srz.setValue(srz)
-        self.compute()
 
     # -- computation -----------------------------------------------------------------------
     def compute(self) -> None:

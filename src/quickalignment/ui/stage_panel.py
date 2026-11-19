@@ -22,7 +22,7 @@ from ..core.collision import ACCEPTANCE_HALF_ANGLE, collisions, in_acceptance, m
 from ..core.schematic import draw_schematic
 from ..core.stage import (
     OPTIC_TYPES, MotorPositions, OpticsCalibration, StageConfig, StageModel, apply_found_offset, checked_sn,
-    focus_correction, found_offset, sn_to_focus,
+    focus_correction, focus_point, found_offset, slide_to_sn, sn_to_focus,
 )
 
 Qt = QtCore.Qt
@@ -158,16 +158,14 @@ class StagePanel(QtWidgets.QWidget):
         self.optic_type.currentTextChanged.connect(self._on_optic_type)
         self.optic_pos = spin(0.0, -10000, 10000, 4, 0.01)
         self.optic_pos.setToolTip("Absolute optic motor position along the beam (from the configuration, or typed in).")
-        use_btn = QtWidgets.QPushButton("Use required position")
-        use_btn.setToolTip("Copy the optic position computed by the last update into the field.")
-        use_btn.clicked.connect(self.use_required_optic)
-        ref_btn = QtWidgets.QPushButton("Set as optics reference")
-        ref_btn.setToolTip(
-            "The beam is in focus now: take the current stage positions, the illuminated surface\n"
-            "and this optic position as the optics reference (for this session; configurations are\n"
-            "made by beamline staff with RealSampleCalibration.py or GoldFrameCalibration.py)."
+        focus_btn = QtWidgets.QPushButton("Move found sample to analyzer focal plane")
+        focus_btn.setToolTip(
+            "The sample was found on the beam and in focus at the entered stage positions with the optic\n"
+            "(ZPS / CPS) at the entered position. From the configuration's optics reference that position\n"
+            "tells where along the beam the sample surface is; SN (ST compensating) brings it onto the\n"
+            "analyzer focal plane and the optic follows to keep it in focus."
         )
-        ref_btn.clicked.connect(self.set_optics_reference)
+        focus_btn.clicked.connect(self.bring_found_to_focal_plane)
         self.optic_ref_label = QtWidgets.QLabel()
         self.optic_ref_label.setWordWrap(True)
         self.optic_ref_label.setStyleSheet("color: #555;")
@@ -175,7 +173,7 @@ class StagePanel(QtWidgets.QWidget):
         of = QtWidgets.QFormLayout(optic_box)
         of.addRow("Type", self.optic_type)
         of.addRow("Optic position", self.optic_pos)
-        of.addRow(equal_row(use_btn, ref_btn))
+        of.addRow(equal_row(focus_btn))
         of.addRow(self.optic_ref_label)
         # working distances of the optic solids (anti-collision); filled from the configuration
         self.distance_form = QtWidgets.QFormLayout()
@@ -335,24 +333,30 @@ class StagePanel(QtWidgets.QWidget):
         self.record = replace(self.record, collision=replace(geo, optics=tuple(optics)))
         self.limits_label.hide()  # computed for the old distances
 
-    def use_required_optic(self) -> None:
-        if self.last_result is not None and self.last_result.required_optic_position is not None:
-            self.optic_pos.setValue(self.last_result.required_optic_position)
-            self.update_view()
-
-    def set_optics_reference(self) -> None:
-        """The current state is in focus: make it the optics reference."""
-        res = focus_correction(self.model(), self.motors.value(), self._layout_getter(), self.calibration())
-        if res.hit is None:
-            QtWidgets.QMessageBox.warning(self, "Optics reference", "The beam does not hit the plate: no reference possible.")
-            return
-        optics = replace(
-            self.record.optics, enabled=True, motors=self.motors.value(), surface_w=res.surface_w,
-            optic_position=self.optic_pos.value(),
-        )
-        self.record = replace(self.record, optics=optics)
-        self._show_record()
-        self.update_view()
+    def bring_found_to_focal_plane(self) -> tuple[MotorPositions, float] | None:
+        """A sample was found on the beam and in focus at the entered stage positions with the optic (ZPS / CPS)
+        at the entered position. The configuration's optics reference turns that optic position into where the
+        focus, i.e. the sample surface, is along the beam; SN (ST compensating, the point slides along the beam)
+        brings it onto the analyzer focal plane and the optic follows it there. Returns (motors, optic)."""
+        model, m, cal = self.model(), self.motors.value(), self.calibration()
+        optic_now = self.optic_pos.value()
+        y = cal.focus_for_position(model, optic_now)
+        u, v, w = (float(x) for x in focus_point(model, m, cal, optic_now))
+        new = slide_to_sn(m, m.sn - y / 2 ** 0.5)
+        optic_new = cal.position_for_focus(model, 0.0)
+        if not self._go_to(new, "The found sample cannot be brought onto the analyzer focal plane", optic=optic_new):
+            return None
+        height = w - model.plate.total_thickness
+        side = "downstream" if y > 0 else "upstream"
+        where = ("It was already on the analyzer focus." if abs(y) < TOLERANCE else
+                 f"It was {abs(y) * 1000:.0f} µm {side} of the analyzer focus (optic {optic_now:.4f}).")
+        self.goto_label.setStyleSheet("color: #207020;")
+        self.goto_label.setText(
+            f"Found sample (plate x = {u:.3f}, y = {v:.3f} mm, surface H = {height:.3f} mm above the plate top) "
+            f"on the analyzer focal plane: ST = {new.st:.4f}, SZ = {new.sz:.4f}, <b>SN = {new.sn:.4f}</b> "
+            f"(ΔSN = {unsigned_zero(new.sn - m.sn, 4):+.4f} mm), optic <b>{optic_new:.4f}</b>. {where}")
+        self.goto_label.show()
+        return new, optic_new
 
     def model(self) -> StageModel:
         return StageModel(self.config(), self._layout_getter().plate)
@@ -490,17 +494,20 @@ class StagePanel(QtWidgets.QWidget):
         self._show_goto(label, t, new, m.sn)
         return new
 
-    def _go_to(self, new: MotorPositions, what: str, hint: str = "") -> bool:
+    def _go_to(self, new: MotorPositions, what: str, hint: str = "", optic: float | None = None) -> bool:
+        """Move to `new` (and the optic to `optic`, if given) unless out of range or colliding."""
         bad = out_of_range(new)
         if bad:
             QtWidgets.QMessageBox.warning(self, "Out of range", f"{what}:\n" + "\n".join(bad)
                                           + "\n\nThe positions are not changed." + hint)
             return False
-        hits = self.move_collisions(new)
+        hits = self.move_collisions(new, optic_new=optic)
         if hits:
             QtWidgets.QMessageBox.warning(self, "Collision", f"{what}: the plate would touch {hits}."
                                           "\n\nThe positions are not changed." + hint)
             return False
+        if optic is not None:
+            self.optic_pos.setValue(optic)
         self.motors.set_value(new)
         self.update_view()
         return True

@@ -1,0 +1,45 @@
+{
+  "zone_plate": {
+    "zps": 53.7502,
+    "zpx": 0.4683,
+    "zpz": 23.511,
+    "energy": 95.0,
+    "focal_per_ev": 0.256,
+    "zps_per_mm": 1.0,
+    "zps_parked": -20.0,
+    "source": "ZPS: configs/calibration_2026-11-15_151356_zone_plate.json (optic_position); ZPX, ZPZ: Cav/Cav_2026-11-15_11-13-55.nxs"
+  },
+  "capillary": {
+    "cps": 61.50753956178848,
+    "cpx": 57.14,
+    "zpz": 3.2395,
+    "cap_rz": -0.408,
+    "cap_rx": 3.9056,
+    "focus": [
+      -0.5657129499785376,
+      0.5657129499785376,
+      -0.19001415904304508
+    ],
+    "direction": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "cps_per_mm": 1.0,
+    "angle_unit": "deg",
+    "pivot_to_focus": 0.0,
+    "parked": [
+      0.0,
+      0.0
+    ],
+    "source": "CPS: configs/calibration_2026-11-15_151356_capillary.json (optic_position); CPX, ZPZ, Cap Rz, Cap Rx: Cav/Cav_2026-11-14_19-48-34.nxs"
+  },
+  "comment": "ZP beam = reference line (+y through the analyzer focus); capillary beam taken parallel to it. Cap Rz sign provisional.",
+  "osa": {
+    "s": 80.0,
+    "x": 0.5,
+    "z": 26.63,
+    "distance": 3.5,
+    "source": "S 80, X 0.5, Z 26.63: OSA working position (beamline 2026-11-17); 3.5 mm: collision model estimate"
+  }
+}

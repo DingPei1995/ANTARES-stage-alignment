@@ -62,7 +62,7 @@ The rotation centres are measured last, by tracking one point through SRn and SR
   <div class="step"><b>3 · Zone plate</b>Spot onto the reference point (ZPX, ZPZ), then focus (ZPS).
     <span class="rec">record ZPX, ZPS, ZPZ</span></div>
   <div class="step"><b>4 · Capillary</b>Position and attitude: spot onto the reference point, then focus.
-    <span class="rec">record CPS, CPX, CPZ, 2 angles</span></div>
+    <span class="rec">record CPS, CPX, ZPZ, 2 angles</span></div>
   <div class="step"><b>5 · Rotations</b>SRn and SRz series, zone-plate focus and SPEM maps on one point.
     <span class="rec">fit SRn and SRz axes</span></div>
 </div>
@@ -132,15 +132,14 @@ and in focus: its position then marks the analyzer focus along the beam.</figcap
     shows the reference point at the piezo centre, then focus with ZPS. Record ZPX, ZPS, ZPZ (and OSA positions):
     ZPS is now the zone-plate position for the analyzer focus.</li>
   <li><b>Capillary.</b> Same with the capillary: position and attitude (two angles) until the spot is on the
-    reference point, then focus with CPS. Record CPS, CPX, CPZ and the two angles.</li>
+    reference point, then focus with CPS. Record CPS, CPX, ZPZ (the vertical motor is shared by the zone plate and
+    the capillary) and the two angles.</li>
   <li><b>Rotation centres.</b> Track the same point with SPEM maps through an SRn series (e.g. 100–150°) and an SRz
     series (e.g. 0 to −25°), SN kept, refocusing with ZPS. ST / SZ give the axes along the plane; ZPS gives the
     positions along the beam — the only way to see the SRz axis <i>across</i> the beam (2026-11-15: it was 0.97 mm
     off, invisible to ST / SZ readings and to the capillary).</li>
 </ol>
 
-<div class="note">Note (step 4): the request listed “ZPZ” for the capillary; this summary assumes the capillary's own
-vertical motor (written CPZ here).</div>
 
 <h2>Using the working distance: height of a sample from the optic focus</h2>
 <div class="two">
@@ -196,6 +195,28 @@ about ±50 µm. So the zone-plate focus measures the height better than the came
 <tr><td><i>Found here</i> (Stage & Optics tab)</td><td>assumes the target is on the analyzer focus at the entered
   positions (no optic)</td><td>plate offset in SZ (all samples), sample Δx and ΔH</td></tr>
 </table>
+
+<div style="break-inside: avoid"><h3>Height error or SRz-axis error? How to tell after an SRz turn</h3>
+<p>Computed with the stage model for the 2026-11-15 SRz series on Cav (zone plate, SRn 120°, SN kept): change of the
+prediction for an error of <b>+0.1 mm in H</b> (the sample believed 0.1 mm higher than it is).</p>
+<table>
+<tr><th>SRz</th><th>−5°</th><th>−10°</th><th>−15°</th><th>−20°</th><th>−25°, SN corrected</th></tr>
+<tr><td>ST (SN kept)</td><td>−17 µm</td><td>−35 µm</td><td>−51 µm</td><td>−68 µm</td><td>across the beam −61 µm</td></tr>
+<tr><td>ZPS (SN kept)</td><td>+13 µm</td><td>+27 µm</td><td>+41 µm</td><td>+57 µm</td><td><b>+128 µm</b> (off the analyzer focus)</td></tr>
+</table>
+<ul>
+  <li><b>An H error shows in ST and in ZPS together</b>, both growing with sin SRz (ratio about −1.2 : 1 with SN kept).
+    With SN corrected it puts the point off the analyzer focus by about √2·δH at any angle.</li>
+  <li><b>An SRz-axis error across the beam shows in ZPS only</b> (ST changes to second order). That was the
+    2026-11-15 case: ZPS +0.11 … +0.29 mm off with the capillary axes while ST agreed within 1 µm. Explaining the
+    ZPS by H would take δH = −0.56 mm, which would put ST 0.1–0.38 mm off: excluded.</li>
+  <li><b>The open SRz −25° point</b> (SN moved, ZPS 0.14 mm short): δH = +0.11 mm would explain the ZPS but predicts
+    66 µm across the beam (22 µm measured) and does not fit the SN-kept series (best δH there: +0.04 mm). H is at most
+    a third of it.</li>
+  <li>So after an SRz turn: <b>fit δH to ST and ZPS together</b>. If one δH explains both, correct H (and keep it for
+    the next rotations); if ZPS is off with ST right, suspect the SRz axis or SN_f, not H.</li>
+</ul>
+</div>
 
 <h2 class="pb">Where errors come in</h2>
 <p>For the next calibration: check list, by step. “Effect” is what the error does to user predictions.</p>

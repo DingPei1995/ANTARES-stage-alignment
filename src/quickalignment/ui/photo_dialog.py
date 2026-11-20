@@ -13,7 +13,7 @@
 Finding the samples by their colour (alignment.photo.detect_samples) is left to
 the assistant (align_detect_samples); this window only has the drawn boxes.
 The boxes are a starting point: they can be moved / resized in the Samples
-tab like drawn ones, and "Found here" corrects the positions later.
+tab like drawn ones, and "Fine tunings by ZPS/CPS" corrects the positions later.
 """
 
 from __future__ import annotations

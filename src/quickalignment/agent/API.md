@@ -48,9 +48,11 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    and/or read each sample's corners on the photo yourself -> align_add_sample_from_photo(points_px, height, name).
    The height H (sample thickness above the plate surface) is NOT visible from above: ask the user (default
    0.525 mm, a Si wafer). Name the samples as the user calls them. Check with align_photo_overlay.
-   Many users do not know H: offer the HEIGHT CHECK (before step 6): at SRn 120, SRz 0 they drive the sample top
+   Many users do not know H: offer SET SN BY EYE (before step 6): at SRn 120, SRz 0 they drive the sample top
    surface onto the camera reference line (the analyzer focal plane) and read SN there (by eye, about ±0.05 mm);
-   align_check_height(sample, sn) sets H from it.
+   align_check_height(sample, sn) sets H from it (rough). Ask them to confirm that SN before the positions. Once the
+   sample is found in focus with the zone plate / capillary, the program's 'Fine tunings by ZPS/CPS' corrects H
+   precisely (the optic's focal distance is fixed) and brings the sample back onto the analyzer focus.
 5. Devices (small structures on a substrate): read them on the plate photo (align_add_device with photo_px), or on a
    microscope photo of the substrate registered with align_register_device_photo (2-4 point pairs: the same
    substrate corners / marks on the microscope photo and on the plate photo). Show align_photo_overlay again.
@@ -143,7 +145,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `align_add_sample` | **acts** | `x*` (number), `y*` (number), `length*` (number), `width*` (number), `height` (number), `name` (string) | Add a rectangular sample (plate mm). |
 | `align_add_sample_from_photo` | **acts** | `points_px*` (array), `height` (number), `name` (string), `photo_id` (string) | Add a sample from its corners read on the plate photo (4 corners, or 2 opposite corners). |
 | `align_update_sample` | **acts** | `name*` (string), `x` (number), `y` (number), `length` (number), `width` (number), `height` (number), `new_name` (string) | Change a sample (centre, size, height, name). |
-| `align_check_height` | **acts** | `sample*` (string), `sn*` (number) | Height check: SN read when the sample top surface is on the camera reference line (analyzer focal plane) at SRn ref, SRz 0 gives its height H; bring_to_beam then keeps this SN for its targets. |
+| `align_check_height` | **acts** | `sample*` (string), `sn*` (number) | Set SN by eye (button 'Set SN by eye'): SN read when the sample top surface is on the camera reference line (analyzer focal plane) at SRn ref, SRz 0 gives its height H roughly (about ±0.05 mm); bring_to_beam then keeps this SN for its targets. A zone-plate / capillary focus ('Fine tunings by ZPS/CPS' in the program) gives H more precisely. |
 | `align_remove_sample` | **acts** | `name*` (string) | Remove a sample. |
 | `align_clear_samples` | **acts** | - | Remove all samples. |
 | `align_add_device` | **acts** | `sample*` (string), `name` (string), `x` (number), `y` (number), `photo_px` (array), `photo_id` (string), `x_edge` (string), `y_edge` (string), `size_mm` (number) | Add a device on a substrate at plate (x, y) mm or at a pixel of a registered photo (plate or microscope). |
@@ -188,7 +190,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `bring_to_beam(target: 'str', motors: 'dict \| None' = None, correct_sn: 'bool' = False) -> 'dict'` | ST / SZ putting a target on the beam with SN kept (how the stage is run), at the given (or current) SRn, SRz, piezo; with correct_sn also SN, so that it is on the analyzer focus. A target whose sample height was checked (check_height) keeps the SN of that check unless `motors` gives SN. |
 | `bz_angles(lattice_a: 'float', hv_map: 'float', gamma: 'list', ref_point: 'list', ref_label: 'str' = 'K', feature: 'str' = 'K', line: 'int' = 0, hv: 'float \| None' = None, map_srn: 'float \| None' = None, map_srz: 'float \| None' = None, binding: 'float' = 0.0) -> 'dict'` | SRn / SRz putting a 2-D hexagonal Brillouin-zone point (Γ, K, K', M) at the slit centre with the slit along a high-symmetry line, from a measured map (ARPES viewer angles θ = deflector, φ = along the slit). |
 | `bz_point_to(lattice_a: 'float', hv_map: 'float', ref_point: 'list', map_srn: 'float', map_srz: 'float', ref_label: 'str' = 'K', hv: 'float \| None' = None, target_angles: 'list \| None' = None, gamma: 'list \| None' = None, keep_srn: 'bool' = False, binding: 'float' = 0.0, sample: 'str \| None' = None) -> 'dict'` | SRn / SRz putting a K or M point read on a map (θ = deflector, φ = slit, ARPES viewer) at chosen analyzer angles at another photon energy. Γ is optional: without it the surface tilt is estimated from \|Γ–point\|. keep_srn: keep the in-plane orientation (slit already along Γ–K / Γ–M) and turn SRz only. With `sample`, also the ST / SZ / SN putting it at the analyzer focus there. |
-| `check_height(sample: 'str', sn: 'float') -> 'dict'` | Height check: the top surface of `sample` was driven onto the camera reference line (the analyzer focal plane) at SRn ref, SRz 0, at SN = sn (read by eye). Its height H follows; bring_to_beam then keeps this SN for its targets (right at SRn ref, SRz 0, as the height was corrected with it). |
+| `check_height(sample: 'str', sn: 'float') -> 'dict'` | Set SN by eye: the top surface of `sample` was driven onto the camera reference line (the analyzer focal plane) at SRn ref, SRz 0, at SN = sn (read by eye, about ±0.05 mm). Its height H follows roughly; bring_to_beam then keeps this SN for its targets (right at SRn ref, SRz 0, as the height was set with it). A zone-plate / capillary focus ('Fine tunings by ZPS/CPS' in the program) gives H more precisely. |
 | `clear_samples() -> 'dict'` | - |
 | `collision_check(motors: 'dict \| None' = None, optic_position: 'float \| None' = None) -> 'dict'` | Does the plate touch the analyzer / optic at these positions, and how far can each motor go. |
 | `configurations(optic: 'str \| None' = None) -> 'dict'` | - |

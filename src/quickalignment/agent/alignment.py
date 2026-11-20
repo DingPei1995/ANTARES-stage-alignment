@@ -682,9 +682,10 @@ class AlignmentSession:
                 "samples": [self._sample_info(s) for s in self.layout.samples]}
 
     def check_height(self, sample: str, sn: float) -> dict:
-        """Height check: the top surface of `sample` was driven onto the camera reference line (the analyzer focal
-        plane) at SRn ref, SRz 0, at SN = sn (read by eye). Its height H follows; bring_to_beam then keeps this SN
-        for its targets (right at SRn ref, SRz 0, as the height was corrected with it)."""
+        """Set SN by eye: the top surface of `sample` was driven onto the camera reference line (the analyzer focal
+        plane) at SRn ref, SRz 0, at SN = sn (read by eye, about ±0.05 mm). Its height H follows roughly;
+        bring_to_beam then keeps this SN for its targets (right at SRn ref, SRz 0, as the height was set with it).
+        A zone-plate / capillary focus ('Fine tunings by ZPS/CPS' in the program) gives H more precisely."""
         self._need_start()
         s = self._sample(sample)
         sn = number(sn, "sn")

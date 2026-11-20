@@ -28,6 +28,9 @@ from ..core.stage import (
 from ..realsample.fit import measurement_sigmas
 
 Qt = QtCore.Qt
+FINE_TUNE_BUTTON = "Fine tunings by ZPS/CPS"
+HEIGHT_FOCUS_MIN = 0.002  # mm: a height change from the focus below this is not offered (H confirmed)
+FOUND_POSITION_MIN = 0.001  # mm: x / y changes from the focus below this (with H below HEIGHT_FOCUS_MIN) are not offered
 
 def unsigned_zero(x: float, decimals: int) -> float:
     """x rounded to `decimals`, a value that rounds to zero without its sign (shown 0.000, not -0.000)."""
@@ -160,17 +163,24 @@ class StagePanel(QtWidgets.QWidget):
         self.optic_type.currentTextChanged.connect(self._on_optic_type)
         self.optic_pos = spin(0.0, -10000, 10000, 4, 0.01)
         self.optic_pos.setToolTip("Absolute optic motor position along the beam (from the configuration, or typed in).")
-        focus_btn = QtWidgets.QPushButton("Move found sample to analyzer focal plane")
+        focus_btn = QtWidgets.QPushButton(FINE_TUNE_BUTTON)
         focus_btn.setToolTip(
-            "The sample was found on the beam and in focus at the entered stage positions with the optic\n"
-            "(ZPS / CPS) at the entered position. From the configuration's optics reference that position\n"
-            "tells where along the beam the sample surface is; SN (ST compensating) brings it onto the\n"
-            "analyzer focal plane and the optic follows to keep it in focus.\n"
-            "After an SRz turn, if the optic is more than 0.05 mm off the prediction for the Target, it also\n"
-            "checks whether a change of the sample height H explains the optic and the ST / SZ errors together,\n"
-            "and if so offers to correct H."
-        )
+            "The Target was found on the beam and in focus at the entered stage positions with the optic\n"
+            "(ZPS / CPS) at the entered position. The optic's focal distance is fixed, so that position tells\n"
+            "where along the beam the sample surface is (configuration's optics reference). Then:\n"
+            "1. at SRz 0 the focus gives where the Target really is (asked first): Δx moves its sample, Δy is the\n"
+            "   plate sitting at another height in the holder (all samples' SZ), ΔH corrects its height.\n"
+            "   After an SRz turn only H, if a change of H explains the optic and the ST / SZ errors together\n"
+            "   (optic > 0.05 mm off).\n"
+            "2. SN (ST compensating, the sample stays on the beam; SZ stays) brings the surface onto the\n"
+            "   analyzer focal plane, and the optic goes back to the configuration's position for the analyzer\n"
+            "   focus.")
         focus_btn.clicked.connect(self.bring_found_to_focal_plane)
+        fine_note = QtWidgets.QLabel(
+            "Works because the focal distance of the optic is fixed: the ZPS / CPS of the found focus corrects "
+            "the sample position and height and brings the sample back onto the analyzer focus.")
+        fine_note.setWordWrap(True)
+        fine_note.setStyleSheet("color: #555;")
         self.optic_ref_label = QtWidgets.QLabel()
         self.optic_ref_label.setWordWrap(True)
         self.optic_ref_label.setStyleSheet("color: #555;")
@@ -179,6 +189,7 @@ class StagePanel(QtWidgets.QWidget):
         of.addRow("Type", self.optic_type)
         of.addRow("Optic position", self.optic_pos)
         of.addRow(equal_row(focus_btn))
+        of.addRow(fine_note)
         of.addRow(self.optic_ref_label)
         # working distances of the optic solids (anti-collision); filled from the configuration
         self.distance_form = QtWidgets.QFormLayout()
@@ -205,20 +216,8 @@ class StagePanel(QtWidgets.QWidget):
         self.start_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.start_box = QtWidgets.QGroupBox("Where the samples are at the initial rotation")
         self.start_box.setStyleSheet("QGroupBox { background: #eef6ee; }")
-        self.found_combo = QtWidgets.QComboBox()
-        found_btn = QtWidgets.QPushButton("Found here: correct plate / sample")
-        found_btn.setToolTip("The chosen device is on the beam, in the analyzer focus, at the stage positions\n"
-                             "entered below. The SZ difference is taken as the plate sitting at another height in\n"
-                             "the holder (all samples move with it; the beam is not corrected); the ST difference and\n"
-                             "the height correct this sample (with all its devices).")
-        found_btn.clicked.connect(self.correct_from_found)
         sb = QtWidgets.QVBoxLayout(self.start_box)
         sb.addWidget(self.start_label)
-        found_row = QtWidgets.QHBoxLayout()
-        found_row.addWidget(QtWidgets.QLabel("Found"))
-        found_row.addWidget(self.found_combo, 1)
-        found_row.addWidget(found_btn)
-        sb.addLayout(found_row)
         self.start_box.hide()
 
         left = QtWidgets.QWidget()
@@ -297,7 +296,7 @@ class StagePanel(QtWidgets.QWidget):
 
     def config(self) -> StageConfig:
         """Stage constants of the configuration for the plate mounted now (SZ shift if it was made with a plate
-        seated at another height, e.g. gating vs standard; and the plate offset found with "Found here")."""
+        seated at another height, e.g. gating vs standard; and the plate offset found with "Fine tunings by ZPS/CPS")."""
         layout = self._layout_getter()
         return self.record.config_for(layout.plate.key, layout.plate_offset_v)
 
@@ -339,10 +338,12 @@ class StagePanel(QtWidgets.QWidget):
         self.limits_label.hide()  # computed for the old distances
 
     def bring_found_to_focal_plane(self) -> tuple[MotorPositions, float] | None:
-        """A sample was found on the beam and in focus at the entered stage positions with the optic (ZPS / CPS)
-        at the entered position. The configuration's optics reference turns that optic position into where the
-        focus, i.e. the sample surface, is along the beam; SN (ST compensating, the point slides along the beam)
-        brings it onto the analyzer focal plane and the optic follows it there. Returns (motors, optic)."""
+        """"Fine tunings by ZPS/CPS". A sample was found on the beam and in focus at the entered stage positions with
+        the optic (ZPS / CPS) at the entered position. The optic's focal distance is fixed, so the configuration's
+        optics reference turns that optic position into where the focus, i.e. the sample surface, is along the beam.
+        First the height H of the Target's sample is checked against it (check_found_height); then SN (ST
+        compensating, the point slides along the beam, SZ stays) brings the surface onto the analyzer focal plane and
+        the optic goes back to the configuration's position for the analyzer focus. Returns (motors, optic)."""
         m, optic_now = self.motors.value(), self.optic_pos.value()
         height_text = self.check_found_height(m, optic_now)  # may correct H of the target's sample
         model, cal = self.model(), self.calibration()
@@ -360,19 +361,21 @@ class StagePanel(QtWidgets.QWidget):
         self.goto_label.setText(
             f"Found sample (plate x = {u:.3f}, y = {v:.3f} mm, surface H = {height:.3f} mm above the plate top) "
             f"on the analyzer focal plane: ST = {new.st:.4f}, SZ = {new.sz:.4f}, <b>SN = {new.sn:.4f}</b> "
-            f"(ΔSN = {unsigned_zero(new.sn - m.sn, 4):+.4f} mm), optic <b>{optic_new:.4f}</b>. {where}"
+            f"(ΔSN = {unsigned_zero(new.sn - m.sn, 4):+.4f} mm, ΔST = {unsigned_zero(new.st - m.st, 4):+.4f} mm, "
+            f"SZ kept), optic back to <b>{optic_new:.4f}</b> (configuration's position for the analyzer focus). "
+            f"{where}"
             + (f"<br>{height_text}" if height_text else ""))
         self.goto_label.show()
         return new, optic_new
 
     def check_found_height(self, m: MotorPositions, optic: float) -> str:
-        """Height check of "Move found sample to analyzer focal plane", only after an SRz turn (|SRz| above
-        HEIGHT_CHECK_SRZ): the Target was found on the beam and in focus at m with the optic at `optic`. If the optic
-        is more than HEIGHT_CHECK_OPTIC off its prediction, fit one change of the sample height to the ST, SZ and
-        optic errors together; if it explains them (fit_height), ask to correct H of the target's sample. Returns a
-        line for the result text ("" when there is nothing to say)."""
-        if abs(m.srz) < HEIGHT_CHECK_SRZ:
-            return ""
+        """Correction part of "Fine tunings by ZPS/CPS": the Target was found on the beam and in focus at m with the
+        optic at `optic`. At SRz 0 (|SRz| below HEIGHT_CHECK_SRZ) the focus gives where the Target really is: x, plate
+        offset and H (correct_found_at_srz0). After an SRz turn, if the optic is more than HEIGHT_CHECK_OPTIC off its
+        prediction,
+        fit one change of the sample height to the ST, SZ and optic errors together; if it explains them
+        (fit_height), ask to correct H of the target's sample. Returns a line for the result text ("" when there is
+        nothing to say)."""
         label = self.target_combo.currentText()
         layout = self._layout_getter()
         sample = layout.sample_of(label) if label else None
@@ -382,6 +385,8 @@ class StagePanel(QtWidgets.QWidget):
         optic_type = self.optic_type.currentText()
         capillary = "capillary" in optic_type
         name = "CPS" if capillary else "ZPS"
+        if abs(m.srz) < HEIGHT_CHECK_SRZ:
+            return self.correct_found_at_srz0(m, optic, label, sample, t, name, optic_type)
         fit = fit_height(self.model(), m, self.calibration(), optic, *t, sigmas=measurement_sigmas(optic_type))
         st, sz, op = fit.before
         if abs(op) <= HEIGHT_CHECK_OPTIC:
@@ -392,7 +397,7 @@ class StagePanel(QtWidgets.QWidget):
         if not fit.explained:
             return ("<span style='color:#b00'>Height check of " + label + f": found off the prediction by {errors}. "
                     f"No change of H explains it (best ΔH = {fit.dh:+.3f} mm leaves ST {a_st:+.3f}, SZ {a_sz:+.3f}, "
-                    f"{name} {a_op:+.3f} mm): H kept. More likely the plate position of the sample (Found here at "
+                    f"{name} {a_op:+.3f} mm): H kept. More likely the plate position of the sample (Fine tunings at "
                     "SRz 0), the SRz axis or SN_f of the configuration.</span>")
         note = ("\n\nCapillary: the CPS focus is read to about ±0.10 mm, so this ΔH is known to about ±0.07 mm "
                 "only. Prefer a zone-plate focus when possible." if capillary else "")
@@ -416,6 +421,60 @@ class StagePanel(QtWidgets.QWidget):
         return (f"<span style='color:#207020'>Height of {sample.name} corrected: H {before:.3f} → "
                 f"{sample.height:.3f} mm (it explains the errors {errors}).</span>")
 
+    def correct_found_at_srz0(self, m: MotorPositions, optic: float, label: str, sample, t, name: str,
+                              optic_type: str) -> str:
+        """SRz 0 part of "Fine tunings by ZPS/CPS" (replaces "Found here"): the surface on the beam is parallel to the
+        analyzer focal plane, so the plate point at the optic focus (fixed focal distance) gives where the Target
+        really is, independent of the rotation axes: Δx (this sample, with its devices), Δy (the plate sits at another
+        height in the holder: plate offset, every sample's SZ) and ΔH (this sample's height). Asks, then applies them.
+        Returns a line for the result text."""
+        model, cal = self.model(), self.calibration()
+        layout = self._layout_getter()
+        y = cal.focus_for_position(model, optic)
+        du, dv, dw = found_offset(model, m, *t, y=y)
+        sigma = measurement_sigmas(optic_type)[1] / 2 ** 0.5  # optic reading along the beam -> along the normal
+        su, sv, sw = (unsigned_zero(x, 3) for x in (du, dv, dw))
+        if abs(du) < FOUND_POSITION_MIN and abs(dv) < FOUND_POSITION_MIN and abs(dw) < HEIGHT_FOCUS_MIN:
+            return (f"<span style='color:#555'>{label} found where expected (Δx {su:+.3f}, Δy {sv:+.3f}, "
+                    f"ΔH {sw:+.3f} mm): nothing corrected.</span>")
+        large = ""
+        if abs(du) > LARGE_FOUND_OFFSET:
+            large = (f"\n\nΔx (ST) is more than {LARGE_FOUND_OFFSET:g} mm: more likely the beam spot has moved (optic "
+                     "realigned?) than the sample, or the Target is not the one on the beam. If other samples show the "
+                     "same ST shift, ask beamline staff for an optics recalibration (RealSampleCalibration, mode "
+                     "optics) instead of correcting the sample.")
+        if abs(dw) > LARGE_FOUND_OFFSET:
+            large += (f"\n\nΔH is more than {LARGE_FOUND_OFFSET:g} mm: check the Target, the optic position typed and "
+                      "SN_f of the configuration.")
+        if abs(layout.plate_offset_v + dv) > PLATE_OFFSET_WARNING:
+            large += (f"\n\nThe plate would then sit {layout.plate_offset_v + dv:+.2f} mm off its usual height in the "
+                      f"holder (more than {PLATE_OFFSET_WARNING:g} mm): check that the right sample was found.")
+        answer = QtWidgets.QMessageBox.question(
+            self, "Correct the plate / sample position and height?",
+            f"{label} was found on the beam and in focus at SRz = 0° with {name} = {optic:.4f} "
+            f"(ST = {m.st:.4f}, SZ = {m.sz:.4f}, SN = {m.sn:.4f}).\n\n"
+            "The focal distance of the optic is fixed, so the focus tells where the surface is: "
+            f"Δx = {su:+.3f}, Δy = {sv:+.3f} mm on the plate and ΔH = {sw:+.3f} ± {sigma:.3f} mm from where it was "
+            "drawn.\n\n"
+            f"• Δy is taken as the plate sitting at another height in the sample holder (it does not always go in at "
+            f"the same height; not the beam): the whole plate moves by {sv:+.3f} mm (plate offset "
+            f"{layout.plate_offset_v:+.3f} → {layout.plate_offset_v + dv:+.3f} mm), so every sample's SZ changes by "
+            f"{unsigned_zero(-dv, 3):+.3f} mm.\n"
+            f"• Δx and ΔH: {sample.name} (with its devices) is moved by Δx and its height corrected "
+            f"(H {sample.height:.3f} → {max(sample.height + dw, 0.0):.3f} mm); the other samples stay." + large,
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes,
+        )
+        if answer != QtWidgets.QMessageBox.Yes:
+            return (f"<span style='color:#555'>{label}: the {name} focus gives Δx {su:+.3f}, Δy {sv:+.3f}, "
+                    f"ΔH {sw:+.3f} mm; nothing corrected.</span>")
+        before = sample.height
+        apply_found_offset(self.config(), layout, sample, du, dv, dw)
+        self.layoutCorrected.emit(sample.name)
+        self.refresh_targets()
+        return (f"<span style='color:#207020'>Corrected by the {name} focus: {sample.name} moved by Δx {su:+.3f} mm, "
+                f"H {before:.3f} → {sample.height:.3f} mm (± {sigma:.3f}); plate offset "
+                f"{layout.plate_offset_v:+.3f} mm.</span>")
+
     def model(self) -> StageModel:
         return StageModel(self.config(), self._layout_getter().plate)
 
@@ -431,10 +490,6 @@ class StagePanel(QtWidgets.QWidget):
             self.target_combo.addItems(["plate centre", *labels])
             self.target_combo.setCurrentIndex(max(self.target_combo.findText(current), 0))
             self.target_combo.blockSignals(False)
-            found = self.found_combo.currentText()
-            self.found_combo.clear()
-            self.found_combo.addItems(labels)
-            self.found_combo.setCurrentIndex(max(self.found_combo.findText(found), 0))
         if not self.start_box.isHidden():
             self.show_start_positions()
 
@@ -451,7 +506,7 @@ class StagePanel(QtWidgets.QWidget):
                         f"<td align=right>{sn:.3f}{mark}</td></tr>")
         if layout.plate_offset_v:
             rows.append(f"<tr><td colspan=4><i>plate {layout.plate_offset_v:+.3f} mm off its usual height in the "
-                        "holder (Found here): SZ0 shifted for all samples</i></td></tr>")
+                        "holder (Fine tunings by ZPS/CPS): SZ0 shifted for all samples</i></td></tr>")
         self.start_label.setText(
             f"At SRn = {c.srn_ref:g}° (plate vertical, tab up), SRz = 0°, PIX = PIY = {c.pi_center:g} µm, "
             "each sample centre is on the beam at the analyzer focus at:"
@@ -462,50 +517,6 @@ class StagePanel(QtWidgets.QWidget):
             "and piezo, and how far the target then is from the analyzer focus; <i>Correct SN</i> only if that is too far."
         )
         self.start_box.show()
-
-    def correct_from_found(self) -> tuple[float, float, float] | None:
-        """The chosen target is on the analyzer focus at the entered positions: move its sample there."""
-        label = self.found_combo.currentText()
-        t = self.target_point(label) if label else None
-        sample = self._layout_getter().sample_of(label) if label else None
-        if t is None or sample is None:
-            return None
-        m = self.motors.value()
-        layout = self._layout_getter()
-        du, dv, dw = found_offset(self.model(), m, *t)
-        su, sv, sw = (unsigned_zero(x, 3) for x in (du, dv, dw))
-        large = ""
-        if abs(du) > LARGE_FOUND_OFFSET:
-            large = (f"\n\nΔx (ST) is more than {LARGE_FOUND_OFFSET:g} mm: more likely the beam spot has moved (optic "
-                     "realigned?) than the sample. If other samples show the same ST shift, ask beamline staff for an "
-                     "optics recalibration (RealSampleCalibration, mode optics) instead of correcting the sample.")
-        if abs(dw) > LARGE_FOUND_OFFSET:
-            large += (f"\n\nΔH is more than {LARGE_FOUND_OFFSET:g} mm: check the sample height (height check) or SN_f "
-                      "of the configuration.")
-        if abs(layout.plate_offset_v + dv) > PLATE_OFFSET_WARNING:
-            large += (f"\n\nThe plate would then sit {layout.plate_offset_v + dv:+.2f} mm off its usual height in the "
-                      f"holder (more than {PLATE_OFFSET_WARNING:g} mm): check that the right sample was found.")
-        answer = QtWidgets.QMessageBox.question(
-            self, "Correct the plate / sample position?",
-            f"{label} is on the beam, in the analyzer focus, at ST = {m.st:.4f}, SZ = {m.sz:.4f}, SN = {m.sn:.4f} "
-            f"(SRn = {m.srn:g}°, SRz = {m.srz:g}°)?\n\n"
-            f"Then it is at Δx = {su:+.3f}, Δy = {sv:+.3f} mm on the plate and ΔH = {sw:+.3f} mm from where it was "
-            "drawn.\n\n"
-            f"• Δy is taken as the plate sitting at another height in the sample holder (it does not always go in "
-            f"at the same height; not the beam): the whole plate moves by {sv:+.3f} mm (plate offset "
-            f"{layout.plate_offset_v:+.3f} → {layout.plate_offset_v + dv:+.3f} mm), so every sample's SZ changes by "
-            f"{-dv:+.3f} mm.\n"
-            f"• Δx and ΔH: {sample.name} (with its devices) is moved by Δx and its height corrected; the other "
-            "samples stay." + large,
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes,
-        )
-        if answer != QtWidgets.QMessageBox.Yes:
-            return None
-        apply_found_offset(self.config(), layout, sample, du, dv, dw)
-        self.layoutCorrected.emit(sample.name)
-        self.refresh_targets()
-        self.update_view()
-        return du, dv, dw
 
     def target_labels(self) -> list[str]:
         return [label for label, *_ in self._layout_getter().targets()]

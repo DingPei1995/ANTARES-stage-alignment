@@ -44,6 +44,7 @@ DEV_EDITABLE = {0, 3, 5, 6, 7}
 MIN_SIZE = 0.1  # mm
 SNAP_STEP = 0.1  # mm; mouse drawing / moving / resizing is rounded to this grid (typed values are not)
 SI_WAFER_THICKNESS = 0.525  # mm, standard 100 mm (4") Si wafer, the usual device substrate
+SET_SN_BUTTON = "Set SN by eye"
 
 
 def cosmetic_pen(color, width=1.0, style=Qt.SolidLine) -> QtGui.QPen:
@@ -464,15 +465,21 @@ class PlateEditor(QtWidgets.QWidget):
         self.check_sn.setKeyboardTracking(False)
         self.check_sn.setToolTip("SN read when the sample top surface is on the camera reference line\n"
                                  "(analyzer focal plane), at SRn = 120°, SRz = 0°. Set by eye: about ±0.05 mm.")
-        check_btn = QtWidgets.QPushButton("Correct H")
-        check_btn.setToolTip("Set the sample height H from this SN. 'Bring target onto the beam' then keeps this\n"
-                             "SN for its targets (right at SRn = 120°, SRz = 0°).")
+        self._check_sn_typed = False  # an SN typed in the field but not set yet (asked at "Samples placed")
+        self.check_sn.valueChanged.connect(lambda _v: self._on_check_sn_typed(True))
+        self.check_combo.currentTextChanged.connect(lambda _t: self._on_check_sn_typed(self._check_sn_typed))
+        check_btn = QtWidgets.QPushButton(SET_SN_BUTTON)
+        check_btn.setToolTip("Rough height by eye: the SN at which the sample top surface is on the camera reference\n"
+                             "line gives the sample height H (about ±0.05 mm), and 'Bring target onto the beam' then\n"
+                             "keeps this SN for the sample's targets (right at SRn = 120°, SRz = 0°). Once the sample\n"
+                             "is found in focus, 'Fine tunings by ZPS/CPS' (Stage && Optics) corrects H precisely.")
         # lambda: clicked(bool) would otherwise arrive as sn = False, i.e. SN 0, whatever was typed
         check_btn.clicked.connect(lambda: self.apply_height_check())
         self.check_label = QtWidgets.QLabel()
         self.check_label.setWordWrap(True)
         self.check_label.setStyleSheet("color: #555;")
-        check_box = QtWidgets.QGroupBox("Height check (optional, H not known): top surface on the reference line")
+        check_box = QtWidgets.QGroupBox("Set SN by eye (optional, rough ±0.05 mm): top surface on the camera "
+                                        "reference line")
         cb = QtWidgets.QGridLayout(check_box)
         cb.addWidget(QtWidgets.QLabel("Sample"), 0, 0)
         cb.addWidget(self.check_combo, 0, 1)
@@ -613,10 +620,54 @@ class PlateEditor(QtWidgets.QWidget):
             "Yes: go to “Stage & Optics”, which shows where each sample is at the initial rotation.",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes,
         )
-        if answer != QtWidgets.QMessageBox.Yes:
+        if answer != QtWidgets.QMessageBox.Yes or not self.confirm_sn_by_eye():
             return False
         self.samplesPlaced.emit()
         return True
+
+    def confirm_sn_by_eye(self) -> bool:
+        """Before going to the Stage tab: ask whether the SN by eye (top surface on the camera reference line at SRn
+        120°, SRz 0°) is the right value, for an SN typed but not set, and for the samples already set. False: stay
+        on the Samples tab to correct it."""
+        name = self.check_combo.currentText()
+        if self._check_sn_typed and name:
+            sn = self.check_sn.value()
+            answer = QtWidgets.QMessageBox.question(
+                self, SET_SN_BUTTON,
+                f"The SN field holds {sn:.3f} mm for {name}, not set yet.\n\n"
+                f"Is SN = {sn:.3f} mm the SN at which the top surface of {name} is on the camera reference line "
+                "(SRn 120°, SRz 0°)?\n\nYes: set it (H follows) and go on. No: go on without it. "
+                "Cancel: stay on this tab.",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel,
+                QtWidgets.QMessageBox.Yes,
+            )
+            if answer == QtWidgets.QMessageBox.Cancel:
+                return False
+            if answer == QtWidgets.QMessageBox.Yes and self.apply_height_check() is None:
+                return False
+            self._check_sn_typed = False
+            return True  # just answered for this value
+        done = [s for s in self.layout_model.samples if s.sn_checked is not None]
+        if not done:
+            return True
+        lines = "\n".join(f"  {s.name}: SN = {s.sn_checked:.3f} mm (H = {s.height:.3f} mm)" for s in done)
+        answer = QtWidgets.QMessageBox.question(
+            self, SET_SN_BUTTON,
+            "Is this the SN at which the top surface of each sample is on the camera reference line "
+            f"(SRn 120°, SRz 0°)?\n\n{lines}\n\n"
+            "Yes: go on (Bring target onto the beam keeps this SN for their targets). No: stay on this tab to "
+            "correct it.",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes,
+        )
+        return answer == QtWidgets.QMessageBox.Yes
+
+    def _on_check_sn_typed(self, typed: bool) -> None:
+        """The SN field was typed in (or the sample changed after typing): pending unless it is the SN already set
+        for the chosen sample."""
+        sample = next((s for s in self.layout_model.samples if s.name == self.check_combo.currentText()), None)
+        set_sn = None if sample is None else sample.sn_checked
+        self._check_sn_typed = (typed and sample is not None
+                                and (set_sn is None or abs(self.check_sn.value() - set_sn) > 5e-4))
 
     def set_layout(self, layout: SampleLayout) -> None:
         self.layout_model = layout
@@ -835,7 +886,7 @@ class PlateEditor(QtWidgets.QWidget):
                 if s.sn_checked is not None]
         self.check_label.setText("Checked: " + "; ".join(done) if done else
                                  "Drive the sample top surface onto the camera reference line at SRn 120°, SRz 0°, "
-                                 "type the SN read there and press Correct H.")
+                                 f"type the SN read there and press {SET_SN_BUTTON}.")
 
     def apply_height_check(self, sn: float | None = None, name: str | None = None) -> float | None:
         """H of the chosen sample from the SN at which its top surface is on the reference line; returns ΔH."""
@@ -843,17 +894,18 @@ class PlateEditor(QtWidgets.QWidget):
         name = self.check_combo.currentText() if name is None else name
         sample = next((s for s in self.layout_model.samples if s.name == name), None)
         if sample is None:
-            QtWidgets.QMessageBox.information(self, "Height check", "Draw or add the sample first.")
+            QtWidgets.QMessageBox.information(self, SET_SN_BUTTON, "Draw or add the sample first.")
             return None
         sn = self.check_sn.value() if sn is None else sn
         config = self.config_getter() if self.config_getter else StageConfig()
         h = height_from_sn(config, sn, self.layout_model.plate)
         if h < 0:
             QtWidgets.QMessageBox.warning(
-                self, "Height check", f"SN = {sn:.3f} puts the reference line {-h:.3f} mm below the plate top "
+                self, SET_SN_BUTTON, f"SN = {sn:.3f} puts the reference line {-h:.3f} mm below the plate top "
                 f"(SN_f = {config.sn_f:.3f}): check the SN value and the configuration. H is not changed.")
             return None
         dh = check_height(config, self.layout_model, sample, sn)
+        self._check_sn_typed = False
         self.sample_changed(sample)
         self._refresh_height_check()
         self.info.setText(f"{sample.name}: H = {sample.height:.3f} mm from SN = {sn:.3f} (ΔH = {dh:+.3f} mm; "

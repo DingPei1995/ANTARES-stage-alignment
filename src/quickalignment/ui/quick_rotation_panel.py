@@ -8,7 +8,7 @@ sample is: its plate position x, y and height H (stage.focus_point). The new pos
 about it (rotation.relocate with `point`).
 
 The tab stands on its own: it reads the configuration in use and the plate mounted, and nothing else (no samples of
-the Samples tab, no "Found here" plate offset); it changes nothing in the other tabs.
+the Samples tab, no "Fine tunings by ZPS/CPS" plate offset); it changes nothing in the other tabs.
 
 Step 4, as in the Rotate sample tab: the sample found at the new position with the piezo off centre gives the
 ST / SZ / SN and the optic that show it with the piezo centred (piezo_box.PiezoBox, without "Send to Stage").
@@ -53,7 +53,7 @@ class QuickRotationPanel(QtWidgets.QWidget):
             "constants (ST0, SZ0, SN_f, rotation axes). An error δ of the optics reference moves the point by δ "
             "along the beam (H and the plate position both change). Check the sample on the camera / spectrum at "
             "the new position.<br>"
-            "This tab uses nothing from the other tabs (no samples, no “Found here” corrections) and changes "
+            "This tab uses nothing from the other tabs (no samples, no “Fine tunings by ZPS/CPS” corrections) and changes "
             "nothing there.")
         about.setWordWrap(True)
         about.setTextFormat(Qt.RichText)
@@ -144,7 +144,7 @@ class QuickRotationPanel(QtWidgets.QWidget):
         return self.stage.record.optic_name
 
     def model(self) -> StageModel:
-        """Stage model of the configuration in use for the plate mounted (no "Found here" plate offset)."""
+        """Stage model of the configuration in use for the plate mounted (no "Fine tunings by ZPS/CPS" plate offset)."""
         plate = self._plate_getter()
         return StageModel(self.stage.record.config_for(plate.key), plate)
 

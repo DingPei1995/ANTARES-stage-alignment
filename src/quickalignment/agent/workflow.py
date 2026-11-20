@@ -35,9 +35,11 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    and/or read each sample's corners on the photo yourself -> align_add_sample_from_photo(points_px, height, name).
    The height H (sample thickness above the plate surface) is NOT visible from above: ask the user (default
    0.525 mm, a Si wafer). Name the samples as the user calls them. Check with align_photo_overlay.
-   Many users do not know H: offer the HEIGHT CHECK (before step 6): at SRn 120, SRz 0 they drive the sample top
+   Many users do not know H: offer SET SN BY EYE (before step 6): at SRn 120, SRz 0 they drive the sample top
    surface onto the camera reference line (the analyzer focal plane) and read SN there (by eye, about ±0.05 mm);
-   align_check_height(sample, sn) sets H from it.
+   align_check_height(sample, sn) sets H from it (rough). Ask them to confirm that SN before the positions. Once the
+   sample is found in focus with the zone plate / capillary, the program's 'Fine tunings by ZPS/CPS' corrects H
+   precisely (the optic's focal distance is fixed) and brings the sample back onto the analyzer focus.
 5. Devices (small structures on a substrate): read them on the plate photo (align_add_device with photo_px), or on a
    microscope photo of the substrate registered with align_register_device_photo (2-4 point pairs: the same
    substrate corners / marks on the microscope photo and on the plate photo). Show align_photo_overlay again.

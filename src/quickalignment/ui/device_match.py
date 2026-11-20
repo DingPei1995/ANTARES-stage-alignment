@@ -593,7 +593,7 @@ class DeviceFromPhotoDialog(QtWidgets.QDialog):
         self.plate_photo.setToolTip("Left view: the substrate as drawn (its corners and devices are the reference "
                                     "points), or a plate photo registered earlier in this run.\nWith a photo the "
                                     "devices are placed where the photo shows them: if the substrate was moved since "
-                                    "(Found here), use the substrate as drawn.")
+                                    "(Fine tunings by ZPS/CPS), use the substrate as drawn.")
         self.plate_photo.currentIndexChanged.connect(self._on_plate_photo)
         self.plate_photo.setEnabled(self.plate_photo.count() > 1)
 

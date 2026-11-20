@@ -128,8 +128,10 @@ TOOLS = [
     tool("align_update_sample", "alignment", "update_sample", "Change a sample (centre, size, height, name).",
          {"name": STR, "x": NUM, "y": NUM, "length": NUM, "width": NUM, "height": NUM, "new_name": STR}, ["name"]),
     tool("align_check_height", "alignment", "check_height",
-         "Height check: SN read when the sample top surface is on the camera reference line (analyzer focal plane) "
-         "at SRn ref, SRz 0 gives its height H; bring_to_beam then keeps this SN for its targets.",
+         "Set SN by eye (button 'Set SN by eye'): SN read when the sample top surface is on the camera reference "
+         "line (analyzer focal plane) at SRn ref, SRz 0 gives its height H roughly (about ±0.05 mm); bring_to_beam "
+         "then keeps this SN for its targets. A zone-plate / capillary focus ('Fine tunings by ZPS/CPS' in the "
+         "program) gives H more precisely.",
          {"sample": STR, "sn": d("SN with the top surface on the reference line (by eye)", **NUM)},
          ["sample", "sn"]),
     tool("align_remove_sample", "alignment", "remove_sample", "Remove a sample.", {"name": STR}, ["name"]),

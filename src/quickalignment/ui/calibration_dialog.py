@@ -20,7 +20,7 @@ from ..core.calibration import CalibrationRecord, CalibrationStore
 Qt = QtCore.Qt
 
 HELP = ("Configurations are made by beamline staff with <b>RealSampleCalibration.py</b> "
-        "(after an optics realignment, re-homing the motors or maintenance). Where a sample really is on the plate is corrected with <i>Found here</i> in the "
+        "(after an optics realignment, re-homing the motors or maintenance). Where a sample really is on the plate is corrected with <i>Fine tunings by ZPS/CPS</i> in the "
         "Stage &amp; Optics tab.")
 
 

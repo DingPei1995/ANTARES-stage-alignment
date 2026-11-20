@@ -26,7 +26,7 @@ ANTARES 线站（SOLEIL）· 用 RealSampleCalibration 标定样品台模型，�
 configs/calibration_YYYY-MM-DD_HHMMSS_<optic>.json      optic: zone_plate 或 capillary
 ```
 
-每次标定生成一个新文件，从不覆盖。用户剩下的误差（主要是在托上画样品的误差）由 Stage & Optics 页中的 *Found here* 修正。
+每次标定生成一个新文件，从不覆盖。用户剩下的误差（主要是在托上画样品的误差）由 Stage & Optics 页中的 *Fine tunings by ZPS/CPS* 修正。
 
 ## 样品台模型及其常数
 
@@ -49,7 +49,7 @@ SRn = 120°（托竖直、tab 朝上）为机械参考；标定时 PIX = PIY = 1
 | capillary 或 zone plate 重新准直（光打在托上的位置变了，焦点移动） | **仅光学** |
 | 电机重新回零 / 复位、样品台维护、更换样品座 | **光学 + 电机** |
 | 首次使用，或该元件还没有配置 | **光学 + 电机** |
-| 用户 *Found here* 的修正超过约 0.3 mm，且多个样品偏移相同 | 先用仅光学检查；残差仍大则做完整标定 |
+| 用户 *Fine tunings by ZPS/CPS* 的修正超过约 0.3 mm，且多个样品偏移相同 | 先用仅光学检查；残差仍大则做完整标定 |
 
 ## 启动 RealSampleCalibration
 

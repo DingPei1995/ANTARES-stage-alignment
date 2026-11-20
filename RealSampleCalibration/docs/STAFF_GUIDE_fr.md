@@ -29,7 +29,7 @@ configs/calibration_YYYY-MM-DD_HHMMSS_<optic>.json      optic : zone_plate ou ca
 ```
 
 Un fichier par étalonnage, jamais écrasé. Ce qui reste pour un utilisateur (surtout l'erreur du dessin d'un
-échantillon sur la plaquette) est corrigé par *Found here* dans l'onglet Stage & Optics.
+échantillon sur la plaquette) est corrigé par *Fine tunings by ZPS/CPS* dans l'onglet Stage & Optics.
 
 ## Le modèle de la platine et ses constantes
 
@@ -56,7 +56,7 @@ pas le plan de la surface et ne demandent pas de déplacer l'optique ; SN, SRz e
 | capillaire ou zone plate réaligné (le faisceau touche la plaquette ailleurs, le foyer a bougé) | **optique seule** |
 | moteurs réinitialisés, maintenance du manipulateur, réceptacle changé | **optique + moteurs** |
 | première utilisation, ou pas encore de configuration pour cette optique | **optique + moteurs** |
-| corrections *Found here* des utilisateurs au-delà de ~0,3 mm, même décalage pour plusieurs échantillons | vérifier avec optique seule ; complet si les résidus restent grands |
+| corrections *Fine tunings by ZPS/CPS* des utilisateurs au-delà de ~0,3 mm, même décalage pour plusieurs échantillons | vérifier avec optique seule ; complet si les résidus restent grands |
 
 ## Lancer RealSampleCalibration
 

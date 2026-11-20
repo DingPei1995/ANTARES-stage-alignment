@@ -22,7 +22,7 @@ At start-up the program asks what was recalibrated:
 - after re-homing / resetting the manipulator motors (ST, SN, SZ, SRn, SRz)
 - after maintenance of the manipulator or the sample receptacle
 - when samples are found far (≳ 0.3 mm, the same shift for several samples) from where QuickAlignment predicts them
-  (*Found here* in QuickAlignment warns about it)
+  (*Fine tunings by ZPS/CPS* in QuickAlignment warns about it)
 
 ## What is determined
 

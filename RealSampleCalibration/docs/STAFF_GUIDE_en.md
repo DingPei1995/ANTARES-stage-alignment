@@ -29,7 +29,7 @@ configs/calibration_YYYY-MM-DD_HHMMSS_<optic>.json      optic: zone_plate or cap
 ```
 
 One file per calibration, never overwritten. What remains for a user (mostly the error of drawing a sample on the
-plate) is corrected by *Found here* in the Stage & Optics tab.
+plate) is corrected by *Fine tunings by ZPS/CPS* in the Stage & Optics tab.
 
 ## The stage model and its constants
 
@@ -55,7 +55,7 @@ optic move; SN, SRz and the sample height do (1 mm along SN moves the spot √2 
 | capillary or zone plate realigned (beam meets the plate elsewhere, focus moved) | **optics only** |
 | motors re-homed / reset, manipulator maintenance, receptacle changed | **optics + motors** |
 | first use, or no configuration for this optic yet | **optics + motors** |
-| users' *Found here* corrections above ~0.3 mm, same shift for several samples | check with optics only; full if the residuals stay large |
+| users' *Fine tunings by ZPS/CPS* corrections above ~0.3 mm, same shift for several samples | check with optics only; full if the residuals stay large |
 
 ## Starting RealSampleCalibration
 

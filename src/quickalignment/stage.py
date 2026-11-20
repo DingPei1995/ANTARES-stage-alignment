@@ -1,0 +1,456 @@
+"""Stage kinematics (plate <-> lab) and optics focus tracking.
+
+Lab frame, mm: origin = analyzer focus (= default optics focus),
++x right, +y along the beam, +z up (top view seen from +z).
+
+Motor directions (top view):
+* +ST  along t = (1, -1, 0)/sqrt2   (ST < 0 moves the sample upper-left)
+* +SN  along n = (1,  1, 0)/sqrt2   (away from the analyzer, which sits at -n)
+* +SZ  along z
+
+Stack, bottom to top: ST/SN/SZ translations -> SRz -> SRn -> PIX/PIY -> plate.
+
+Plate frame (u, v, w): see geometry.py. It is fixed to the back plate,
+which is identical for all plate types: w is the height above the back
+face, towards the analyzer. At SRn = 120, SRz = 0 the plate axes are
+u -> t, v -> z, w -> -n. At SN = SN_f the riser top of the standard plate
+(w = SN_REFERENCE_W = 5.0) lies in the analyzer focal plane, whatever plate is
+mounted, so a surface at height w is in focus for SN = SN_f + (w - 5.0):
+SN = SN_f + H for a sample of height H on a 5.0 mm plate, and
+SN = SN_f + (h - 5.0) + H on a custom plate whose block top is at h.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+
+import numpy as np
+
+from .geometry import SN_REFERENCE_W, PlateGeometry, SampleLayout
+
+T_HAT = np.array([1.0, -1.0, 0.0]) / np.sqrt(2)
+N_HAT = np.array([1.0, 1.0, 0.0]) / np.sqrt(2)
+Z_HAT = np.array([0.0, 0.0, 1.0])
+Y_HAT = np.array([0.0, 1.0, 0.0])
+# columns: lab direction of plate u, v, w at SRn = 120, SRz = 0
+B = np.column_stack([T_HAT, Z_HAT, -N_HAT])
+
+
+@dataclass
+class StageConfig:
+    """Adjustable reference / calibration parameters of the stage."""
+
+    st0: float = 0.0  # ST putting the plate centre on the focus
+    sz0: float = 40.0  # SZ putting the plate centre on the focus
+    sn_f: float = 0.0  # SN putting the standard plate's riser top (w = 5.0) in the focal plane
+    srn_ref: float = 120.0  # SRn with the plate vertical, tab up
+    pi_center: float = 150.0  # um
+    srn_axis_u: float = 0.0  # SRn axis position on the plate (mm, plate frame, piezo centred)
+    srn_axis_v: float = 0.0
+    srz_offset_t: float = 0.0  # SRz axis offset from the plate-surface centre line, along +ST (mm)
+    srz_offset_n: float = 0.0  # ... along +SN (mm)
+
+
+def config_for_plate(config: StageConfig, from_seat: float, to_seat: float) -> StageConfig:
+    """The configuration fitted with a plate seated `from_seat` mm high in the holder (geometry.PLATE_SEAT_V), for a
+    plate seated `to_seat` mm high. The plate frame moves with the plate: a plate seated d = to - from higher reaches
+    the focus at an SZ d lower (SZ0 - d), and the SRn axis, fixed to the holder, is d lower in its frame. ST0, SN_f
+    and the SRz axis (lab offsets) do not change."""
+    d = to_seat - from_seat
+    return replace(config, sz0=config.sz0 - d, srn_axis_v=config.srn_axis_v - d)
+
+
+@dataclass
+class MotorPositions:
+    st: float = 0.0
+    sn: float = 0.0
+    sz: float = 40.0
+    srn: float = 120.0
+    srz: float = 0.0
+    pix: float = 150.0  # um
+    piy: float = 150.0  # um
+
+
+def rot_z(deg: float) -> np.ndarray:
+    a = np.radians(deg)
+    c, s = np.cos(a), np.sin(a)
+    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+
+
+def rot_2d(deg: float) -> np.ndarray:
+    a = np.radians(deg)
+    c, s = np.cos(a), np.sin(a)
+    return np.array([[c, -s], [s, c]])
+
+
+class StageModel:
+    def __init__(self, config: StageConfig | None = None, plate: PlateGeometry | None = None):
+        self.config = config or StageConfig()
+        self.plate = plate or PlateGeometry()
+
+    # -- pieces of the transform -------------------------------------------
+    def _translation(self, m: MotorPositions) -> np.ndarray:
+        c = self.config
+        # + SN_REFERENCE_W: SN_f refers to the standard riser top, not the back face
+        return (m.st - c.st0) * T_HAT + (m.sn - c.sn_f + SN_REFERENCE_W) * N_HAT + (m.sz - c.sz0) * Z_HAT
+
+    def _srz_axis_local(self) -> np.ndarray:
+        """A point of the SRz axis in plate coordinates (SRn = 120, piezo centred)."""
+        c = self.config
+        return np.array([c.srz_offset_t, 0.0, SN_REFERENCE_W - c.srz_offset_n])  # fixed to the stage
+
+    def _piezo(self, m: MotorPositions) -> np.ndarray:
+        """Plate shift (u, v) in mm from the piezo. +PIY moves the plate DOWN (-v), against +SZ: checked at the
+        beamline 2026-11-14 (to see a feature at a larger PIY, SZ has to be increased). +PIX moves the plate along
+        +u, like -ST: checked 2026-11-15 (to see a feature at a larger PIX, ST has to be decreased)."""
+        c = self.config
+        return np.array([m.pix - c.pi_center, -(m.piy - c.pi_center)]) / 1000.0
+
+    def _srn_angle(self, m: MotorPositions) -> float:
+        """CCW seen from the analyzer."""
+        return m.srn - self.config.srn_ref
+
+    @staticmethod
+    def _srz_angle(m: MotorPositions) -> float:
+        """Math angle about +z (SRz < 0 is CCW seen from above)."""
+        return -m.srz
+
+    # -- forward / inverse -----------------------------------------------------
+    def plate_to_lab(self, m: MotorPositions, u: float, v: float, w: float) -> np.ndarray:
+        c = self.config
+        axis = np.array([c.srn_axis_u, c.srn_axis_v])
+        q = np.array([u, v]) + self._piezo(m)
+        q = rot_2d(self._srn_angle(m)) @ (q - axis) + axis
+        local = np.array([q[0], q[1], w])
+        a = self._srz_axis_local()
+        return self._translation(m) + B @ a + rot_z(self._srz_angle(m)) @ (B @ (local - a))
+
+    def plate_to_lab_many(self, m: MotorPositions, points) -> np.ndarray:
+        """plate_to_lab for an (N, 3) array of plate points (u, v, w); returns (N, 3) lab points."""
+        c = self.config
+        pts = np.asarray(points, float)
+        axis = np.array([c.srn_axis_u, c.srn_axis_v])
+        q = (pts[:, :2] + self._piezo(m) - axis) @ rot_2d(self._srn_angle(m)).T + axis
+        local = np.column_stack([q, pts[:, 2]])
+        a = self._srz_axis_local()
+        rot = rot_z(self._srz_angle(m)) @ B
+        return self._translation(m) + B @ a + (local - a) @ rot.T
+
+    def lab_to_plate(self, m: MotorPositions, p) -> np.ndarray:
+        c = self.config
+        a = self._srz_axis_local()
+        rel = np.asarray(p, float) - self._translation(m) - B @ a
+        local = a + B.T @ (rot_z(-self._srz_angle(m)) @ rel)
+        axis = np.array([c.srn_axis_u, c.srn_axis_v])
+        q = rot_2d(-self._srn_angle(m)) @ (local[:2] - axis) + axis - self._piezo(m)
+        return np.array([q[0], q[1], local[2]])
+
+    def stage_frame(self, m: MotorPositions, u: float, v: float) -> np.ndarray:
+        """Plate point (u, v) after piezo + SRn, in the SRz-stage frame (as seen from the analyzer at SRz = 0)."""
+        c = self.config
+        axis = np.array([c.srn_axis_u, c.srn_axis_v])
+        q = np.array([u, v]) + self._piezo(m)
+        return rot_2d(self._srn_angle(m)) @ (q - axis) + axis
+
+    def plate_from_stage_frame(self, m: MotorPositions, q) -> np.ndarray:
+        """Inverse of stage_frame: plate point (u, v) seen at stage-frame point q."""
+        c = self.config
+        axis = np.array([c.srn_axis_u, c.srn_axis_v])
+        return rot_2d(-self._srn_angle(m)) @ (np.asarray(q, float) - axis) + axis - self._piezo(m)
+
+    def reference_motors(self, u: float, v: float, w: float) -> tuple[float, float, float]:
+        """(ST, SZ, SN) putting plate point (u, v, w) on the focus at SRn = ref, SRz = 0, piezo centred."""
+        c = self.config
+        return c.st0 - u, c.sz0 - v, c.sn_f + w - SN_REFERENCE_W
+
+    def focal_plane_height(self, m: MotorPositions) -> float:
+        """Plate height w of the surface that lies in the analyzer focal plane at these positions
+        (the camera "SN = 0" line), measured along the plate normal through the analyzer focus."""
+        return float(self.lab_to_plate(m, np.zeros(3))[2])
+
+    def reference_to_plate(self, st: float, sz: float) -> tuple[float, float]:
+        c = self.config
+        return c.st0 - st, c.sz0 - sz
+
+    def surface_normal(self, m: MotorPositions) -> np.ndarray:
+        """Lab direction of the plate +w axis (towards the analyzer)."""
+        return rot_z(self._srz_angle(m)) @ B[:, 2]
+
+    def beam_hit(self, m: MotorPositions, w: float) -> np.ndarray | None:
+        """Where the beam (the lab y axis) crosses the plane at plate height w."""
+        normal = self.surface_normal(m)
+        if abs(normal[1]) < 1e-9:
+            return None
+        p0 = self.plate_to_lab(m, 0.0, 0.0, w)
+        s = normal @ p0 / normal[1]
+        return s * Y_HAT
+
+    def motors_for_target(
+        self, u: float, v: float, w: float, srn: float, srz: float, pix: float | None = None, piy: float | None = None
+    ) -> MotorPositions:
+        """ST/SN/SZ putting plate point (u, v, w) on the analyzer focus for the given rotations."""
+        c = self.config
+        m = MotorPositions(
+            st=c.st0, sn=c.sn_f - SN_REFERENCE_W, sz=c.sz0, srn=srn, srz=srz,
+            pix=c.pi_center if pix is None else pix, piy=c.pi_center if piy is None else piy,
+        )
+        p = self.plate_to_lab(m, u, v, w)
+        m.st -= p @ T_HAT
+        m.sn -= p @ N_HAT
+        m.sz -= p @ Z_HAT
+        return m
+
+    def motors_on_beam(
+        self, u: float, v: float, w: float, srn: float, srz: float, sn: float,
+        pix: float | None = None, piy: float | None = None,
+    ) -> MotorPositions:
+        """ST/SZ putting plate point (u, v, w) on the beam with SN kept at `sn` (how the stage is run):
+        the point then sits `beam_position` along the beam, and the optic refocuses on it."""
+        return slide_to_sn(self.motors_for_target(u, v, w, srn, srz, pix, piy), sn)
+
+    def beam_position(self, m: MotorPositions, u: float, v: float, w: float) -> float:
+        """Position of plate point (u, v, w) along the beam from the analyzer focus (+ = downstream)."""
+        return float(self.plate_to_lab(m, u, v, w)[1])
+
+
+def slide_to_sn(m: MotorPositions, sn: float) -> MotorPositions:
+    """m with SN set to `sn` and ST compensating (dST = -dSN): the stage moves by sqrt2 * dSN along +y,
+    so a point on the beam stays on it and only slides along it (out of / into the analyzer focus)."""
+    return replace(m, sn=sn, st=m.st - (sn - m.sn))
+
+
+def sn_to_focus(model: StageModel, m: MotorPositions, u: float, v: float, w: float) -> float:
+    """SN change (ST compensating) bringing plate point (u, v, w), on the beam at m, onto the analyzer focus."""
+    return -model.beam_position(m, u, v, w) / np.sqrt(2)
+
+
+def height_from_sn(config: StageConfig, sn: float, plate: PlateGeometry) -> float:
+    """Sample height H above the plate surface whose top is on the analyzer focal plane (the camera reference line)
+    at SN = `sn`, SRn ref, SRz 0 (inverse of SN = SN_f + (plate top - 5.0) + H; piezo, ST, SZ do not matter)."""
+    return sn - config.sn_f + SN_REFERENCE_W - plate.total_thickness
+
+
+def sn_from_height(config: StageConfig, height: float, plate: PlateGeometry) -> float:
+    """SN putting a surface H above the plate top on the analyzer focal plane at SRn ref, SRz 0."""
+    return config.sn_f - SN_REFERENCE_W + plate.total_thickness + height
+
+
+def check_height(config: StageConfig, layout: SampleLayout, sample, sn: float) -> float:
+    """Height check: the top surface of `sample` was on the camera reference line (analyzer focal plane) at SN = sn,
+    SRn ref, SRz 0. Sets its height from it (never below 0) and remembers sn; returns the change of H (mm)."""
+    h = max(height_from_sn(config, sn, layout.plate), 0.0)
+    dh = h - sample.height
+    sample.height, sample.sn_checked = h, float(sn)
+    return dh
+
+
+def apply_found_offset(config: StageConfig, layout: SampleLayout, sample, du: float, dv: float, dw: float) -> None:
+    """A target found on the beam (found_offset du, dv, dw of a target of `sample`; "Fine tunings by ZPS/CPS" at SRz 0
+    in the program, found_here for the agent): ST is usually right and SZ is off because the
+    plate does not always go into the holder at the same height (0-2 mm), not because of the beam. So dv moves the
+    whole plate in the holder (layout.plate_offset_v; all samples, the plate drawing stays), du moves this sample
+    and dw changes its height (its checked SN, if any, follows). `config`: the configuration in use before."""
+    layout.plate_offset_v += dv
+    sample.u += du
+    sample.height = max(sample.height + dw, 0.0)
+    if sample.sn_checked is not None and dw:
+        sample.sn_checked = sn_from_height(config, sample.height, layout.plate)
+
+
+def checked_sn(layout: SampleLayout, label: str) -> float | None:
+    """SN of the height check of the sample of target `label` ("sample" or "sample/device"); None if not checked."""
+    sample = layout.sample_of(label)
+    return None if sample is None else sample.sn_checked
+
+
+def found_offset(model: StageModel, m: MotorPositions, u: float, v: float, w: float,
+                 y: float = 0.0) -> tuple[float, float, float]:
+    """(du, dv, dw) from the expected plate point (u, v, w) to the one really on the beam, `y` along it from the
+    analyzer focus, at m (y = 0: on the analyzer focus; with the optic in focus, y from its position, see
+    focus_point).
+
+    Use when the target was found on the beam (and in focus) at the stage
+    positions m: moving its sample by (du, dv) and its height by dw makes
+    the model put it there (and the sample's other devices with it).
+    """
+    pu, pv, pw = model.lab_to_plate(m, y * Y_HAT)
+    return float(pu - u), float(pv - v), float(pw - w)
+
+
+HEIGHT_CHECK_OPTIC = 0.05  # mm: optic (ZPS / CPS) off its prediction by more than this after an SRz turn -> check H
+HEIGHT_CHECK_SRZ = 0.01  # deg: below this SRz counts as 0 (no height check: H changes nothing there but SN)
+HEIGHT_EXPLAIN_TOL = 0.03  # mm: what one height change must leave of the ST, SZ and optic errors to explain them
+
+
+@dataclass
+class HeightFit:
+    """Can one change of the sample height H explain the optic and the stage errors of a target found after an SRz
+    turn? Errors are measured - predicted (mm; optic in optic motor units, ~mm along the beam), for the target on the
+    beam with SN as measured: `before` with the present H, `after` with H + `dh`."""
+
+    dh: float
+    before: tuple[float, float, float]  # ST, SZ, optic
+    after: tuple[float, float, float]
+    explained: bool
+
+    @property
+    def optic_error(self) -> float:
+        return self.before[2]
+
+
+def found_errors(model: "StageModel", m: "MotorPositions", cal: "OpticsCalibration", optic_position: float,
+                 u: float, v: float, w: float) -> tuple[float, float, float]:
+    """Measured - predicted ST, SZ and optic position for plate point (u, v, w) found on the beam and in focus at m
+    with the optic at `optic_position`; the prediction keeps SN, SRn, SRz and the piezo as measured."""
+    pred = model.motors_on_beam(u, v, w, srn=m.srn, srz=m.srz, sn=m.sn, pix=m.pix, piy=m.piy)
+    optic = cal.position_for_focus(model, model.beam_position(pred, u, v, w))
+    return m.st - pred.st, m.sz - pred.sz, optic_position - optic
+
+
+def fit_height(model: "StageModel", m: "MotorPositions", cal: "OpticsCalibration", optic_position: float,
+               u: float, v: float, w: float, sigmas: tuple[float, float] = (0.02, 0.02),
+               tol: float = HEIGHT_EXPLAIN_TOL) -> HeightFit:
+    """The change of height dh of the target (u, v, w) that best explains its ST, SZ and optic errors together
+    (weighted by `sigmas` = (position, optic) reading errors), and whether it explains them: every error left within
+    `tol`. After an SRz turn an H error moves ST and the focus together (both ~ sin SRz); an SRz-axis error across
+    the beam moves the focus only, a wrong plate position x, y moves ST / SZ only: neither is explained by H."""
+    weights = np.array([1 / sigmas[0], 1 / sigmas[0], 1 / sigmas[1]])
+
+    def errors(dh: float) -> np.ndarray:
+        return np.array(found_errors(model, m, cal, optic_position, u, v, w + dh))
+
+    e0, dh = errors(0.0), 0.0
+    for _ in range(3):  # nearly linear in dh: Gauss-Newton converges in one or two steps
+        step = 1e-3
+        e = errors(dh)
+        jac = (errors(dh + step) - e) / step
+        a, b = weights * jac, weights * e
+        if a @ a < 1e-12:
+            break
+        dh -= float(a @ b / (a @ a))
+    e1 = errors(dh)
+    return HeightFit(float(dh), tuple(float(x) for x in e0), tuple(float(x) for x in e1),
+                     bool(np.all(np.abs(e1) <= tol)))
+
+
+OPTIC_TYPES = ("zone plate + OSA", "capillary")
+
+
+@dataclass
+class OpticsCalibration:
+    """Focusing optic (zone plate + OSA or capillary), only along the beam.
+
+    `optic_position` is the absolute optic motor position that puts the focus
+    on the reference point: the analyzer focus, or, when `enabled`, the point
+    where the beam met a surface at plate height `surface_w` with the stage at
+    `motors` (a measured reference). `optic_sign` is +1 if increasing the optic
+    motor moves the optic downstream (towards the sample), -1 otherwise.
+    """
+
+    enabled: bool = False
+    motors: MotorPositions = field(default_factory=MotorPositions)
+    surface_w: float = 5.5
+    optic_position: float = 0.0
+    optic_sign: int = 1
+    optic_type: str = OPTIC_TYPES[0]
+    last_position: float | None = None  # optic position when the configuration was saved
+
+    @property
+    def current_position(self) -> float:
+        return self.optic_position if self.last_position is None else self.last_position
+
+    def reference_y(self, model: StageModel) -> float:
+        """Position along the beam of the focus when the optic is at `optic_position`."""
+        if not self.enabled:
+            return 0.0  # the analyzer focus
+        ref = model.beam_hit(self.motors, self.surface_w)
+        return 0.0 if ref is None else float(ref[1])
+
+    def position_for_focus(self, model: StageModel, y: float) -> float:
+        """Absolute optic position putting the focus at y along the beam."""
+        return self.optic_position + self.optic_sign * (y - self.reference_y(model))
+
+    def focus_for_position(self, model: StageModel, position: float) -> float:
+        """Focus position along the beam for an absolute optic position."""
+        return self.reference_y(model) + self.optic_sign * (position - self.optic_position)
+
+
+@dataclass
+class BeamResult:
+    hit: np.ndarray | None  # lab point where the beam meets the illuminated surface
+    plate_uv: tuple[float, float] | None
+    surface_w: float | None
+    target: str  # what the beam lands on
+    optic_position: float  # absolute optic position used (entered, or the configuration's)
+    focus_y: float  # focus position along the beam for that optic position
+    required_optic_position: float | None  # absolute optic position for focus on the illuminated surface
+
+    @property
+    def delta(self) -> float | None:
+        """Distance from the focus to the illuminated surface along the beam (+ = surface downstream)."""
+        return None if self.hit is None else float(self.hit[1]) - self.focus_y
+
+
+def beam_on_layout(model: StageModel, m: MotorPositions, layout: SampleLayout) -> tuple[np.ndarray | None, tuple[float, float] | None, float | None, str]:
+    """Find the first surface the beam meets: a sample/device, the riser, or the base plate."""
+    plate = model.plate
+    best = None
+    for s in layout.samples:
+        w = plate.total_thickness + s.height
+        hit = model.beam_hit(m, w)
+        if hit is None:
+            continue
+        u, v, _ = model.lab_to_plate(m, hit)
+        u0, v0, u1, v1 = s.bounds()
+        if u0 <= u <= u1 and v0 <= v <= v1 and (best is None or hit[1] < best[0][1]):
+            name = s.name
+            for d in s.devices:
+                du, dv = d.position(s)
+                if abs(u - du) <= d.length / 2 and abs(v - dv) <= d.width / 2:
+                    name = f"{s.name}/{d.name}"
+            best = (hit, (u, v), w, name)
+    if best:
+        return best
+    r0, s0, r1, s1 = plate.riser_bounds()
+    surfaces = []
+    if plate.contact_block:
+        surfaces.append((plate.contact_block_top, plate.contact_block, "contact block"))
+    for w, bounds, name in surfaces + [
+        (plate.total_thickness, (r0, s0, r1, s1), "plate surface (no sample)"),
+        (plate.base_thickness, (-plate.width / 2, -plate.height / 2, plate.width / 2, plate.height / 2), "base plate"),
+    ]:
+        hit = model.beam_hit(m, w)
+        if hit is None:
+            continue
+        u, v, _ = model.lab_to_plate(m, hit)
+        if bounds[0] <= u <= bounds[2] and bounds[1] <= v <= bounds[3]:
+            return hit, (u, v), w, name
+    return None, None, None, "misses the plate"
+
+
+def focus_point(model: StageModel, m: MotorPositions, cal: OpticsCalibration, optic_position: float) -> np.ndarray:
+    """Plate point (u, v, w) at the optic focus: where the sample point is when it was found on the beam and in
+    focus at the stage positions m with the optic at `optic_position`. The working distance of the optic stays, so
+    the optic position tells where along the beam the focus is (configuration's optics reference), and with it the
+    plate position and height of the point, without knowing the sample on the plate beforehand."""
+    y = cal.focus_for_position(model, optic_position)
+    return model.lab_to_plate(m, y * Y_HAT)
+
+
+def focus_correction(
+    model: StageModel,
+    m: MotorPositions,
+    layout: SampleLayout,
+    cal: OpticsCalibration,
+    optic_position: float | None = None,
+) -> BeamResult:
+    """Where the beam lands and the absolute optic position that focuses there.
+
+    `optic_position` is the current absolute optic position (default: the
+    configuration's reference position).
+    """
+    position = cal.optic_position if optic_position is None else optic_position
+    focus_y = cal.focus_for_position(model, position)
+    hit, uv, w, target = beam_on_layout(model, m, layout)
+    required = None if hit is None else cal.position_for_focus(model, float(hit[1]))
+    return BeamResult(hit, uv, w, target, position, focus_y, required)

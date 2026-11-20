@@ -189,8 +189,9 @@ about ±50 µm. So the zone-plate focus measures the height better than the came
   H = SN − SN<sub>f</sub></td><td>H of the sample (kept, used by <i>Bring target onto the beam</i>)</td></tr>
 <tr><td><i>Move found sample to analyzer focal plane</i> (Stage & Optics tab)</td><td>stage positions + optic
   position in focus, the configuration's optics reference: the plate point at the optic focus (x, y, H)</td>
-  <td>gives the new ST, SZ, SN (ΔSN = −Δy/√2) and optic position, and shows H; <b>H is not written back</b> to the
-  sample</td></tr>
+  <td>gives the new ST, SZ, SN (ΔSN = −Δy/√2) and optic position, and shows H. After an SRz turn, if the optic is
+  &gt; 0.05 mm off the prediction for the Target and one ΔH explains the ST, SZ and optic errors together (all left
+  ≤ 0.03 mm), it offers to <b>correct H</b> of that sample</td></tr>
 <tr><td><i>Quick sample rotation</i> tab</td><td>same as above</td><td>rotation about that point; nothing stored</td></tr>
 <tr><td><i>Found here</i> (Stage & Optics tab)</td><td>assumes the target is on the analyzer focus at the entered
   positions (no optic)</td><td>plate offset in SZ (all samples), sample Δx and ΔH</td></tr>

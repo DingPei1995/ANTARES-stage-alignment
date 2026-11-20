@@ -273,6 +273,62 @@ def found_offset(model: StageModel, m: MotorPositions, u: float, v: float, w: fl
     return float(pu - u), float(pv - v), float(pw - w)
 
 
+HEIGHT_CHECK_OPTIC = 0.05  # mm: optic (ZPS / CPS) off its prediction by more than this after an SRz turn -> check H
+HEIGHT_CHECK_SRZ = 0.01  # deg: below this SRz counts as 0 (no height check: H changes nothing there but SN)
+HEIGHT_EXPLAIN_TOL = 0.03  # mm: what one height change must leave of the ST, SZ and optic errors to explain them
+
+
+@dataclass
+class HeightFit:
+    """Can one change of the sample height H explain the optic and the stage errors of a target found after an SRz
+    turn? Errors are measured - predicted (mm; optic in optic motor units, ~mm along the beam), for the target on the
+    beam with SN as measured: `before` with the present H, `after` with H + `dh`."""
+
+    dh: float
+    before: tuple[float, float, float]  # ST, SZ, optic
+    after: tuple[float, float, float]
+    explained: bool
+
+    @property
+    def optic_error(self) -> float:
+        return self.before[2]
+
+
+def found_errors(model: "StageModel", m: "MotorPositions", cal: "OpticsCalibration", optic_position: float,
+                 u: float, v: float, w: float) -> tuple[float, float, float]:
+    """Measured - predicted ST, SZ and optic position for plate point (u, v, w) found on the beam and in focus at m
+    with the optic at `optic_position`; the prediction keeps SN, SRn, SRz and the piezo as measured."""
+    pred = model.motors_on_beam(u, v, w, srn=m.srn, srz=m.srz, sn=m.sn, pix=m.pix, piy=m.piy)
+    optic = cal.position_for_focus(model, model.beam_position(pred, u, v, w))
+    return m.st - pred.st, m.sz - pred.sz, optic_position - optic
+
+
+def fit_height(model: "StageModel", m: "MotorPositions", cal: "OpticsCalibration", optic_position: float,
+               u: float, v: float, w: float, sigmas: tuple[float, float] = (0.02, 0.02),
+               tol: float = HEIGHT_EXPLAIN_TOL) -> HeightFit:
+    """The change of height dh of the target (u, v, w) that best explains its ST, SZ and optic errors together
+    (weighted by `sigmas` = (position, optic) reading errors), and whether it explains them: every error left within
+    `tol`. After an SRz turn an H error moves ST and the focus together (both ~ sin SRz); an SRz-axis error across
+    the beam moves the focus only, a wrong plate position x, y moves ST / SZ only: neither is explained by H."""
+    weights = np.array([1 / sigmas[0], 1 / sigmas[0], 1 / sigmas[1]])
+
+    def errors(dh: float) -> np.ndarray:
+        return np.array(found_errors(model, m, cal, optic_position, u, v, w + dh))
+
+    e0, dh = errors(0.0), 0.0
+    for _ in range(3):  # nearly linear in dh: Gauss-Newton converges in one or two steps
+        step = 1e-3
+        e = errors(dh)
+        jac = (errors(dh + step) - e) / step
+        a, b = weights * jac, weights * e
+        if a @ a < 1e-12:
+            break
+        dh -= float(a @ b / (a @ a))
+    e1 = errors(dh)
+    return HeightFit(float(dh), tuple(float(x) for x in e0), tuple(float(x) for x in e1),
+                     bool(np.all(np.abs(e1) <= tol)))
+
+
 OPTIC_TYPES = ("zone plate + OSA", "capillary")
 
 

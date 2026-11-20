@@ -100,6 +100,7 @@ Agent/                   MCP server for AI assistants
 OpticsGeometry/          3-D geometry of the zone plate and the capillary (separate tool, report)
 configs/                 calibration configurations (newest per optic is used)
 docs/rotation_formula/   the rotation formula (HTML / PDF)
+docs/                    notes: alignment procedure, correction buttons (en / zh), tests to do
 src/quickalignment/      shared code (core, alignment, realsample, optics, ui, agent)
 tests/   devtools/       tests (python -m pytest) and documentation tools
 ```

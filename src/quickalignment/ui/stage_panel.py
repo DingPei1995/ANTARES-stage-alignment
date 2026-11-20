@@ -21,9 +21,11 @@ from ..core.motors import (  # noqa: F401  (re-exported for the other windows)
 from ..core.collision import ACCEPTANCE_HALF_ANGLE, collisions, in_acceptance, motor_limits
 from ..core.schematic import draw_schematic
 from ..core.stage import (
-    OPTIC_TYPES, MotorPositions, OpticsCalibration, StageConfig, StageModel, apply_found_offset, checked_sn,
-    focus_correction, focus_point, found_offset, slide_to_sn, sn_to_focus,
+    HEIGHT_CHECK_OPTIC, HEIGHT_CHECK_SRZ, HEIGHT_EXPLAIN_TOL, OPTIC_TYPES, MotorPositions, OpticsCalibration,
+    StageConfig, StageModel, apply_found_offset, checked_sn, fit_height, focus_correction, focus_point, found_offset,
+    slide_to_sn, sn_to_focus,
 )
+from ..realsample.fit import measurement_sigmas
 
 Qt = QtCore.Qt
 
@@ -163,7 +165,10 @@ class StagePanel(QtWidgets.QWidget):
             "The sample was found on the beam and in focus at the entered stage positions with the optic\n"
             "(ZPS / CPS) at the entered position. From the configuration's optics reference that position\n"
             "tells where along the beam the sample surface is; SN (ST compensating) brings it onto the\n"
-            "analyzer focal plane and the optic follows to keep it in focus."
+            "analyzer focal plane and the optic follows to keep it in focus.\n"
+            "After an SRz turn, if the optic is more than 0.05 mm off the prediction for the Target, it also\n"
+            "checks whether a change of the sample height H explains the optic and the ST / SZ errors together,\n"
+            "and if so offers to correct H."
         )
         focus_btn.clicked.connect(self.bring_found_to_focal_plane)
         self.optic_ref_label = QtWidgets.QLabel()
@@ -338,8 +343,9 @@ class StagePanel(QtWidgets.QWidget):
         at the entered position. The configuration's optics reference turns that optic position into where the
         focus, i.e. the sample surface, is along the beam; SN (ST compensating, the point slides along the beam)
         brings it onto the analyzer focal plane and the optic follows it there. Returns (motors, optic)."""
-        model, m, cal = self.model(), self.motors.value(), self.calibration()
-        optic_now = self.optic_pos.value()
+        m, optic_now = self.motors.value(), self.optic_pos.value()
+        height_text = self.check_found_height(m, optic_now)  # may correct H of the target's sample
+        model, cal = self.model(), self.calibration()
         y = cal.focus_for_position(model, optic_now)
         u, v, w = (float(x) for x in focus_point(model, m, cal, optic_now))
         new = slide_to_sn(m, m.sn - y / 2 ** 0.5)
@@ -354,9 +360,61 @@ class StagePanel(QtWidgets.QWidget):
         self.goto_label.setText(
             f"Found sample (plate x = {u:.3f}, y = {v:.3f} mm, surface H = {height:.3f} mm above the plate top) "
             f"on the analyzer focal plane: ST = {new.st:.4f}, SZ = {new.sz:.4f}, <b>SN = {new.sn:.4f}</b> "
-            f"(ΔSN = {unsigned_zero(new.sn - m.sn, 4):+.4f} mm), optic <b>{optic_new:.4f}</b>. {where}")
+            f"(ΔSN = {unsigned_zero(new.sn - m.sn, 4):+.4f} mm), optic <b>{optic_new:.4f}</b>. {where}"
+            + (f"<br>{height_text}" if height_text else ""))
         self.goto_label.show()
         return new, optic_new
+
+    def check_found_height(self, m: MotorPositions, optic: float) -> str:
+        """Height check of "Move found sample to analyzer focal plane", only after an SRz turn (|SRz| above
+        HEIGHT_CHECK_SRZ): the Target was found on the beam and in focus at m with the optic at `optic`. If the optic
+        is more than HEIGHT_CHECK_OPTIC off its prediction, fit one change of the sample height to the ST, SZ and
+        optic errors together; if it explains them (fit_height), ask to correct H of the target's sample. Returns a
+        line for the result text ("" when there is nothing to say)."""
+        if abs(m.srz) < HEIGHT_CHECK_SRZ:
+            return ""
+        label = self.target_combo.currentText()
+        layout = self._layout_getter()
+        sample = layout.sample_of(label) if label else None
+        t = self.target_point(label) if label else None
+        if t is None or sample is None:
+            return ""
+        optic_type = self.optic_type.currentText()
+        capillary = "capillary" in optic_type
+        name = "CPS" if capillary else "ZPS"
+        fit = fit_height(self.model(), m, self.calibration(), optic, *t, sigmas=measurement_sigmas(optic_type))
+        st, sz, op = fit.before
+        if abs(op) <= HEIGHT_CHECK_OPTIC:
+            return (f"<span style='color:#555'>Height check of {label}: {name} {op:+.3f} mm from the prediction "
+                    f"(within {HEIGHT_CHECK_OPTIC:g} mm): H kept.</span>")
+        a_st, a_sz, a_op = fit.after
+        errors = f"ST {st:+.3f}, SZ {sz:+.3f}, {name} {op:+.3f} mm"
+        if not fit.explained:
+            return ("<span style='color:#b00'>Height check of " + label + f": found off the prediction by {errors}. "
+                    f"No change of H explains it (best ΔH = {fit.dh:+.3f} mm leaves ST {a_st:+.3f}, SZ {a_sz:+.3f}, "
+                    f"{name} {a_op:+.3f} mm): H kept. More likely the plate position of the sample (Found here at "
+                    "SRz 0), the SRz axis or SN_f of the configuration.</span>")
+        note = ("\n\nCapillary: the CPS focus is read to about ±0.10 mm, so this ΔH is known to about ±0.07 mm "
+                "only. Prefer a zone-plate focus when possible." if capillary else "")
+        answer = QtWidgets.QMessageBox.question(
+            self, "Correct the sample height?",
+            f"{label} was found on the beam and in focus at SRz = {m.srz:g}° off the prediction by {errors}.\n\n"
+            f"A height change ΔH = {fit.dh:+.3f} mm of {sample.name} explains these errors together: "
+            f"with it they become ST {a_st:+.3f}, SZ {a_sz:+.3f}, {name} {a_op:+.3f} mm "
+            f"(all within {HEIGHT_EXPLAIN_TOL:g} mm).\n\n"
+            f"Correct H of {sample.name}: {sample.height:.3f} → {max(sample.height + fit.dh, 0.0):.3f} mm "
+            "(kept for the next positions and rotations)?" + note,
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes,
+        )
+        if answer != QtWidgets.QMessageBox.Yes:
+            return (f"<span style='color:#555'>Height check of {label}: ΔH = {fit.dh:+.3f} mm would explain the "
+                    f"errors ({errors}); H not changed.</span>")
+        before = sample.height
+        apply_found_offset(self.config(), layout, sample, 0.0, 0.0, fit.dh)
+        self.layoutCorrected.emit(sample.name)
+        self.refresh_targets()
+        return (f"<span style='color:#207020'>Height of {sample.name} corrected: H {before:.3f} → "
+                f"{sample.height:.3f} mm (it explains the errors {errors}).</span>")
 
     def model(self) -> StageModel:
         return StageModel(self.config(), self._layout_getter().plate)

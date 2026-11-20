@@ -209,6 +209,13 @@ ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back
    the point stays on the beam) brings it onto the analyzer focal plane and the optic is moved to keep it in focus.
    The line under the motors gives the new ST, SZ, SN, ΔSN and optic position, and where the point is on the plate.
    Refused, with nothing changed, if a motor would leave its range or the plate would touch something.
+   **Height check after an SRz turn.** If SRz is not 0 and the optic position is more than 0.05 mm off the one
+   predicted for the chosen *Target*, the program looks for one change of the sample height ΔH that explains the
+   ST, SZ and optic errors together (an H error moves ST and the focus together after an SRz turn). If one does
+   (all errors left ≤ 0.03 mm), it asks to correct H of that sample (kept for the next positions and rotations); if
+   none does, H stays and the result line names the likely causes (plate position → *Found here* at SRz 0; SRz axis or
+   SN_f → the beamline staff). With the capillary the ΔH is only known to about ±0.07 mm. At SRz 0 there is no check:
+   use *Correct H* or *Found here*.
 
 **The schematic** (redrawn only with *Update schematic & optics*):
 

@@ -223,6 +223,14 @@ pour repère).
    l'optique suit pour rester au foyer. La ligne sous les moteurs donne les nouveaux ST, SZ, SN, ΔSN et la position
    de l'optique, et où est le point sur la plaquette. Refusé, sans rien changer, si un moteur sortait de sa course ou
    si la plaquette touchait quelque chose.
+   **Contrôle de hauteur après une rotation SRz.** Si SRz n'est pas 0 et que la position de l'optique s'écarte de plus
+   de 0,05 mm de celle prédite pour la *Target* choisie, le programme cherche un changement de hauteur ΔH de
+   l'échantillon qui explique ensemble les écarts de ST, SZ et de l'optique (après une rotation SRz, une erreur de H
+   déplace ST et le foyer ensemble). S'il en trouve un (écarts restants ≤ 0,03 mm), il propose de corriger H de cet
+   échantillon (gardé pour les positions et rotations suivantes) ; sinon H reste et la ligne de résultat indique les
+   causes probables (position sur la plaquette → *Found here* à SRz 0 ; axe SRz ou SN_f → le personnel de la ligne).
+   Avec le capillaire, ΔH n'est connu qu'à environ ±0,07 mm. À SRz 0 pas de contrôle : utiliser *Correct H* ou
+   *Found here*.
 
 **Le schéma** (redessiné seulement avec *Update schematic & optics*) :
 

@@ -89,6 +89,11 @@ Positions here are **absolute motor values** (ST, SZ, SN, …, optic).
   on the illuminated surface. *Move found sample to analyzer focal plane*: with a sample found on the beam and in
   focus at the entered stage and optic (ZPS / CPS) positions, the configuration's optics reference gives where the
   surface is along the beam; SN (ST compensating) brings it onto the analyzer focal plane and the optic follows.
+  After an SRz turn (|SRz| ≥ 0.01°), if the optic is more than 0.05 mm off its prediction for the Target, one height
+  change ΔH is fitted to the ST, SZ and optic errors together (`core.stage.fit_height`, weights from
+  `realsample.fit.measurement_sigmas`); if it leaves all three within 0.03 mm the user is asked to correct H of the
+  target's sample (`HEIGHT_CHECK_OPTIC`, `HEIGHT_EXPLAIN_TOL` in `core/stage.py`). Every correction button:
+  [`docs/correction_buttons_en.md`](../docs/correction_buttons_en.md).
 - schematic: top view (plate orientation, analyzer and its focal plane, beam, optic with its position and the
   position needed for focus) and the sample plane in front view (SRn rotation; beam spot, analyzer focus and
   SRn axis with a legend in the same colours; axes in absolute ST / SZ)

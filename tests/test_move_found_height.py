@@ -1,6 +1,7 @@
-"""Height check of "Move found sample to analyzer focal plane": after an SRz turn, an optic (ZPS / CPS) error above
-0.05 mm is checked against one change of the sample height H, which must explain the ST, SZ and optic errors
-together (core.stage.fit_height, StagePanel.check_found_height)."""
+"""Corrections of "Fine tunings by ZPS/CPS" (StagePanel.check_found_height): at SRz 0 the optic focus (fixed focal
+distance) gives where the Target really is, x / plate offset / H (replaces "Found here"); after an SRz turn, an optic
+(ZPS / CPS) error above 0.05 mm is checked against one change of the sample height H, which must explain the ST, SZ and
+optic errors together (core.stage.fit_height)."""
 
 import os
 from dataclasses import replace
@@ -123,12 +124,52 @@ def test_move_found_keeps_the_height_when_refused(stage, monkeypatch):
     assert sample.height == 0.75 and "H not changed" in st.goto_label.text()
 
 
-def test_no_height_check_at_srz_0_or_for_a_small_optic_error(stage, monkeypatch):
+def test_no_height_check_for_a_small_optic_error_after_an_srz_turn(stage, monkeypatch):
     st, sample = stage
     asked = answer(monkeypatch, QtWidgets.QMessageBox.Yes)
-    set_found(st, 0.65, 0.0)  # SRz 0: Correct H / Found here are for that
-    st.bring_found_to_focal_plane()
     set_found(st, 0.74, -20.0)  # 0.01 mm: the optic is within 0.05 mm of the prediction
     st.bring_found_to_focal_plane()
     assert not asked and sample.height == 0.75
     assert "H kept" in st.goto_label.text()
+
+
+def test_fine_tuning_at_srz_0_corrects_the_height_from_the_focus(stage, monkeypatch):
+    st, sample = stage
+    set_found(st, 0.65, 0.0)  # 0.1 mm lower than drawn, found on the beam (centre) and in focus
+    asked = answer(monkeypatch, QtWidgets.QMessageBox.Yes)
+    new, optic = st.bring_found_to_focal_plane()
+    assert len(asked) == 1 and "ΔH = -0.100" in asked[0] and "Δx = +0.000" in asked[0]
+    assert sample.height == pytest.approx(0.65, abs=2e-4)
+    assert (sample.u, sample.v) == pytest.approx((2.0, 4.0), abs=2e-4)
+    assert st._layout_getter().plate_offset_v == pytest.approx(0.0, abs=2e-4)
+    assert "Corrected by the ZPS focus" in st.goto_label.text()
+    # then back on the analyzer focus: the optic at the configuration's position for it, the sample surface there
+    model, cal = st.model(), st.calibration()
+    assert optic == pytest.approx(cal.position_for_focus(model, 0.0))
+    assert model.beam_position(st.motors.value(), 2.0, 4.0, PLATE.total_thickness + 0.65) == pytest.approx(0, abs=2e-4)
+    # found again where it now is expected: nothing more to correct
+    asked.clear()
+    st.bring_found_to_focal_plane()
+    assert not asked and "nothing corrected" in st.goto_label.text()
+
+
+def test_fine_tuning_at_srz_0_moves_sample_and_plate(stage, monkeypatch):
+    """Found elsewhere on the plate (what "Found here" did, now with the focus where the optic says it is)."""
+    st, sample = stage
+    model, cal = st.model(), st.calibration()
+    w = PLATE.total_thickness + 0.80
+    m = model.motors_on_beam(2.1, 3.95, w, srn=120, srz=0.0, sn=0.3, pix=150, piy=150)
+    st.motors.set_value(M(st=m.st, sz=m.sz, sn=m.sn, srn=120, srz=0.0, pix=150, piy=150))
+    st.optic_pos.setValue(cal.position_for_focus(model, model.beam_position(m, 2.1, 3.95, w)))
+    answer(monkeypatch, QtWidgets.QMessageBox.Yes)
+    st.bring_found_to_focal_plane()
+    assert (sample.u, sample.height) == pytest.approx((2.1, 0.80), abs=2e-4)
+    assert sample.v == 4.0 and st._layout_getter().plate_offset_v == pytest.approx(-0.05, abs=2e-4)
+
+
+def test_fine_tuning_at_srz_0_refused_changes_nothing(stage, monkeypatch):
+    st, sample = stage
+    set_found(st, 0.65, 0.0)
+    answer(monkeypatch, QtWidgets.QMessageBox.No)
+    st.bring_found_to_focal_plane()
+    assert sample.height == 0.75 and "nothing corrected" in st.goto_label.text()

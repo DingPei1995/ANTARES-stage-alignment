@@ -769,14 +769,17 @@ def test_found_device_corrects_its_sample(window, monkeypatch):
     text = st.start_label.text()
     assert "<td>Sub/D1</td>" in text and "<td>Sub</td>" not in text
 
-    # D1 really is 0.2 mm further right, 0.1 mm lower and 0.05 mm higher than drawn
+    # D1 really is 0.2 mm further right, 0.1 mm lower and 0.05 mm higher than drawn; found on the beam and in focus
+    # on the analyzer focus (optic at the configuration's position for it): "Fine tunings by ZPS/CPS" at SRz 0 does
+    # what "Found here" did
     assert sub.devices[0].position(sub) == (0.0, -2.0)
     found = st.model().motors_for_target(0.0 + 0.2, -2.0 - 0.1, 5.5 + 0.05, srn=120, srz=0)
     st.motors.set_value(found)
+    st.optic_pos.setValue(st.calibration().position_for_focus(st.model(), 0.0))
     record = st.record
-    st.found_combo.setCurrentText("Sub/D1")
-    du, dv, dw = st.correct_from_found()
-    assert (du, dv, dw) == pytest.approx((0.2, -0.1, 0.05), abs=1e-4)
+    st.target_combo.setCurrentText("Sub/D1")
+    assert st.bring_found_to_focal_plane() is not None
+    assert "Corrected by the ZPS focus" in st.goto_label.text()
     # x and H: only that sample (with its devices), the editor shows it; y: the whole plate sits 0.1 mm lower in the
     # holder (plate offset), the drawing stays; no configuration change
     assert (sub.u, sub.v, sub.height) == pytest.approx((1.2, -1.0, 0.55), abs=1e-4)
@@ -806,9 +809,9 @@ def test_height_check_then_bring_to_beam_keeps_its_sn(window, monkeypatch):
     monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: QtWidgets.QMessageBox.Yes)
     ed.confirm_samples_placed()
     assert "(H checked)" in st.start_label.text()
-    # the Correct H button uses the typed SN (its clicked(bool) used to arrive as sn = False, i.e. SN 0)
+    # the Set SN by eye button uses the typed SN (its clicked(bool) used to arrive as sn = False, i.e. SN 0)
     ed.check_sn.setValue(sn_f + 0.7)
-    next(b for b in ed.findChildren(QtWidgets.QPushButton) if b.text() == "Correct H").click()
+    next(b for b in ed.findChildren(QtWidgets.QPushButton) if b.text() == "Set SN by eye").click()
     assert s.sn_checked == pytest.approx(sn_f + 0.7) and s.height == pytest.approx(0.7)
     ed.check_sn.setValue(sn_f + 0.8)
     ed.apply_height_check()
@@ -823,6 +826,46 @@ def test_height_check_then_bring_to_beam_keeps_its_sn(window, monkeypatch):
     row = ed.layout_model.samples.index(s)
     ed.table.item(row, 6).setText("0.600")
     assert s.sn_checked is None
+
+
+def test_samples_placed_asks_to_confirm_the_sn_by_eye(window, monkeypatch):
+    """"Samples placed → Stage" asks whether the SN by eye is the one with the top surface on the reference line: an
+    SN typed but not set (Yes sets it, Cancel stays), then the SNs set (No stays). Nothing is asked without one."""
+    ed = window.editor
+    s = ed.add_sample(Sample("S1", u=1.0, v=1.0, length=2, width=2, height=0.525))
+    sn_f = window.stage.config().sn_f
+    replies = []
+    asked = []
+
+    def question(*a, **k):
+        asked.append(a[2])
+        return replies.pop(0)
+
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", question)
+    replies[:] = [QtWidgets.QMessageBox.Yes]
+    assert ed.confirm_samples_placed() and len(asked) == 1  # no SN by eye: only "Samples placed?"
+    # typed, not set: Cancel stays on the tab, Yes sets it
+    ed.check_combo.setCurrentText("S1")
+    ed.check_sn.setValue(sn_f + 0.8)
+    asked.clear()
+    replies[:] = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Cancel]
+    assert not ed.confirm_samples_placed() and s.sn_checked is None
+    assert "not set yet" in asked[1] and f"SN = {sn_f + 0.8:.3f}" in asked[1]
+    replies[:] = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Yes]
+    assert ed.confirm_samples_placed() and s.sn_checked == pytest.approx(sn_f + 0.8)
+    # set: asked to confirm it; No stays
+    asked.clear()
+    replies[:] = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No]
+    assert not ed.confirm_samples_placed()
+    assert f"S1: SN = {sn_f + 0.8:.3f} mm (H = 0.800 mm)" in asked[1]
+    replies[:] = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Yes]
+    assert ed.confirm_samples_placed()
+    # choosing another sample without typing does not count as typed
+    ed.add_sample(Sample("S2", u=-3.0, v=1.0, length=2, width=2, height=0.525))
+    ed.check_combo.setCurrentText("S2")
+    asked.clear()
+    replies[:] = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Yes]
+    assert ed.confirm_samples_placed() and "not set yet" not in asked[1]
 
 
 def test_real_sample_calibration_asks_what_was_recalibrated(tmp_path):

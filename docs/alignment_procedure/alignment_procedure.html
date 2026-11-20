@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stage and Optics Alignment</title>
+<style>
+@page { size: A4; margin: 15mm 15mm 16mm 15mm; }
+:root { --ink: #1d2330; --muted: #55627a; --accent: #2f6db3; --head: #16365f; --line: #cdd6e3; --soft: #f1f5fb;
+        --beam: #d62728; --ana: #1f77b4; --plate: #e08a2c; --laser: #2ca02c; --optic: #7a5c9e; }
+html { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; font-size: 9.4pt; line-height: 1.45;
+       color: var(--ink); background: #fff; }
+body { margin: 0; }
+h1 { font-size: 20pt; color: var(--head); margin: 0 0 1mm; border-bottom: 2.5px solid var(--accent);
+     padding-bottom: 2mm; }
+.sub { color: var(--muted); margin: 0 0 4mm; }
+h2 { font-size: 13pt; color: var(--head); margin: 6mm 0 2mm; border-bottom: 1px solid var(--line);
+     padding-bottom: 1mm; break-after: avoid; }
+h3 { font-size: 10.5pt; color: var(--accent); margin: 4mm 0 1.5mm; break-after: avoid; }
+p { margin: 1.5mm 0; }
+ol, ul { margin: 1.5mm 0; padding-left: 6mm; }
+li { margin: 0.8mm 0; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.4pt; background: #eef2f8; padding: 0 2px;
+       border-radius: 2px; }
+table { border-collapse: collapse; width: 100%; margin: 2mm 0; font-size: 8.4pt; }
+th, td { border: 1px solid var(--line); padding: 1.1mm 1.6mm; vertical-align: top; text-align: left; }
+th { background: #e8eef7; }
+tr { break-inside: avoid; }
+.steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2mm; margin: 3mm 0; }
+.step { border: 1px solid var(--line); border-top: 3px solid var(--accent); background: var(--soft);
+        padding: 1.6mm 2mm; border-radius: 2px; font-size: 8.2pt; }
+.step b { display: block; color: var(--head); font-size: 8.8pt; margin-bottom: 0.8mm; }
+.step .rec { color: var(--muted); display: block; margin-top: 1mm; }
+figure { margin: 3mm 0; break-inside: avoid; text-align: center; }
+figcaption { font-size: 8.2pt; color: var(--muted); margin-top: 1mm; text-align: left; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; align-items: start; }
+.note { border-left: 3px solid var(--accent); background: var(--soft); padding: 1.5mm 3mm; margin: 2.5mm 0; }
+.warn { border-left: 3px solid #c0392b; background: #fbf1f0; padding: 1.5mm 3mm; margin: 2.5mm 0; }
+.size { white-space: nowrap; }
+.pb { break-before: page; }
+svg text { font-family: "DejaVu Sans", Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<h1>Stage and Optics Alignment</h1>
+<p class="sub">ANTARES (SOLEIL) · reference procedure for the next calibration, and where its errors come from ·
+draft 2026-11-20</p>
+
+<h2>Idea</h2>
+<p>The analyzer collects electrons from one fixed point, the <b>analyzer focus</b>. The procedure first puts a sample
+reference point exactly there with the stage (no X-rays needed), then brings each focusing optic's spot onto that same
+point and focuses it. After that the optic positions are known for the analyzer focus, and because the
+<b>working distance of an optic does not change</b>, the optic position in focus on any other sample tells where its
+surface is along the beam. That gives the sample height, and the SN that puts the sample back on the analyzer focus.
+The rotation centres are measured last, by tracking one point through SRn and SRz turns with the zone-plate focus.</p>
+
+<div class="steps">
+  <div class="step"><b>1 · SN</b>Chamber marks / camera line: sample top surface on the analyzer focal plane.
+    <span class="rec">record SN<sub>f</sub></span></div>
+  <div class="step"><b>2 · ST, SZ</b>Laser through the viewport behind the hemisphere: reference point on the
+    entrance-slit centre.<span class="rec">record ST, SZ</span></div>
+  <div class="step"><b>3 · Zone plate</b>Spot onto the reference point (ZPX, ZPZ), then focus (ZPS).
+    <span class="rec">record ZPX, ZPS, ZPZ</span></div>
+  <div class="step"><b>4 · Capillary</b>Position and attitude: spot onto the reference point, then focus.
+    <span class="rec">record CPS, CPX, CPZ, 2 angles</span></div>
+  <div class="step"><b>5 · Rotations</b>SRn and SRz series, zone-plate focus and SPEM maps on one point.
+    <span class="rec">fit SRn and SRz axes</span></div>
+</div>
+
+<figure>
+<svg viewBox="0 0 720 360" width="100%" role="img" aria-label="Top view of the analyzer, beam, optic and sample">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>
+  </defs>
+  <!-- origin (analyzer focus) at 400,170; beam +y = up -->
+  <!-- analyzer focal plane (45 deg, upper-left to lower-right) -->
+  <line x1="290" y1="60" x2="540" y2="310" stroke="#8e44ad" stroke-dasharray="6 4" stroke-width="1.4"/>
+  <text x="545" y="318" font-size="11" fill="#8e44ad">analyzer focal plane</text>
+  <!-- plate, parallel to the focal plane, behind it -->
+  <polygon points="330,100 340,90 490,240 480,250" fill="#f4c28a" stroke="#e08a2c" stroke-width="1.5"/>
+  <text x="470" y="128" font-size="11" fill="#b8661a">sample on the plate</text>
+  <text x="470" y="142" font-size="11" fill="#b8661a">(SRz = 0: parallel</text>
+  <text x="470" y="156" font-size="11" fill="#b8661a">to the focal plane)</text>
+  <!-- analyzer: lower left, axis perpendicular to the plane -->
+  <g transform="rotate(45 400 170)">
+    <rect x="378" y="225" width="44" height="40" fill="#cfe2f3" stroke="#1f77b4"/>
+    <rect x="360" y="265" width="80" height="55" fill="#cfe2f3" stroke="#1f77b4"/>
+    <line x1="400" y1="170" x2="400" y2="330" stroke="#2ca02c" stroke-width="2" stroke-dasharray="2 3"/>
+  </g>
+  <text x="138" y="300" font-size="11" fill="#1f77b4">analyzer (MBS A1)</text>
+  <text x="138" y="314" font-size="11" fill="#1f77b4">lens · slit · hemisphere</text>
+  <text x="138" y="328" font-size="11" fill="#1f77b4">viewport at the back</text>
+  <text x="150" y="215" font-size="11" fill="#2ca02c">laser on the</text>
+  <text x="150" y="229" font-size="11" fill="#2ca02c">analyzer axis (step 2)</text>
+  <!-- SN and ST arrows -->
+  <line x1="595" y1="95" x2="635" y2="55" stroke="#333" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="640" y="55" font-size="11">ST</text>
+  <line x1="595" y1="95" x2="635" y2="135" stroke="#333" stroke-width="1.4" marker-end="url(#ar)"/>
+  <text x="640" y="142" font-size="11">SN</text>
+  <text x="590" y="170" font-size="10" fill="#55627a">SZ: vertical</text>
+  <text x="590" y="183" font-size="10" fill="#55627a">(out of the page)</text>
+  <!-- beam -->
+  <line x1="400" y1="350" x2="400" y2="172" stroke="#d62728" stroke-width="2.2"/>
+  <text x="408" y="345" font-size="11" fill="#d62728">X-ray beam (+y)</text>
+  <!-- optic -->
+  <rect x="380" y="282" width="40" height="7" fill="#c9b6e4" stroke="#7a5c9e"/>
+  <text x="426" y="290" font-size="11" fill="#7a5c9e">zone plate / capillary (steps 3, 4)</text>
+  <line x1="390" y1="280" x2="390" y2="176" stroke="#7a5c9e" stroke-width="1.2" marker-start="url(#ar)" marker-end="url(#ar)"/>
+  <text x="408" y="225" font-size="10" fill="#7a5c9e">working</text><text x="408" y="238" font-size="10" fill="#7a5c9e">distance</text><text x="408" y="251" font-size="10" fill="#7a5c9e">(fixed)</text>
+  <!-- focus -->
+  <circle cx="400" cy="170" r="6" fill="none" stroke="#1f77b4" stroke-width="2"/>
+  <text x="300" y="168" font-size="11" fill="#1f77b4">analyzer focus</text>
+  <text x="20" y="22" font-size="12" font-weight="bold" fill="#16365f">Top view (beam going up)</text>
+</svg>
+<figcaption><b>Figure 1.</b> What each step fixes. Step 1 puts the surface on the analyzer focal plane (SN, along the
+analyzer axis). Step 2 moves the reference point along the plane (ST, SZ) onto the analyzer axis, marked by the laser
+through the slit: the point is now on the analyzer focus. Steps 3–4 move each optic until its spot is on that point
+and in focus: its position then marks the analyzer focus along the beam.</figcaption>
+</figure>
+
+<h2>Steps</h2>
+<ol>
+  <li><b>SN on the focal plane.</b> SRn 120°, SRz 0°, PIX = PIY = 150 µm. With the chamber marks / camera reference
+    line, move SN until the top surface of the sample is on the analyzer focal plane. Record SN; with the sample height
+    H known this gives SN<sub>f</sub> (SN of the standard riser top in focus) = SN − H.</li>
+  <li><b>ST, SZ on the analyzer axis.</b> Shine the laser through the viewport behind the hemisphere so that it
+    comes out through the entrance slit and the lens. Move a sharp reference point of the sample onto the slit centre
+    with ST and SZ (SN unchanged). Record ST, SZ: with the point's plate position (x, y) this gives
+    ST0 = ST + x and SZ0 = SZ + y, the analyzer focus in stage coordinates.</li>
+  <li><b>Zone plate.</b> At 95 eV, move the zone plate across the beam (ZPX, ZPZ; realign the OSA) until the SPEM map
+    shows the reference point at the piezo centre, then focus with ZPS. Record ZPX, ZPS, ZPZ (and OSA positions):
+    ZPS is now the zone-plate position for the analyzer focus.</li>
+  <li><b>Capillary.</b> Same with the capillary: position and attitude (two angles) until the spot is on the
+    reference point, then focus with CPS. Record CPS, CPX, CPZ and the two angles.</li>
+  <li><b>Rotation centres.</b> Track the same point with SPEM maps through an SRn series (e.g. 100–150°) and an SRz
+    series (e.g. 0 to −25°), SN kept, refocusing with ZPS. ST / SZ give the axes along the plane; ZPS gives the
+    positions along the beam — the only way to see the SRz axis <i>across</i> the beam (2026-11-15: it was 0.97 mm
+    off, invisible to ST / SZ readings and to the capillary).</li>
+</ol>
+
+<div class="note">Note (step 4): the request listed “ZPZ” for the capillary; this summary assumes the capillary's own
+vertical motor (written CPZ here).</div>
+
+<h2>Using the working distance: height of a sample from the optic focus</h2>
+<div class="two">
+<figure style="margin-top:0">
+<svg viewBox="0 0 360 300" width="100%" role="img" aria-label="Sample surface above the reference plane and the focus shift along the beam">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>
+  </defs>
+  <!-- reference plane through analyzer focus (180,200) at 45 deg -->
+  <line x1="60" y1="80" x2="300" y2="320" stroke="#8e44ad" stroke-dasharray="6 4" stroke-width="1.3"/>
+  <text x="18" y="70" font-size="10" fill="#8e44ad">analyzer focal plane</text>
+  <!-- sample surface: shifted toward analyzer (lower-left) by dH along normal: normal dir svg (-1,+1)/sqrt2; shift 40px -> beam hit moves down by 40*sqrt2=56.6 -->
+  <line x1="40" y1="116" x2="260" y2="336" stroke="#e08a2c" stroke-width="3"/>
+  <text x="12" y="138" font-size="10" fill="#b8661a">sample surface</text>
+  <!-- beam -->
+  <line x1="180" y1="300" x2="180" y2="200" stroke="#d62728" stroke-width="2"/>
+  <circle cx="180" cy="200" r="5" fill="none" stroke="#1f77b4" stroke-width="2"/>
+  <text x="190" y="196" font-size="10" fill="#1f77b4">analyzer focus</text>
+  <circle cx="180" cy="256.6" r="4" fill="#d62728"/>
+  <text x="200" y="262" font-size="10" fill="#d62728">optic focus on the sample</text>
+  <!-- delta y -->
+  <line x1="165" y1="203" x2="165" y2="254" stroke="#333" stroke-width="1.2" marker-start="url(#ar2)" marker-end="url(#ar2)"/>
+  <text x="112" y="234" font-size="10">Δy = ΔZPS</text>
+  <!-- dH along normal -->
+  <line x1="236" y1="256" x2="208" y2="284" stroke="#333" stroke-width="1.2" marker-start="url(#ar2)" marker-end="url(#ar2)"/>
+  <text x="238" y="290" font-size="10">ΔH = Δy / √2</text>
+  <text x="10" y="18" font-size="11" font-weight="bold" fill="#16365f">Top view: a sample higher by ΔH</text>
+</svg>
+</figure>
+<div>
+<p>With the optic positions of steps 3–4 and a fixed working distance, a sample found in focus at another optic
+position <code>ZPS</code> has its surface at</p>
+<p style="text-align:center"><b>Δy = s · (ZPS − ZPS<sub>ref</sub>)</b> along the beam &nbsp;(s = optic sign, scale ≈ 1)</p>
+<p>from the analyzer focus. The beam meets the surface at 45°, so the surface is <b>ΔH = Δy / √2</b> off the focal
+plane along SN, and <b>ΔSN = −Δy / √2</b> (ST compensating, so the point stays on the beam) puts it back on the
+analyzer focus; the optic then returns to ZPS<sub>ref</sub>.</p>
+<p>Reading precision: zone plate ±0.02 mm → ΔH ±14 µm; capillary ±0.10 mm → ±70 µm; eye on the camera line
+about ±50 µm. So the zone-plate focus measures the height better than the camera line; the capillary does not.</p>
+</div>
+</div>
+
+<h3>What QuickAlignment does today</h3>
+<table>
+<tr><th>function</th><th>what it uses</th><th>what it changes</th></tr>
+<tr><td><i>Height check → Correct H</i> (Samples tab)</td><td>SN read with the top surface on the camera line:
+  H = SN − SN<sub>f</sub></td><td>H of the sample (kept, used by <i>Bring target onto the beam</i>)</td></tr>
+<tr><td><i>Move found sample to analyzer focal plane</i> (Stage & Optics tab)</td><td>stage positions + optic
+  position in focus, the configuration's optics reference: the plate point at the optic focus (x, y, H)</td>
+  <td>gives the new ST, SZ, SN (ΔSN = −Δy/√2) and optic position, and shows H; <b>H is not written back</b> to the
+  sample</td></tr>
+<tr><td><i>Quick sample rotation</i> tab</td><td>same as above</td><td>rotation about that point; nothing stored</td></tr>
+<tr><td><i>Found here</i> (Stage & Optics tab)</td><td>assumes the target is on the analyzer focus at the entered
+  positions (no optic)</td><td>plate offset in SZ (all samples), sample Δx and ΔH</td></tr>
+</table>
+
+<h2 class="pb">Where errors come in</h2>
+<p>For the next calibration: check list, by step. “Effect” is what the error does to user predictions.</p>
+
+<table>
+<tr><th style="width:15%">step</th><th style="width:47%">error source</th><th style="width:38%">effect / how to reduce it</th></tr>
+
+<tr><td rowspan="6"><b>1 · SN on the focal plane</b></td>
+  <td>Judging the surface on the camera line by eye: depth of field, parallax, camera resolution.</td>
+  <td>Offset of SN<sub>f</sub> (2026-11-14: −0.3 mm instead of 0). All heights and the “analyzer focus” share it.
+  Repeat, approach from both sides, average.</td></tr>
+<tr><td>The mark / line itself not on the true analyzer focal plane (when was it set, for which lens mode?).</td>
+  <td>Systematic: data taken off the analyzer focus (distorted angles and energies). Check against spectra: sharpest
+  angular features vs SN.</td></tr>
+<tr><td>Sample height H not known (substrate thickness, glue, silver paint, plate riser tolerance).</td>
+  <td>SN<sub>f</sub> = SN − H is wrong by the error of H (2026-11-14: 0.500 instead of 0.525 mm). Use a reference
+  sample of known thickness.</td></tr>
+<tr><td>Surface not parallel to the focal plane: SRz zero offset, sample tilted on the plate, plate not flat in the
+  holder.</td><td>The SN read depends on where on the sample one looks. Judge at the reference point itself.</td></tr>
+<tr><td>SN direction not exactly perpendicular to the focal plane; SN backlash.</td>
+  <td>Small ST / SZ coupling; always approach SN from the same side.</td></tr>
+<tr><td>Temperature: cooling the manipulator moves the sample by tens of µm.</td>
+  <td>Calibrate at the measuring temperature, after it is stable.</td></tr>
+
+<tr><td rowspan="6"><b>2 · Laser on the slit centre</b></td>
+  <td>The optical (laser) axis is not the electron-optical axis of the lens (lens mode, deflector zero, alignment of
+  the viewport and laser).</td>
+  <td>ST0 / SZ0 offset: the beam spot is put on the wrong point. Check once with photoelectrons (map the reference
+  point with deflector 0 at the slit centre).</td></tr>
+<tr><td>Laser tilted with respect to the analyzer axis by α.</td>
+  <td>An SN error δ (step 1) moves the laser spot laterally by α·δ. Align the laser on the axis; do step 1 first.</td></tr>
+<tr><td>Size of the laser spot on the sample, judging the slit centre (along the slit especially), slit width.</td>
+  <td>±tens of µm in ST / SZ. Use a narrow slit and a small, sharp reference feature.</td></tr>
+<tr><td>Refraction / reflection at the viewport, diffuse spot on rough or transparent samples.</td>
+  <td>Biased centre. Prefer a metallic, sharp feature (gold pad corner).</td></tr>
+<tr><td>Plate position (x, y) of the reference point from the photo.</td>
+  <td>Goes fully into ST0 / SZ0 (±0.05 mm, 2026-11-14). Mark it on a microscope photo registered on the plate photo.</td></tr>
+<tr><td>Piezo not centred (PIX / PIY ≠ 150 µm) during the reading.</td><td>Direct offset; centre it.</td></tr>
+
+<tr><td rowspan="6"><b>3 · Zone plate</b></td>
+  <td>Focus judged on SPEM maps: depth of focus, map step, drift during the map.</td>
+  <td>Error of ZPS<sub>ref</sub> → all heights from the optic shift by it/√2. Focus series, take the sharpest
+  (fit), same criterion every time.</td></tr>
+<tr><td>Photon energy: the focal length is proportional to E (f ≈ 0.256·E mm, 24.3 mm at 95 eV).</td>
+  <td>0.1 eV → 26 µm in focus. Use the reference only at the same energy; check the monochromator calibration.</td></tr>
+<tr><td>Moving ZPX / ZPZ changes the beam direction slightly (zone plate / OSA not on the incoming beam axis).</td>
+  <td>Beam not along the model's +y by an angle τ: a sample Δy along the beam is missed laterally by τ·Δy
+  (10 mrad × 2 mm = 20 µm).</td></tr>
+<tr><td>ZPS scale and backlash (2026-11-15: focus / ZPS = 1.015).</td><td>Error proportional to Δy; approach from one
+  side; fit the scale.</td></tr>
+<tr><td>Spot on the reference point read on the map (map resolution, recognising the feature).</td>
+  <td>±5–10 µm; use the same feature as in step 2.</td></tr>
+<tr><td>Beam pointing drift (undulator gap, mono, thermal load, top-up).</td><td>Spot moves after the calibration:
+  re-check the spot position with one map before a series.</td></tr>
+
+<tr><td rowspan="4"><b>4 · Capillary</b></td>
+  <td>Large depth of focus: CPS focus only to about ±0.10 mm.</td>
+  <td>Heights from the CPS ±70 µm; not good enough for the SRz axis across the beam (2026-11-14 / 15).</td></tr>
+<tr><td>Attitude (two angles) sets the beam direction; any later tweak changes it.</td>
+  <td>Same τ·Δy error as above, and a new reference: redo step 4 after every capillary adjustment.</td></tr>
+<tr><td>The capillary does not refocus by moving along exactly the beam axis.</td><td>Spot moves sideways while
+  focusing: check the spot position after focusing.</td></tr>
+<tr><td>Achromatic, but the spot size and position depend on the alignment and on the energy band of the beam.</td>
+  <td>Check at the energy used.</td></tr>
+
+<tr><td rowspan="7"><b>5 · Rotation centres</b></td>
+  <td>Tracking the point on SPEM maps (feature recognition, map step).</td><td>±4 µm per map (2026-11-15); use
+  correlation of the integrated maps.</td></tr>
+<tr><td>SRz axis across the beam: changes ST only to second order (cos SRz − 1).</td><td>Seen only in the focus:
+  needs zone-plate ZPS at large SRz (−15 to −25°).</td></tr>
+<tr><td>Rotation axes not perpendicular / vertical (tilt), run-out (wobble) of the rotations.</td>
+  <td>Errors that grow with the angle; not in the model. Watch the residuals at the largest angles.</td></tr>
+<tr><td>SN straightness / direction when SRz is turned (open point 2026-11-15: 0.14 mm along the beam, 20–25 µm across
+  at SRz −25 with SN moved 1.5 mm).</td><td>Correct SN at large SRz less exact: refocus and use the piezo step.</td></tr>
+<tr><td>Height H of the tracked point, SN<sub>f</sub> and the optic scale enter the fit together.</td>
+  <td>Correlated constants; the fit reports the least-determined combination: add sets that break it.</td></tr>
+<tr><td>Extrapolation outside the measured SRn / SRz range.</td><td>Measure the range that will be used.</td></tr>
+<tr><td>Piezo directions and scale (PIX, PIY), backlash of SRn / SRz.</td><td>Checked 2026-11-14 / 15; approach angles
+  from one side.</td></tr>
+
+<tr><td rowspan="4"><b>Always</b></td>
+  <td>The assumption itself: optic positions and working distance unchanged after the calibration.</td>
+  <td>Any optic realignment, energy change (zone plate) or capillary tweak invalidates the reference: redo steps 3–4
+  (RealSampleCalibration, mode optics).</td></tr>
+<tr><td>Plate seating after a transfer (height in the holder).</td><td>SZ offset of all samples: one <i>Found here</i>
+  corrects it.</td></tr>
+<tr><td>Motor reproducibility, re-homing, encoder vs steps.</td><td>Re-homing: full calibration.</td></tr>
+<tr><td>Typing / reading errors; numbers in another locale (“,” decimal).</td><td>Record in the program, not on paper;
+  always “.”.</td></tr>
+</table>
+
+<div class="warn"><b>Reminder.</b> Steps 1 and 2 define the analyzer focus for everything after: their errors do not
+show in any residual (the optics and the rotations are fitted around them). Check them independently — the analyzer
+itself (sharpest features vs SN, photoelectron map at the slit centre) is the only absolute reference.</div>
+
+</body>
+</html>

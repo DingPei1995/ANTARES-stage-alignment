@@ -185,16 +185,17 @@ about ±50 µm. So the zone-plate focus measures the height better than the came
 <h3>What QuickAlignment does today</h3>
 <table>
 <tr><th>function</th><th>what it uses</th><th>what it changes</th></tr>
-<tr><td><i>Height check → Correct H</i> (Samples tab)</td><td>SN read with the top surface on the camera line:
-  H = SN − SN<sub>f</sub></td><td>H of the sample (kept, used by <i>Bring target onto the beam</i>)</td></tr>
-<tr><td><i>Move found sample to analyzer focal plane</i> (Stage & Optics tab)</td><td>stage positions + optic
-  position in focus, the configuration's optics reference: the plate point at the optic focus (x, y, H)</td>
-  <td>gives the new ST, SZ, SN (ΔSN = −Δy/√2) and optic position, and shows H. After an SRz turn, if the optic is
-  &gt; 0.05 mm off the prediction for the Target and one ΔH explains the ST, SZ and optic errors together (all left
-  ≤ 0.03 mm), it offers to <b>correct H</b> of that sample</td></tr>
+<tr><td><i>Set SN by eye</i> (Samples tab; confirmed at <i>Samples placed → Stage</i>)</td><td>SN read with the
+  top surface on the camera line (by eye, ±0.05 mm): H = SN − SN<sub>f</sub></td><td>H of the sample, rough (kept,
+  the SN used by <i>Bring target onto the beam</i>)</td></tr>
+<tr><td><i>Fine tunings by ZPS/CPS</i> (Stage & Optics tab)</td><td>stage positions + optic position in focus, the
+  configuration's optics reference (fixed focal distance): the plate point at the optic focus (x, y, H)</td>
+  <td>at SRz 0 (replaces the former <i>Found here</i>): offers to correct the plate offset in SZ (Δy, all samples),
+  the Target's sample Δx and <b>ΔH</b>. After an SRz turn: if the optic is &gt; 0.05 mm off the prediction for the
+  Target and one ΔH explains the ST, SZ and optic errors together (all left ≤ 0.03 mm), offers to correct H. Then new
+  ST, SN (ΔSN = −Δy/√2, SZ kept) put the surface on the analyzer focal plane and the optic goes back to the
+  configuration's position for the analyzer focus</td></tr>
 <tr><td><i>Quick sample rotation</i> tab</td><td>same as above</td><td>rotation about that point; nothing stored</td></tr>
-<tr><td><i>Found here</i> (Stage & Optics tab)</td><td>assumes the target is on the analyzer focus at the entered
-  positions (no optic)</td><td>plate offset in SZ (all samples), sample Δx and ΔH</td></tr>
 </table>
 
 <div style="break-inside: avoid"><h3>Height error or SRz-axis error? How to tell after an SRz turn</h3>
@@ -302,7 +303,7 @@ prediction for an error of <b>+0.1 mm in H</b> (the sample believed 0.1 mm highe
   <td>The assumption itself: optic positions and working distance unchanged after the calibration.</td>
   <td>Any optic realignment, energy change (zone plate) or capillary tweak invalidates the reference: redo steps 3–4
   (RealSampleCalibration, mode optics).</td></tr>
-<tr><td>Plate seating after a transfer (height in the holder).</td><td>SZ offset of all samples: one <i>Found here</i>
+<tr><td>Plate seating after a transfer (height in the holder).</td><td>SZ offset of all samples: one <i>Fine tunings by ZPS/CPS</i>
   corrects it.</td></tr>
 <tr><td>Motor reproducibility, re-homing, encoder vs steps.</td><td>Re-homing: full calibration.</td></tr>
 <tr><td>Typing / reading errors; numbers in another locale (“,” decimal).</td><td>Record in the program, not on paper;

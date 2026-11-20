@@ -26,7 +26,7 @@ heights H finishes the plate.
 
 **2 · Go to a sample.** The Stage & Optics tab lists, for every sample and device, the ST / SZ / SN that put it on the
 beam in the analyzer focus at the start orientation (SRn 120°, SRz 0°), and the optic position (ZPS / CPS) for focus.
-Once the first sample is found on the beam, **Found here** corrects the drawing (the whole plate in SZ, the sample
+Once the first sample is found on the beam, **Fine tunings by ZPS/CPS** corrects the drawing (the whole plate in SZ, the sample
 in ST / height): the other samples then come out right too.
 
 ![Stage & Optics tab](QuickAlignment/docs/images/guide/stage_tab.png)
@@ -72,7 +72,7 @@ SPEM maps (300 × 300 µm, 10 µm steps) before and after the turn
 
 The positions are as good as the stage calibration in `configs/`, made by the beamline staff with
 RealSampleCalibration ([staff guide](RealSampleCalibration/docs/pdf/RealSampleCalibration_staff_guide_en.pdf)).
-If *Found here* moves a sample by more than 0.3 mm, or all samples the same way, ask the staff to recalibrate.
+If *Fine tunings by ZPS/CPS* moves a sample by more than 0.3 mm, or all samples the same way, ask the staff to recalibrate.
 
 ## AI assistant (optional)
 

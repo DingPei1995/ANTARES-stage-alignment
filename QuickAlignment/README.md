@@ -91,14 +91,16 @@ Positions here are **absolute motor values** (ST, SZ, SN, …, optic).
   focus corrects the sample height and brings the sample back onto the analyzer focus): with a sample found on the
   beam and in focus at the entered stage and optic (ZPS / CPS) positions, the configuration's optics reference gives
   where the surface is along the beam; SN (ST compensating, SZ kept) brings it onto the analyzer focal plane and the
-  optic goes back to the configuration's position for the analyzer focus. At SRz 0 the focus gives the surface
-  height directly: if it lies on the Target's sample (`FOCUS_ON_SAMPLE_MARGIN`), the user is asked to correct H by
-  ΔH (`ui/stage_panel.py: check_height_at_srz0`; below `HEIGHT_FOCUS_MIN` H is only confirmed). *Set SN by eye*
+  optic goes back to the configuration's position for the analyzer focus. At SRz 0 (|SRz| below `HEIGHT_CHECK_SRZ`) the
+  focus gives where the Target really is (`core.stage.found_offset` with `y` = the optic focus): Δx and ΔH of its
+  sample and Δy of the plate (plate offset), applied after a confirmation (`ui/stage_panel.py: correct_found_at_srz0`;
+  nothing is offered below `FOUND_POSITION_MIN` in x, y and `HEIGHT_FOCUS_MIN` in H). *Set SN by eye*
   (Samples tab) is the rough height by eye (SN on the camera line), confirmed at *Samples placed → Stage*.
   After an SRz turn (|SRz| ≥ 0.01°), if the optic is more than 0.05 mm off its prediction for the Target, one height
   change ΔH is fitted to the ST, SZ and optic errors together (`core.stage.fit_height`, weights from
   `realsample.fit.measurement_sigmas`); if it leaves all three within 0.03 mm the user is asked to correct H of the
-  target's sample (`HEIGHT_CHECK_OPTIC`, `HEIGHT_EXPLAIN_TOL` in `core/stage.py`). Every correction button:
+  target's sample (`ui/stage_panel.py: check_found_height`; `HEIGHT_CHECK_OPTIC`, `HEIGHT_EXPLAIN_TOL` in
+  `core/stage.py`). Every correction button:
   [`docs/correction_buttons_en.md`](../docs/correction_buttons_en.md).
 - schematic: top view (plate orientation, analyzer and its focal plane, beam, optic with its position and the
   position needed for focus) and the sample plane in front view (SRn rotation; beam spot, analyzer focus and

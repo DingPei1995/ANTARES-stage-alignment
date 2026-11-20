@@ -270,12 +270,14 @@ parties (puis la platine revient au foyer de l'analyseur, voir l'étape 4 ci-des
 Toutes les prédictions utilisent ensuite les positions corrigées (enregistrées avec la session) ; la liste des
 positions de départ est mise à jour.
 
+![La fenêtre de confirmation de Fine tunings by ZPS/CPS pour D1](images/guide/fine_tuning.png)
+
 Dans l'exemple D1 est trouvé à ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°) : il était dessiné
 0,20 mm trop à droite, et décalé de 0,27 mm en y (dessiné trop haut), pris comme décalage de la plaquette. Un Δx ou ΔH de plus de 0,3 mm, ou le même
 décalage en ST pour tous les échantillons, suggère une configuration périmée : prévenir le personnel de la ligne. Le
 faire à SRz = 0° : là, le foyer donne x, y et H sans les axes de rotation ; après une rotation SRz le bouton ne corrige
 que H (quand un ΔH explique les écarts), car les erreurs de x, y ne s'y distinguent pas des erreurs d'axe. (Ceci
-remplace l'ancien bouton *Fine tunings by ZPS/CPS*, qui supposait l'échantillon exactement au foyer de l'analyseur au lieu de lire
+remplace l'ancien bouton *Found here*, qui supposait l'échantillon exactement au foyer de l'analyseur au lieu de lire
 le foyer sur l'optique.)
 
 ### Anticollision
@@ -318,9 +320,9 @@ Garder une distance de sécurité et surveiller la caméra.
    tab* les reprend.
 
 **Exemple.** D1 est sous le faisceau à SRn = 120°, SRz = 0° (ST = −2.4601, SZ = 37.8095, SN = 0, capillaire
-59.6926) ; voulu : SRn = 92°, SRz = −24°. Avec SN gardé, ST = −6.0561, SZ = 38.9759 et le capillaire à 61.7277
+59.6926) ; voulu : SRn = 92°, SRz = −24°. Avec SN gardé, ST = −6.0561, SZ = 38.9760 et le capillaire à 61.7277
 remettent D1 sous le faisceau, mais à 2035 µm en aval du foyer de l'analyseur (rouge : les spectres seraient
-déformés). Avec *Correct SN* : ST = −4.6171, SZ = 38.9759, SN = −1.4390, capillaire inchangé : D1 au foyer de
+déformés). Avec *Correct SN* : ST = −4.6171, SZ = 38.9760, SN = −1.4390, capillaire inchangé : D1 au foyer de
 l'analyseur. Case cochée, *Send to Stage & Optics tab* :
 
 ![D1 retrouvé après la rotation](images/guide/rotate_found.png)

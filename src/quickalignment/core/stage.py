@@ -245,7 +245,8 @@ def check_height(config: StageConfig, layout: SampleLayout, sample, sn: float) -
 
 
 def apply_found_offset(config: StageConfig, layout: SampleLayout, sample, du: float, dv: float, dw: float) -> None:
-    """"Found here" (found_offset du, dv, dw of a target of `sample`): ST is usually right and SZ is off because the
+    """A target found on the beam (found_offset du, dv, dw of a target of `sample`; "Fine tunings by ZPS/CPS" at SRz 0
+    in the program, found_here for the agent): ST is usually right and SZ is off because the
     plate does not always go into the holder at the same height (0-2 mm), not because of the beam. So dv moves the
     whole plate in the holder (layout.plate_offset_v; all samples, the plate drawing stays), du moves this sample
     and dw changes its height (its checked SN, if any, follows). `config`: the configuration in use before."""
@@ -262,14 +263,17 @@ def checked_sn(layout: SampleLayout, label: str) -> float | None:
     return None if sample is None else sample.sn_checked
 
 
-def found_offset(model: StageModel, m: MotorPositions, u: float, v: float, w: float) -> tuple[float, float, float]:
-    """(du, dv, dw) from the expected plate point (u, v, w) to the one really on the analyzer focus at m.
+def found_offset(model: StageModel, m: MotorPositions, u: float, v: float, w: float,
+                 y: float = 0.0) -> tuple[float, float, float]:
+    """(du, dv, dw) from the expected plate point (u, v, w) to the one really on the beam, `y` along it from the
+    analyzer focus, at m (y = 0: on the analyzer focus; with the optic in focus, y from its position, see
+    focus_point).
 
-    Use when the target was found on the beam, in the analyzer focus, at the
-    stage positions m: moving its sample by (du, dv) and its height by dw makes
+    Use when the target was found on the beam (and in focus) at the stage
+    positions m: moving its sample by (du, dv) and its height by dw makes
     the model put it there (and the sample's other devices with it).
     """
-    pu, pv, pw = model.lab_to_plate(m, np.zeros(3))
+    pu, pv, pw = model.lab_to_plate(m, y * Y_HAT)
     return float(pu - u), float(pv - v), float(pw - w)
 
 

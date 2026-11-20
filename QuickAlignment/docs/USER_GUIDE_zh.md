@@ -144,7 +144,9 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 之后所有预测都使用修正后的位置（随 session 保存），初始位置列表也随之更新。
 
-例子中 D1 在 ST = −2.4601、SZ = 37.8095、SN = 0（SRn = 120°，SRz = 0°）处找到：它在图上画得偏右 0.20 mm，y 方向偏 0.27 mm（画得偏上 0.27 mm），作为样品托的偏移。Δx 或 ΔH 超过 0.3 mm，或所有样品的 ST 偏移相同，可能说明配置已过时：请告知线站人员。请在 SRz = 0° 时做：此时焦点直接给出 x、y 和 H，与转轴无关；转过 SRz 后，按钮只修正 H（当一个 ΔH 能解释误差时），因为那时 x、y 误差和转轴误差分不开。（这取代了原来的 *Fine tunings by ZPS/CPS* 按钮：它假设样品正好在分析器焦点上，而不是由聚焦元件读出焦点。）
+![D1 的 Fine tunings by ZPS/CPS 确认窗口](images/guide/fine_tuning.png)
+
+例子中 D1 在 ST = −2.4601、SZ = 37.8095、SN = 0（SRn = 120°，SRz = 0°）处找到：它在图上画得偏右 0.20 mm，y 方向偏 0.27 mm（画得偏上 0.27 mm），作为样品托的偏移。Δx 或 ΔH 超过 0.3 mm，或所有样品的 ST 偏移相同，可能说明配置已过时：请告知线站人员。请在 SRz = 0° 时做：此时焦点直接给出 x、y 和 H，与转轴无关；转过 SRz 后，按钮只修正 H（当一个 ΔH 能解释误差时），因为那时 x、y 误差和转轴误差分不开。（这取代了原来的 *Found here* 按钮：它假设样品正好在分析器焦点上，而不是由聚焦元件读出焦点。）
 
 ### 防碰撞
 
@@ -161,7 +163,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 5. **Send to Stage & Optics tab** 采用所显示的结果（勾选时为修正后的结果）；超出行程或样品托会碰到东西时拒绝。
 6. **Sample seen off the piezo centre at the new position?** 如果在新位置上，样品在 PIX / PIY 扫描图上找到了，但不在 piezo 中心（150 µm），输入 **看到它时的 PIX 和 PIY** 以及在那里聚焦的聚焦元件位置，按 **Centre the piezo: correct ST / SZ / SN and the optic**。表格给出 piezo 居中时能看到它的 ST / SZ（SN 不变）和聚焦元件位置（转角不变），以及样品沿光束移动了多少；*Send corrected position to Stage & Optics tab* 把它们送到 Stage 页。
 
-**例子。** D1 在 SRn = 120°、SRz = 0° 时位于光斑上（ST = −2.4601，SZ = 37.8095，SN = 0，capillary 59.6926）；目标：SRn = 92°，SRz = −24°。SN 不变时，ST = −6.0561、SZ = 38.9759、capillary 61.7277 能把 D1 放回光斑上，但它在分析器焦点下游 2035 µm（红色：谱会畸变）。勾选 *Correct SN*：ST = −4.6171，SZ = 38.9759，SN = −1.4390，capillary 不变：D1 位于分析器焦点上。在勾选状态下按 *Send to Stage & Optics tab*：
+**例子。** D1 在 SRn = 120°、SRz = 0° 时位于光斑上（ST = −2.4601，SZ = 37.8095，SN = 0，capillary 59.6926）；目标：SRn = 92°，SRz = −24°。SN 不变时，ST = −6.0561、SZ = 38.9760、capillary 61.7277 能把 D1 放回光斑上，但它在分析器焦点下游 2035 µm（红色：谱会畸变）。勾选 *Correct SN*：ST = −4.6171，SZ = 38.9760，SN = −1.4390，capillary 不变：D1 位于分析器焦点上。在勾选状态下按 *Send to Stage & Optics tab*：
 
 ![转动后再次找到 D1](images/guide/rotate_found.png)
 

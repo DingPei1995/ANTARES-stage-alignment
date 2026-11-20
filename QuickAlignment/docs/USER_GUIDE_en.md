@@ -253,11 +253,13 @@ back onto the analyzer focus, see step 4 above):
 
 All predictions then use the corrected positions (saved with the session); the list of start positions is updated.
 
+![The confirmation window of Fine tunings by ZPS/CPS for D1](images/guide/fine_tuning.png)
+
 In the example D1 is found at ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°): it was drawn 0.20 mm too
 far right, and the plate is 0.27 mm off in y (it was drawn 0.27 mm too high). A Δx or ΔH above 0.3 mm, or the same ST shift for every sample, suggests that the
 configuration is outdated: tell the beamline staff. Do it at SRz = 0°: there the focus gives x, y and H without the
 rotation axes; after an SRz turn the button corrects H only (when one ΔH explains the errors), because x, y errors
-cannot be told apart from rotation-axis errors there. (This replaces the former *Fine tunings by ZPS/CPS* button, which assumed the
+cannot be told apart from rotation-axis errors there. (This replaces the former *Found here* button, which assumed the
 sample to be exactly on the analyzer focus instead of reading the focus from the optic.)
 
 ### Anti-collision
@@ -298,9 +300,9 @@ watch the camera.
    how far the sample moves along the beam; *Send corrected position to Stage & Optics tab* takes them.
 
 **Example.** D1 is on the beam at SRn = 120°, SRz = 0° (ST = −2.4601, SZ = 37.8095, SN = 0, capillary 59.6926);
-wanted: SRn = 92°, SRz = −24°. With SN kept, ST = −6.0561, SZ = 38.9759 and the capillary at 61.7277 put D1 back on
+wanted: SRn = 92°, SRz = −24°. With SN kept, ST = −6.0561, SZ = 38.9760 and the capillary at 61.7277 put D1 back on
 the beam, but 2035 µm downstream of the analyzer focus (red: the spectra would be distorted). With *Correct SN*:
-ST = −4.6171, SZ = 38.9759, SN = −1.4390, the capillary unchanged: D1 on the analyzer focus. Ticked, *Send to Stage
+ST = −4.6171, SZ = 38.9760, SN = −1.4390, the capillary unchanged: D1 on the analyzer focus. Ticked, *Send to Stage
 & Optics tab*:
 
 ![D1 found again after the rotation](images/guide/rotate_found.png)

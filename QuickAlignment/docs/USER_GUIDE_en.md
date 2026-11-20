@@ -136,7 +136,7 @@ photo is fine). Press **From photo…**:
 6. Optionally locate the devices on a second photo (tab 2, below), then press **Add to plate**. *Remove the samples
    already on the plate* replaces the present ones.
 
-The boxes are in plate coordinates; they can then be moved, resized and given devices like drawn samples. The accuracy is set by the corner clicks (about 0.1–0.3 mm); *Found here* in the
+The boxes are in plate coordinates; they can then be moved, resized and given devices like drawn samples. The accuracy is set by the corner clicks (about 0.1–0.3 mm); *Fine tunings by ZPS/CPS* in the
 Stage & Optics tab corrects the rest. Everything runs on the computer, nothing is sent anywhere.
 
 **Placing the corners well.** The corners are those of the **raised part** (riser top = sample area), not of the
@@ -172,16 +172,19 @@ the match.
 
 The accuracy is that of the plate photo (corner clicks, 0.1–0.3 mm) plus the point matching.
 
-#### Height check (H not known)
+#### Set SN by eye (H not known, rough)
 
-The height H of a sample is often not known or not measured. Below the table, *Height check*: drive the sample top
+The height H of a sample is often not known or not measured. Below the table, *Set SN by eye*: drive the sample top
 surface onto the **camera reference line** (the analyzer focal plane) at SRn = 120°, SRz = 0°, choose the sample, type
-the **SN read there** and press **Correct H**. H is computed from this SN and SN_f of the configuration (by eye: about
-±0.05 mm); the line below lists the samples checked. *Bring target onto the beam* then keeps this SN for the targets of
-that sample (exact at SRn = 120°, SRz = 0°), and the start positions mark it *(H checked)*. Typing H by hand in the
-table drops the check.
+the **SN read there** and press **Set SN by eye**. H is computed from this SN and SN_f of the configuration (by eye:
+about ±0.05 mm); the line below lists the samples set. *Bring target onto the beam* then keeps this SN for the targets
+of that sample (exact at SRn = 120°, SRz = 0°), and the start positions mark it *(H checked)*. Typing H by hand in the
+table drops it. This is rough: once the sample is found in focus, *Fine tunings by ZPS/CPS* (Stage & Optics tab)
+corrects H precisely.
 
-When all samples are drawn, press **Samples placed → Stage**.
+When all samples are drawn, press **Samples placed → Stage**. If a sample has an SN set by eye, or an SN is typed in
+the field but not set, you are asked first whether this is the SN at which the top surface is on the reference line;
+*No* (set values) or *Cancel* (typed value) keeps you on the tab to correct it.
 
 ## Stage & Optics tab: going to a sample
 
@@ -203,19 +206,25 @@ ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back
 3. **Focusing optic**: *Type* is the optic in use (zone plate + OSA, or capillary); enter the optic position; press
    **Update schematic & optics**. The schematic shows the beam, the analyzer focus, the optic and the position
    **needed** for focus on the illuminated surface (in the picture the capillary is at 60.04, 59.6926 is needed).
-4. **Move found sample to analyzer focal plane**: once a sample is found on the beam and focused by hand, enter the
-   stage positions and the optic position (ZPS / CPS) where it is in focus and press it. With the configuration's
-   optics reference, the optic position tells where along the beam the sample surface is; SN (ST compensating, so
-   the point stays on the beam) brings it onto the analyzer focal plane and the optic is moved to keep it in focus.
-   The line under the motors gives the new ST, SZ, SN, ΔSN and optic position, and where the point is on the plate.
-   Refused, with nothing changed, if a motor would leave its range or the plate would touch something.
-   **Height check after an SRz turn.** If SRz is not 0 and the optic position is more than 0.05 mm off the one
-   predicted for the chosen *Target*, the program looks for one change of the sample height ΔH that explains the
-   ST, SZ and optic errors together (an H error moves ST and the focus together after an SRz turn). If one does
-   (all errors left ≤ 0.03 mm), it asks to correct H of that sample (kept for the next positions and rotations); if
-   none does, H stays and the result line names the likely causes (plate position → *Found here* at SRz 0; SRz axis or
-   SN_f → the beamline staff). With the capillary the ΔH is only known to about ±0.07 mm. At SRz 0 there is no check:
-   use *Correct H* or *Found here*.
+4. **Fine tunings by ZPS/CPS** (how it works: the focal distance of the optic is fixed, so the ZPS / CPS of the
+   focus corrects the sample height and brings the sample back onto the analyzer focus): once a sample is found on
+   the beam and focused by hand, choose the *Target* the beam is on, enter the stage positions and the optic position
+   (ZPS / CPS) where it is in focus and press it. With the configuration's optics reference, the optic position tells
+   where along the beam the sample surface is. Then:
+   - **Position and H corrected.** At SRz 0 the focus gives where the *Target* really is, independent of the
+     rotation axes: Δx and ΔH of its sample and Δy of the plate (see
+     [below](#fine-tunings-by-zpscps-at-srz-0-correcting-the-drawing); ΔH to about ±0.014 mm with the zone plate,
+     ±0.07 mm with the capillary); you are asked first, and nothing is offered when it is already right (below
+     0.001 mm in x, y and 0.002 mm in H). After an SRz turn, H only: if the optic position is
+     more than 0.05 mm off the prediction, the program looks for one ΔH that explains the ST, SZ and optic errors
+     together (an H error moves ST and the focus together after an SRz turn); if one does (all errors left
+     ≤ 0.03 mm) it asks to correct H, otherwise H stays and the result line names the likely causes (plate position →
+     this button at SRz 0; SRz axis or SN_f → the beamline staff).
+   - **Back onto the analyzer focus.** SN (ST compensating, so the point stays on the beam; SZ kept) brings the
+     surface onto the analyzer focal plane, and the optic goes back to the configuration's exact position for the
+     analyzer focus. The line under the motors gives the new ST, SZ, SN, ΔSN, ΔST and optic position, and where the
+     point is on the plate. Not moved if a motor would leave its range or the plate would touch something (a height
+     correction already made is kept).
 
 **The schematic** (redrawn only with *Update schematic & optics*):
 
@@ -227,14 +236,14 @@ ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back
   a point onto the beam at SRz = 0. × = beam spot, blue + = analyzer focus projected on the surface, purple ○ = SRn
   axis. Moving the mouse over it shows (under the views) those ST, SZ, the plate position x, y and the sample there.
 
-### Found here: correcting the drawing
-
-![Found here](images/guide/found_here.png)
+### Fine tunings by ZPS/CPS at SRz 0: correcting the drawing
 
 The photo (or the drawing) is good to 0.1–0.3 mm, so a device is usually found a little away from its listed
-position. Once it is really **on the beam and in the analyzer focus**, enter the positions, choose the device under
-*Found* and press **Found here: correct plate / sample**. The window asks for confirmation and gives the error of the
-drawing (Δx, Δy on the plate, ΔH in height), then *Yes* applies it in two parts:
+position. Once it is really **on the beam and in focus** at SRz = 0°, choose it as *Target*, enter the stage positions
+and the optic position (ZPS / CPS) and press **Fine tunings by ZPS/CPS**. The optic's focal distance is fixed, so the
+optic position tells where the surface is along the beam: the window asks for confirmation and gives the error of
+the drawing (Δx, Δy on the plate, ΔH in height), then *Yes* applies it in two parts (and the stage is then moved
+back onto the analyzer focus, see step 4 above):
 
 - **Δy (SZ)** is taken as the **plate** sitting at another height in the sample holder (it does not always go in at the
   same height): the whole plate moves, so the SZ of **every** sample changes by the same amount. The start positions
@@ -246,9 +255,10 @@ All predictions then use the corrected positions (saved with the session); the l
 
 In the example D1 is found at ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°): it was drawn 0.20 mm too
 far right, and the plate is 0.27 mm off in y (it was drawn 0.27 mm too high). A Δx or ΔH above 0.3 mm, or the same ST shift for every sample, suggests that the
-configuration is outdated: tell the beamline staff. Use *Found here* at SRz = 0° when you can: there SN kept means
-"in the analyzer focus"; after an SRz turn with SN kept the point is usually not in the analyzer focus, and ΔH would
-be wrong.
+configuration is outdated: tell the beamline staff. Do it at SRz = 0°: there the focus gives x, y and H without the
+rotation axes; after an SRz turn the button corrects H only (when one ΔH explains the errors), because x, y errors
+cannot be told apart from rotation-axis errors there. (This replaces the former *Fine tunings by ZPS/CPS* button, which assumed the
+sample to be exactly on the analyzer focus instead of reading the focus from the optic.)
 
 ### Anti-collision
 
@@ -342,7 +352,7 @@ stage positions and the optic position (ZPS / CPS) at which the sample is in foc
 **How it works.** The working distance of the zone plate / capillary does not change, so the optic position in focus
 tells where along the beam the sample surface is. With the optics reference and the stage model of the
 **configuration in use** this gives where the sample is on the plate (x, y) and its height H, and the rotation is
-computed about that point. The tab uses nothing from the other tabs (no samples, no *Found here* correction) and
+computed about that point. The tab uses nothing from the other tabs (no samples, no *Fine tunings by ZPS/CPS* correction) and
 changes nothing there. The line under the explanation gives the configuration and plate in use and the optics
 reference.
 
@@ -382,11 +392,11 @@ Measured with the configurations of the calibrations of November 2026 (reports i
 | Cav with the zone plate, 2026-11-15 | SRn 140 / SRz −15, SN kept | – | – | ZPS 54.30 predicted, **54.33** found |
 | SampleA / D1 (this guide), 2026-10-24 | SRn 120 → 92, SRz 0 → −24, SN kept | 3.6 mm ST, 1.2 mm SZ | **8 µm / 12 µm** (ST / SZ) | capillary 61.73 predicted, 61.74 found |
 
-So, once the first sample is found and corrected (*Found here*), a rotation keeps it **within 50 µm** — on the same
+So, once the first sample is found and corrected (*Fine tunings by ZPS/CPS*), a rotation keeps it **within 50 µm** — on the same
 SPEM map — and the optic position (or the SN correction) keeps it **in focus**, even for SRz turns of 25° where the
 point would otherwise slide 2–3 mm along the beam. On the photo alone the first sample is found within 0.1–0.3 mm
 (D1 on 2026-11-14: 0.10 mm in x and y on a blurred photo). The predictions are only as good as the configuration:
-if *Found here* moves a sample by more than 0.3 mm, or several samples by the same amount, tell the beamline staff.
+if *Fine tunings by ZPS/CPS* moves a sample by more than 0.3 mm, or several samples by the same amount, tell the beamline staff.
 
 ## Finding the angles for a Brillouin-zone point
 
@@ -446,7 +456,7 @@ first use of a new kind of measurement, check that the point appears where the a
    the sample on the beam and use the *Quick sample rotation* tab.)
 3. Go to the first sample or device with the listed ST / SZ / SN (SRn = 120°, SRz = 0°); find it with the beam
    (camera, photoemission map).
-4. *Found here*: correct its position. The others now come out right too.
+4. *Fine tunings by ZPS/CPS*: correct its position. The others now come out right too.
 5. Measure a map at SRn = 120°, SRz = 0°; read Γ and one K / M point in ARPES viewer.
 6. Ask the agent for the BZ point angles → *Wanted angles* → *Compute new position* (tick *Correct SN* if the point is
    more than 50 µm from the analyzer focus) → *Send to Stage & Optics tab*. If the sample is then seen off the
@@ -461,8 +471,8 @@ first use of a new kind of measurement, check that the point appears where the a
 | *Collision: the plate would touch …* | at that position the plate (or a sample, a screw) would hit the optic or the analyzer; nothing is changed: choose another position, or move the optic back |
 | *… in the analyzer acceptance cone: it would shadow the electrons* | the optic stands in the path of the electrons to the analyzer; move it out |
 | *… µm from the analyzer focus* (red) | after an SRz turn the point left the focal plane: tick *Correct SN* |
-| *Correct the plate / sample position?* | *Found here*: check the positions and the device; *Yes* moves the plate by Δy (all samples) and the sample by Δx, ΔH |
-| *Found here* moves a sample by > 0.3 mm | the drawing was off, or the configuration is outdated (motors re-homed): ask the staff |
+| *Correct the plate / sample position and height?* | *Fine tunings by ZPS/CPS*: check the positions and the device; *Yes* moves the plate by Δy (all samples) and the sample by Δx, ΔH |
+| *Fine tunings by ZPS/CPS* moves a sample by > 0.3 mm | the drawing was off, or the configuration is outdated (motors re-homed): ask the staff |
 | *The beam misses the plate* | ST / SZ do not put the beam on the plate |
 | *Check the input: Γ–K on the map is …* | lattice constant, point or photon energy does not match the map |
 | *An unexpected error occurred* | the program keeps running; check the last result, save the session and send the details to the staff |

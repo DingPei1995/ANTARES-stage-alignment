@@ -124,7 +124,7 @@ The same list, with the arguments, is in [`src/quickalignment/agent/API.md`](../
 | `align_add_sample` | Add a rectangular sample (plate mm). |
 | `align_add_sample_from_photo` | Add a sample from its corners read on the plate photo (4 corners, or 2 opposite corners). |
 | `align_update_sample` | Change a sample (centre, size, height, name). |
-| `align_check_height` | Height check: SN read when the sample top surface is on the camera reference line (analyzer focal plane) at SRn ref, SRz 0 gives its height H; bring_to_beam then keeps this SN for its targets. |
+| `align_check_height` | Set SN by eye (button 'Set SN by eye'): SN read when the sample top surface is on the camera reference line (analyzer focal plane) at SRn ref, SRz 0 gives its height H roughly (about ±0.05 mm); bring_to_beam then keeps this SN for its targets. A zone-plate / capillary focus ('Fine tunings by ZPS/CPS' in the program) gives H more precisely. |
 | `align_remove_sample` | Remove a sample. |
 | `align_clear_samples` | Remove all samples. |
 | `align_add_device` | Add a device on a substrate at plate (x, y) mm or at a pixel of a registered photo (plate or microscope). |

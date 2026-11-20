@@ -67,11 +67,12 @@ y up, front view (sample side) with the tab up), not motor positions; the plate 
   with a list of the ST / SZ / SN that put each sample on the analyzer focus at the initial rotation
   (SRn = 120, SRz = 0, PIX = PIY = 150 µm). A substrate carrying devices is listed by its devices only (also in
   the target lists).
-- **Found here: correct its sample** (in that list): once a device is found on the beam in the analyzer focus,
-  enter its stage positions in the Stage tab, choose the device and press the button. Its sample (with all its
-  devices) is moved on the plate to where it really is (Δx, Δy, ΔH: an error of the drawing); the other samples
-  and the configuration stay. The list is recomputed and the sample keeps the corrected position from then on
-  (saved with the session).
+- **Fine tunings by ZPS/CPS at SRz 0: correct its sample** (replaces the former *Found here*): once a device is
+  found on the beam and in focus, enter its stage and optic (ZPS / CPS) positions in the Stage tab, choose it as
+  Target and press the button. The optic's fixed focal distance tells where the surface is: its sample (with all its
+  devices) is moved on the plate to where it really is (Δx, ΔH; Δy as the plate offset in the holder: an error of the
+  drawing); the other samples and the configuration stay. The list is recomputed and the sample keeps the corrected
+  position from then on (saved with the session).
 
 ![Samples tab](docs/images/guide/samples_tab.png)
 
@@ -86,9 +87,14 @@ Positions here are **absolute motor values** (ST, SZ, SN, …, optic).
   SN/ST/SZ that put it on the analyzer focus.
 - **focusing optic** (zone plate + OSA or capillary, only along the beam): its absolute position is read
   from the configuration and can be typed in. The result gives the **absolute optic position** for focus
-  on the illuminated surface. *Move found sample to analyzer focal plane*: with a sample found on the beam and in
-  focus at the entered stage and optic (ZPS / CPS) positions, the configuration's optics reference gives where the
-  surface is along the beam; SN (ST compensating) brings it onto the analyzer focal plane and the optic follows.
+  on the illuminated surface. *Fine tunings by ZPS/CPS* (the optic's focal distance is fixed, so its position in
+  focus corrects the sample height and brings the sample back onto the analyzer focus): with a sample found on the
+  beam and in focus at the entered stage and optic (ZPS / CPS) positions, the configuration's optics reference gives
+  where the surface is along the beam; SN (ST compensating, SZ kept) brings it onto the analyzer focal plane and the
+  optic goes back to the configuration's position for the analyzer focus. At SRz 0 the focus gives the surface
+  height directly: if it lies on the Target's sample (`FOCUS_ON_SAMPLE_MARGIN`), the user is asked to correct H by
+  ΔH (`ui/stage_panel.py: check_height_at_srz0`; below `HEIGHT_FOCUS_MIN` H is only confirmed). *Set SN by eye*
+  (Samples tab) is the rough height by eye (SN on the camera line), confirmed at *Samples placed → Stage*.
   After an SRz turn (|SRz| ≥ 0.01°), if the optic is more than 0.05 mm off its prediction for the Target, one height
   change ΔH is fitted to the ST, SZ and optic errors together (`core.stage.fit_height`, weights from
   `realsample.fit.measurement_sigmas`); if it leaves all three within 0.03 mm the user is asked to correct H of the
@@ -127,7 +133,7 @@ from the stage positions and the optic position (ZPS / CPS) in focus, the optics
 the configuration in use give the plate point at the optic focus (`stage.focus_point`: x, y and height H); the new
 position after the rotation is computed about it (`rotation.relocate(..., point=...)`), SN kept and SN corrected, with
 the out-of-range and anti-collision checks, and the piezo step 4 (without *Send*). The tab reads only the
-configuration and the plate mounted: no samples, no *Found here* plate offset, and changes nothing in the other tabs.
+configuration and the plate mounted: no samples, no *Fine tunings by ZPS/CPS* plate offset, and changes nothing in the other tabs.
 It is an estimate: an error δ of the optics reference moves the point by δ along the beam (Cav, 2026-11-14: 0.12 mm
 from the full prediction, which was found within 27 µm).
 
@@ -247,8 +253,8 @@ SN_f and the axes are kept).
 Read-only: the configuration in use (time stamp, optic, comment), its constants and optics reference. An
 older configuration can be selected for the session. There is no calibration in QuickAlignment: the
 configuration comes from RealSampleCalibration (constants fitted and checked within 0.05 mm), and what remains for a sample – mostly the error of drawing it on the plate – is corrected with
-*Found here* in the Stage & Optics tab. A configuration error of 0.05 mm, absorbed that way, leaves a few
-10 µm at other rotations (tested). If *Found here* has to move a sample by more than 0.3 mm, the program
+*Fine tunings by ZPS/CPS* in the Stage & Optics tab. A configuration error of 0.05 mm, absorbed that way, leaves a few
+10 µm at other rotations (tested). If *Fine tunings by ZPS/CPS* has to move a sample by more than 0.3 mm, the program
 suggests checking whether the configuration is outdated (motors re-homed): then beamline staff run
 RealSampleCalibration.
 

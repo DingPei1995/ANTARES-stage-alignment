@@ -144,7 +144,7 @@ Au lieu de les dessiner, les échantillons peuvent être trouvés sur une photo 
    samples already on the plate* remplace les échantillons présents.
 
 Les cadres sont en coordonnées plaquette ; ils se déplacent, se redimensionnent et reçoivent des dispositifs comme les échantillons dessinés. La précision dépend des clics sur les
-coins (environ 0,1–0,3 mm) ; *Found here* dans l'onglet Stage & Optics corrige le reste. Tout est calculé sur
+coins (environ 0,1–0,3 mm) ; *Fine tunings by ZPS/CPS* dans l'onglet Stage & Optics corrige le reste. Tout est calculé sur
 l'ordinateur, rien n'est envoyé.
 
 **Bien placer les coins.** Ce sont les coins de la **partie surélevée** (dessus de la rehausse = zone d'échantillons),
@@ -183,16 +183,21 @@ quand un détail s'y prête, vérifie la correspondance.
 La précision est celle de la photo de la plaquette (clics des coins, 0,1–0,3 mm) plus celle de la mise en
 correspondance.
 
-#### Contrôle de hauteur (H inconnue)
+#### Set SN by eye (H inconnue, estimation)
 
-La hauteur H d'un échantillon est souvent inconnue ou non mesurée. Sous le tableau, *Height check* : amener la surface
-de l'échantillon sur la **ligne de référence de la caméra** (plan focal de l'analyseur) à SRn = 120°, SRz = 0°,
-choisir l'échantillon, entrer le **SN lu à cet endroit** et appuyer sur **Correct H**. H est calculée à partir de ce SN
-et du SN_f de la configuration (à l'œil : environ ±0,05 mm) ; la ligne en dessous liste les échantillons contrôlés.
-*Bring target onto the beam* garde ensuite ce SN pour les cibles de cet échantillon (exact à SRn = 120°, SRz = 0°), et
-les positions de départ le marquent *(H checked)*. Entrer H à la main dans le tableau annule le contrôle.
+La hauteur H d'un échantillon est souvent inconnue ou non mesurée. Sous le tableau, *Set SN by eye* : amener la
+surface de l'échantillon sur la **ligne de référence de la caméra** (plan focal de l'analyseur) à SRn = 120°,
+SRz = 0°, choisir l'échantillon, entrer le **SN lu à cet endroit** et appuyer sur **Set SN by eye**. H est calculée à
+partir de ce SN et du SN_f de la configuration (à l'œil : environ ±0,05 mm) ; la ligne en dessous liste les
+échantillons réglés. *Bring target onto the beam* garde ensuite ce SN pour les cibles de cet échantillon (exact à
+SRn = 120°, SRz = 0°), et les positions de départ le marquent *(H checked)*. Entrer H à la main dans le tableau
+l'annule. C'est une estimation : une fois l'échantillon trouvé et focalisé, *Fine tunings by ZPS/CPS* (onglet Stage &
+Optics) corrige H précisément.
 
-Une fois les échantillons dessinés, appuyer sur **Samples placed → Stage**.
+Une fois les échantillons dessinés, appuyer sur **Samples placed → Stage**. Si un échantillon a un SN réglé à l'œil, ou
+si un SN est entré dans le champ sans être réglé, le programme demande d'abord si c'est bien le SN pour lequel la
+surface est sur la ligne de référence ; *No* (valeurs réglées) ou *Cancel* (valeur entrée) permet de rester sur
+l'onglet pour corriger.
 
 ## Onglet Stage & Optics : aller sur un échantillon
 
@@ -216,21 +221,25 @@ pour repère).
 3. **Optique** : *Type* est l'optique utilisée (zone plate + OSA, ou capillaire) ; entrer sa position et appuyer sur
    **Update schematic & optics**. Le schéma montre le faisceau, le foyer de l'analyseur, l'optique et la position
    **nécessaire** pour focaliser sur la surface éclairée (sur l'image le capillaire est à 60.04, il faut 59.6926).
-4. **Move found sample to analyzer focal plane** : une fois un échantillon trouvé sous le faisceau et focalisé à la
-   main, entrer les positions de la platine et la position de l'optique (ZPS / CPS) où il est au foyer, puis appuyer.
-   Avec la référence optique de la configuration, la position de l'optique indique où se trouve la surface le long du
-   faisceau ; SN (ST compensant, le point reste sous le faisceau) l'amène dans le plan focal de l'analyseur et
-   l'optique suit pour rester au foyer. La ligne sous les moteurs donne les nouveaux ST, SZ, SN, ΔSN et la position
-   de l'optique, et où est le point sur la plaquette. Refusé, sans rien changer, si un moteur sortait de sa course ou
-   si la plaquette touchait quelque chose.
-   **Contrôle de hauteur après une rotation SRz.** Si SRz n'est pas 0 et que la position de l'optique s'écarte de plus
-   de 0,05 mm de celle prédite pour la *Target* choisie, le programme cherche un changement de hauteur ΔH de
-   l'échantillon qui explique ensemble les écarts de ST, SZ et de l'optique (après une rotation SRz, une erreur de H
-   déplace ST et le foyer ensemble). S'il en trouve un (écarts restants ≤ 0,03 mm), il propose de corriger H de cet
-   échantillon (gardé pour les positions et rotations suivantes) ; sinon H reste et la ligne de résultat indique les
-   causes probables (position sur la plaquette → *Found here* à SRz 0 ; axe SRz ou SN_f → le personnel de la ligne).
-   Avec le capillaire, ΔH n'est connu qu'à environ ±0,07 mm. À SRz 0 pas de contrôle : utiliser *Correct H* ou
-   *Found here*.
+4. **Fine tunings by ZPS/CPS** (principe : la distance focale de l'optique est fixe, donc le ZPS / CPS du foyer corrige
+   la hauteur de l'échantillon et le ramène au foyer de l'analyseur) : une fois un échantillon trouvé sous le faisceau
+   et focalisé à la main, choisir la *Target* sous le faisceau, entrer les positions de la platine et la position de
+   l'optique (ZPS / CPS) où il est au foyer, puis appuyer. Avec la référence optique de la configuration, la position
+   de l'optique indique où se trouve la surface le long du faisceau. Ensuite :
+   - **Position et H corrigées.** À SRz 0 le foyer donne où est vraiment la *Target*, indépendamment des axes de
+     rotation : Δx et ΔH de son échantillon et Δy de la plaquette (voir
+     [plus bas](#fine-tunings-by-zpscps-à-srz-0--corriger-le-dessin) ; ΔH à environ ±0,014 mm avec la zone plate,
+     ±0,07 mm avec le capillaire) ; le programme demande d'abord, et ne propose rien si c'est déjà juste (moins de
+     0,001 mm en x, y et 0,002 mm en H). Après une rotation SRz, H seulement :
+     si l'optique s'écarte de plus de 0,05 mm de la prédiction, le programme cherche un ΔH qui explique ensemble les
+     écarts de ST, SZ et de l'optique ; s'il en trouve un (écarts restants ≤ 0,03 mm) il propose de corriger H, sinon H
+     reste et la ligne de résultat indique les causes probables (position sur la plaquette → ce bouton à SRz 0 ;
+     axe SRz ou SN_f → le personnel de la ligne).
+   - **Retour au foyer de l'analyseur.** SN (ST compensant, le point reste sous le faisceau ; SZ gardé) amène la
+     surface dans le plan focal de l'analyseur, et l'optique revient à la position exacte de la configuration pour le
+     foyer de l'analyseur. La ligne sous les moteurs donne les nouveaux ST, SZ, SN, ΔSN, ΔST et la position de
+     l'optique, et où est le point sur la plaquette. Pas de déplacement si un moteur sortait de sa course ou si la
+     plaquette touchait quelque chose (une correction de H déjà faite est gardée).
 
 **Le schéma** (redessiné seulement avec *Update schematic & optics*) :
 
@@ -243,14 +252,14 @@ pour repère).
   surface, ○ violet = axe SRn. La souris sur cette vue donne (sous les vues) ces ST, SZ, la position x, y sur la
   plaquette et l'échantillon qui s'y trouve.
 
-### Found here : corriger le dessin
-
-![Found here](images/guide/found_here.png)
+### Fine tunings by ZPS/CPS à SRz 0 : corriger le dessin
 
 La photo (ou le dessin) est juste à 0,1–0,3 mm près : un dispositif se trouve donc en général un peu à côté de sa
-position listée. Une fois qu'il est vraiment **sous le faisceau et au foyer de l'analyseur**, entrer les positions,
-choisir le dispositif sous *Found* et appuyer sur **Found here: correct plate / sample**. La fenêtre demande confirmation
-et donne l'erreur du dessin (Δx, Δy sur la plaquette, ΔH en hauteur) ; *Yes* l'applique en deux parties :
+position listée. Une fois qu'il est vraiment **sous le faisceau et focalisé** à SRz = 0°, le choisir comme *Target*,
+entrer les positions de la platine et la position de l'optique (ZPS / CPS) et appuyer sur **Fine tunings by ZPS/CPS**.
+La distance focale de l'optique est fixe : sa position indique où est la surface le long du faisceau. La fenêtre
+demande confirmation et donne l'erreur du dessin (Δx, Δy sur la plaquette, ΔH en hauteur) ; *Yes* l'applique en deux
+parties (puis la platine revient au foyer de l'analyseur, voir l'étape 4 ci-dessus) :
 
 - **Δy (SZ)** est attribué à la **plaquette**, entrée à une autre hauteur dans le porte-échantillon (elle n'entre pas
   toujours à la même hauteur) : toute la plaquette se déplace, le SZ de **tous** les échantillons change d'autant. Les
@@ -263,9 +272,11 @@ positions de départ est mise à jour.
 
 Dans l'exemple D1 est trouvé à ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°) : il était dessiné
 0,20 mm trop à droite, et décalé de 0,27 mm en y (dessiné trop haut), pris comme décalage de la plaquette. Un Δx ou ΔH de plus de 0,3 mm, ou le même
-décalage en ST pour tous les échantillons, suggère une configuration périmée : prévenir le personnel de la ligne. Utiliser *Found here* à
-SRz = 0° quand c'est possible : là, SN gardé veut dire « au foyer de l'analyseur » ; après une rotation SRz avec SN
-gardé, le point n'est en général pas au foyer de l'analyseur, et ΔH serait faux.
+décalage en ST pour tous les échantillons, suggère une configuration périmée : prévenir le personnel de la ligne. Le
+faire à SRz = 0° : là, le foyer donne x, y et H sans les axes de rotation ; après une rotation SRz le bouton ne corrige
+que H (quand un ΔH explique les écarts), car les erreurs de x, y ne s'y distinguent pas des erreurs d'axe. (Ceci
+remplace l'ancien bouton *Fine tunings by ZPS/CPS*, qui supposait l'échantillon exactement au foyer de l'analyseur au lieu de lire
+le foyer sur l'optique.)
 
 ### Anticollision
 
@@ -407,11 +418,11 @@ Mesuré avec les configurations des calibrations de novembre 2026 (rapports dans
 | Cav avec la zone plate, 2026-11-15 | SRn 140 / SRz −15, SN gardé | – | – | ZPS 54.30 prédit, **54.33** trouvé |
 | SampleA / D1 (ce guide), 2026-10-24 | SRn 120 → 92, SRz 0 → −24, SN gardé | ST 3,6 mm, SZ 1,2 mm | **8 µm / 12 µm** (ST / SZ) | capillaire 61.73 prédit, 61.74 trouvé |
 
-Ainsi, une fois le premier échantillon trouvé et corrigé (*Found here*), une rotation le garde **à moins de 50 µm**
+Ainsi, une fois le premier échantillon trouvé et corrigé (*Fine tunings by ZPS/CPS*), une rotation le garde **à moins de 50 µm**
 — sur la même carte SPEM — et la position de l'optique (ou la correction de SN) le garde **au point**, même pour des
 rotations SRz de 25° où le point glisserait sinon de 2–3 mm le long du faisceau. Sur la photo seule, le premier
 échantillon est trouvé à 0,1–0,3 mm (D1 le 2026-11-14 : 0,10 mm en x et en y sur une photo floue). Les prédictions
-valent ce que vaut la configuration : si *Found here* déplace un échantillon de plus de 0,3 mm, ou plusieurs
+valent ce que vaut la configuration : si *Fine tunings by ZPS/CPS* déplace un échantillon de plus de 0,3 mm, ou plusieurs
 échantillons de la même quantité, prévenir le personnel de la ligne.
 
 ## Trouver les angles pour un point de la zone de Brillouin
@@ -475,7 +486,7 @@ lors d'un nouveau type de mesure, vérifier que le point apparaît là où l'age
    temps ? Trouver l'échantillon sous le faisceau et utiliser l'onglet *Quick sample rotation*.)
 3. Aller au premier échantillon ou dispositif avec les ST / SZ / SN listés (SRn = 120°, SRz = 0°) ; le trouver avec le
    faisceau (caméra, carte de photoémission).
-4. *Found here* : corriger sa position. Les autres tombent alors juste aussi.
+4. *Fine tunings by ZPS/CPS* : corriger sa position. Les autres tombent alors juste aussi.
 5. Mesurer une carte à SRn = 120°, SRz = 0° ; lire Γ et un point K / M dans ARPES viewer.
 6. Demander à l'agent les angles du point de zone → *Wanted angles* → *Compute new position* (cocher *Correct SN* si le point est à
    plus de 50 µm du foyer) → *Send to Stage & Optics tab*. Si l'échantillon est ensuite vu hors du centre du piezo
@@ -490,8 +501,8 @@ lors d'un nouveau type de mesure, vérifier que le point apparaît là où l'age
 | *Collision: the plate would touch …* | à cette position la plaquette (ou un échantillon, une vis) heurterait l'optique ou l'analyseur ; rien n'est changé : choisir une autre position, ou reculer l'optique |
 | *… in the analyzer acceptance cone: it would shadow the electrons* | l'optique est sur le trajet des électrons vers l'analyseur ; la retirer |
 | *… µm from the analyzer focus* (rouge) | après une rotation SRz le point a quitté le plan focal : cocher *Correct SN* |
-| *Correct the plate / sample position?* | *Found here* : vérifier les positions et le dispositif ; *Yes* déplace la plaquette de Δy (tous les échantillons) et l'échantillon de Δx, ΔH |
-| *Found here* déplace un échantillon de plus de 0,3 mm | dessin faux, ou configuration périmée (moteurs réinitialisés) : demander au personnel |
+| *Correct the plate / sample position and height?* | *Fine tunings by ZPS/CPS* : vérifier les positions et le dispositif ; *Yes* déplace la plaquette de Δy (tous les échantillons) et l'échantillon de Δx, ΔH |
+| *Fine tunings by ZPS/CPS* déplace un échantillon de plus de 0,3 mm | dessin faux, ou configuration périmée (moteurs réinitialisés) : demander au personnel |
 | *The beam misses the plate* | ST / SZ ne mettent pas le faisceau sur la plaquette |
 | *Check the input: Γ–K on the map is …* | constante de réseau, point ou énergie ne correspondent pas à la carte |
 | *An unexpected error occurred* | le programme continue ; vérifier le dernier résultat, enregistrer la session et envoyer les détails au personnel |

@@ -205,7 +205,6 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     st = win.stage
     target = "SampleA/D1"
     st.target_combo.setCurrentText(target)
-    st.found_combo.setCurrentText(target)
     st.motors.set_value(MotorPositions(st=0.0, sn=0.0, sz=40.0, srn=120, srz=0))
     st.bring_target_on_beam()
     m = st.motors.value()
@@ -213,8 +212,9 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     st.update_view()
     save(win, "stage_tab", app)
 
-    # D1 found a little off the listed position (the photo is good to 0.1-0.3 mm): Found here. The found
-    # position is where the beamtime configuration puts D1 (the device position it was fitted with)
+    # D1 found a little off the listed position (the photo is good to 0.1-0.3 mm), on the beam and in focus:
+    # Fine tunings by ZPS/CPS. The found position is where the beamtime configuration puts D1 (the device position it
+    # was fitted with)
     W = GATING_PLATE.total_thickness + 0.525
     f_st, f_sz, f_sn = st.model().reference_motors(1.51, 2.82, W)
     st.motors.set_value(MotorPositions(st=round(f_st, 4), sn=round(f_sn, 4), sz=round(f_sz, 4), srn=120, srz=0))
@@ -222,8 +222,8 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     st.optic_pos.setValue(st.last_result.required_optic_position)
     st.update_view()
     question = QtWidgets.QMessageBox.question
-    QtWidgets.QMessageBox.question = grab_question(app, "found_here")
-    st.correct_from_found()
+    QtWidgets.QMessageBox.question = grab_question(app, "fine_tuning")
+    st.bring_found_to_focal_plane()
     QtWidgets.QMessageBox.question = question
     st.update_view()
 

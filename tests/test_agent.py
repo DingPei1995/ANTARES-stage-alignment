@@ -202,6 +202,18 @@ def test_device_photo_from_point_pairs(api):
     assert reg["pair_rms_mm"] == pytest.approx(0, abs=1e-9) and reg["mm_per_px"] == pytest.approx(0.01)
     dev = a.add_device("sub", "FET", photo_px=[150, 250], photo_id="micro")
     assert [dev["x"], dev["y"]] == pytest.approx([-0.5, 1.5])
+    # the same photo turned by 90° on the plate: the direction (bottom edge of the substrate) gives the orientation, the
+    # pairs scale and shift only (least squares)
+    direction = {"photo": [[0, 0], [0, 300]], "plate_mm": [[-1.5, 0], [2, 0]]}  # not the same places, same direction
+    pairs = [{"photo": [400, 0], "plate_mm": [-2, 4]}, {"photo": [0, 400], "plate_mm": [2, 0]},
+             {"photo": [400, 400], "plate_mm": [2, 4]}]
+    reg = a.register_device_photo(pairs, photo_id="turned", direction=direction)
+    assert reg["rotation_deg"] == pytest.approx(90) and reg["pair_rms_mm"] == pytest.approx(0, abs=1e-9)
+    assert "no distortion" in reg["transform"] and reg["warnings"] == []
+    dev = a.add_device("sub", "FET2", photo_px=[100, 300], photo_id="turned")
+    assert [dev["x"], dev["y"]] == pytest.approx([1.0, 1.0])
+    with pytest.raises(APIError):
+        a.register_device_photo(pairs, direction={"photo": [[0, 0]], "plate_mm": [[0, 0], [1, 0]]})
 
 
 def test_session_round_trip(api, tmp_path):

@@ -54,8 +54,11 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    sample is found in focus with the zone plate / capillary, the program's 'Fine tunings by ZPS/CPS' corrects H
    precisely (the optic's focal distance is fixed) and brings the sample back onto the analyzer focus.
 5. Devices (small structures on a substrate): read them on the plate photo (align_add_device with photo_px), or on a
-   microscope photo of the substrate registered with align_register_device_photo (2-4 point pairs: the same
-   substrate corners / marks on the microscope photo and on the plate photo). Show align_photo_overlay again.
+   microscope photo of the substrate registered with align_register_device_photo: first the same DIRECTION on both
+   (two points A -> B along a substrate edge on the microscope photo and on the plate photo; only the direction
+   counts; the two photos are often not turned the same way), then >= 2 point pairs (the same corners / marks on
+   both). The direction fixes the orientation, the pairs the scale and the shift by least squares (more pairs
+   average the clicking errors, never distort). Show align_photo_overlay again.
 5b. ALWAYS ASK whether the user is satisfied with the samples found (show the overlay). If not, offer:
    (i) they tell you what to change (which sample, where, its size or height) -> align_update_sample /
    align_remove_sample / align_add_sample; (ii) MANUAL ANNOTATION: align_manual_annotation opens the photo window on
@@ -150,7 +153,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `align_clear_samples` | **acts** | - | Remove all samples. |
 | `align_add_device` | **acts** | `sample*` (string), `name` (string), `x` (number), `y` (number), `photo_px` (array), `photo_id` (string), `x_edge` (string), `y_edge` (string), `size_mm` (number) | Add a device on a substrate at plate (x, y) mm or at a pixel of a registered photo (plate or microscope). |
 | `align_remove_device` | **acts** | `target*` (string) | Remove a device ('sample/device'). |
-| `align_register_device_photo` | **acts** | `pairs*` (array), `path` (string), `photo_id` (string), `plate_photo_id` (string) | Map a microscope photo of a substrate onto the plate from 2-4+ point pairs (same feature on both). |
+| `align_register_device_photo` | **acts** | `pairs*` (array), `direction` (object), `path` (string), `photo_id` (string), `plate_photo_id` (string) | Map a microscope photo of a substrate onto the plate: the same direction on both (orientation) and >= 2 point pairs (scale + shift, least squares, no distortion). |
 | `align_samples` | reads | - | The samples and devices with their warnings. |
 | `align_sample_positions` | reads | - | ST / SZ / SN of every sample and device at the start rotation (SRn ref, SRz 0, piezo centred). |
 | `align_set_position` | **acts** | `motors*` (object), `optic_position` (number) | The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits. |
@@ -209,7 +212,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `plate_to_photo(points_mm, photo_id: 'str \| None' = None, height: 'float \| None' = None) -> 'dict'` | - |
 | `plate_view() -> 'dict'` | The plate model (front view, tab up) with the samples and devices, axes in plate mm. |
 | `plates() -> 'dict'` | The sample plates the program knows, with their sample area and the photo corners. |
-| `register_device_photo(pairs, path: 'str \| None' = None, photo_id: 'str \| None' = None, plate_photo_id: 'str \| None' = None) -> 'dict'` | A close-up (microscope) photo of a substrate, mapped onto the plate from point pairs: the same feature (substrate corner, mark) seen on this photo (`photo` px) and on the plate (`plate_mm`, or `plate_photo_px` on the registered plate photo). 2 pairs: similarity, 3: affine, >= 4: perspective. |
+| `register_device_photo(pairs, path: 'str \| None' = None, photo_id: 'str \| None' = None, plate_photo_id: 'str \| None' = None, direction: 'dict \| None' = None) -> 'dict'` | A close-up (microscope) photo of a substrate, mapped onto the plate. Recommended: `direction`, the same direction on both, as two points A -> B along a substrate edge or a long pattern line on each, {"photo": [[x, y], [x, y]], "plate_mm": [[x, y], [x, y]] or "plate_photo_px": [...]} (only the direction counts: A and B need not be the same places on both): it sets the in-plane orientation, and the point `pairs` (>= 2) then set the scale and the shift by least squares, without distorting the photo. `pairs`: the same feature (substrate corner, mark) seen on this photo (`photo` px) and on the plate (`plate_mm`, or `plate_photo_px` on the registered plate photo). Without `direction` (former way): 2 pairs similarity, 3 affine, >= 4 perspective. |
 | `register_photo(corners_px, path: 'str \| None' = None, image_size=None, photo_id: 'str \| None' = None) -> 'dict'` | Map a plate photo onto the plate from the four sample-area corners read on it (photo pixels, in the order of photo_corners). `path`: the image file (needed for detect_samples and the overlays); without it give `image_size` [width, height] of the image the corners were read on. |
 | `register_photo_3d(points, path: 'str \| None' = None, image_size=None, photo_id: 'str \| None' = None) -> 'dict'` | OPTIONAL 3D correction for an oblique photo: a camera model from >= 6 points at several heights ([{"name" or "number" from photo_points_3d, "px": [x, y]}] or [{"plate_mm": [x, y, w], "px": [x, y]}]). Positions at any height (thick samples, devices) are then corrected for the perspective. |
 | `remove_device(target: 'str') -> 'dict'` | - |

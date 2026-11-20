@@ -105,6 +105,64 @@ def pair_transform(photo_pts, plate_pts) -> tuple[np.ndarray, float]:
     return t, float(np.sqrt((res ** 2).sum(axis=1).mean()))
 
 
+@dataclass
+class LineMatch:
+    """Device photo -> plate from the same direction drawn on both photos and point pairs (line_transform)."""
+
+    t: np.ndarray  # 3 x 3, photo pixels -> plate mm (rotation + uniform scale + shift: no distortion)
+    rms: float  # rms residual of the point pairs, mm
+    residuals: np.ndarray  # residual of each pair, mm
+    angle: float  # rotation of the photo on the plate, degrees (counter-clockwise, plate frame)
+    mm_per_px: float
+    angle_check: float | None  # degrees the points alone would turn the photo further (None: < 2 pairs)
+
+
+def _to_complex(pts, flip: bool) -> np.ndarray:
+    p = np.asarray(pts, float).reshape(-1, 2)
+    return p[:, 0] + (-1j if flip else 1j) * p[:, 1]
+
+
+def line_transform(photo_line, plate_line, photo_pts, plate_pts) -> LineMatch:
+    """Photo pixels -> plate mm: the rotation from the same direction drawn on both photos (a line A -> B along a
+    substrate edge or a pattern line on each; only its direction is used, A and B need not be the same places), the
+    scale and the shift from the point pairs, by least squares (the sum of the squared mismatches of all pairs is the
+    smallest).
+
+    The photo is only turned, scaled and shifted, never distorted, whatever the number of pairs: more pairs average
+    out the clicking errors instead of bending the photo. The lines may point opposite ways (the fit
+    then turns the photo by a further 180°). Needs at least 2 point pairs (the scale)."""
+    zl, wl = _to_complex(photo_line, True), _to_complex(plate_line, False)
+    if len(zl) != 2 or len(wl) != 2:
+        raise ValueError("Draw the direction with two points on each photo.")
+    dz, dw = zl[1] - zl[0], wl[1] - wl[0]
+    if abs(dz) < 1e-9 or abs(dw) < 1e-12:
+        raise ValueError("The two points of a direction line coincide: click them apart along an edge or a pattern line.")
+    rot = (dw / abs(dw)) / (dz / abs(dz))
+    z, w = _to_complex(photo_pts, True), _to_complex(plate_pts, False)
+    if len(z) != len(w):
+        raise ValueError("Give as many points on both photos.")
+    if len(z) < 2:
+        raise ValueError("At least 2 point pairs are needed (the scale of the photo).")
+    q = rot * z
+    qc, wc = q - q.mean(), w - w.mean()
+    den = float((np.abs(qc) ** 2).sum())
+    if den < 1e-12:
+        raise ValueError("The points of the device photo coincide.")
+    s = float((np.conj(qc) * wc).real.sum()) / den
+    if abs(s) < 1e-12 * max(1.0, float(np.abs(wc).max())) or float((np.abs(wc) ** 2).sum()) < 1e-18:
+        raise ValueError("The points on the plate coincide.")
+    if s < 0:  # the lines point opposite ways
+        rot, s = -rot, -s
+    a = s * rot
+    b = w.mean() - a * z.mean()
+    t = np.array([[a.real, -a.imag, b.real], [a.imag, a.real, b.imag], [0, 0, 1]]) @ np.diag([1.0, -1.0, 1.0])
+    res = np.abs(a * z + b - w)
+    zc = z - z.mean()
+    free = (np.conj(zc) * wc).sum() / (np.abs(zc) ** 2).sum()  # rotation + scale of the points alone
+    check = float(np.degrees(np.angle(free / a))) if abs(free) > 0 else None
+    return LineMatch(t, float(np.sqrt((res ** 2).mean())), res, float(np.degrees(np.angle(rot))), s, check)
+
+
 def check_corners(ref_pts, photo_pts) -> None:
     """Raise ValueError if the points clicked on the photo cannot be the reference points (plate
     coordinates, e.g. the corners of the sample area) seen from the sample side."""

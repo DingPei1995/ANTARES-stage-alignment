@@ -30,7 +30,7 @@ import numpy as np
 
 from ..alignment.photo import (
     apply_homography, camera_matrix, check_corners, check_mirror_3d, corner_points, detect_samples, homography,
-    pair_transform, plane_homography, plate_view_bounds, rectify, reference_points_3d, rgb_to_lab,
+    line_transform, pair_transform, plane_homography, plate_view_bounds, rectify, reference_points_3d, rgb_to_lab,
 )
 from ..alignment.rotation import relocate, wrap180
 from ..core.calibration import CalibrationRecord, CalibrationStore
@@ -348,36 +348,74 @@ class AlignmentSession:
                 "next": "Check with photo_overlay (back plate outline at its own height, samples at theirs)."}
 
     def register_device_photo(self, pairs, path: str | None = None, photo_id: str | None = None,
-                              plate_photo_id: str | None = None) -> dict:
-        """A close-up (microscope) photo of a substrate, mapped onto the plate from point pairs: the same feature
-        (substrate corner, mark) seen on this photo (`photo` px) and on the plate (`plate_mm`, or `plate_photo_px`
-        on the registered plate photo). 2 pairs: similarity, 3: affine, >= 4: perspective."""
+                              plate_photo_id: str | None = None, direction: dict | None = None) -> dict:
+        """A close-up (microscope) photo of a substrate, mapped onto the plate. Recommended: `direction`, the same
+        direction on both, as two points A -> B along a substrate edge or a long pattern line on each, {"photo":
+        [[x, y], [x, y]], "plate_mm": [[x, y], [x, y]] or "plate_photo_px": [...]} (only the direction counts: A and B
+        need not be the same places on both): it sets the in-plane orientation, and the point `pairs` (>= 2) then set
+        the scale and the shift by least squares, without distorting the photo. `pairs`: the same feature (substrate
+        corner, mark) seen on this photo (`photo` px) and on the plate (`plate_mm`, or `plate_photo_px` on the
+        registered plate photo). Without `direction` (former way): 2 pairs similarity, 3 affine, >= 4 perspective."""
         self._need_start()
-        src, dst = [], []
         plate_photo = None
+
+        def plate_point(p, what):
+            nonlocal plate_photo
+            if "plate_mm" in p:
+                return [number(p["plate_mm"][0], "x"), number(p["plate_mm"][1], "y")]
+            if "plate_photo_px" in p:
+                plate_photo = plate_photo or self._photo(plate_photo_id, "plate")
+                return plate_photo.plate([p["plate_photo_px"]])[0].tolist()
+            raise APIError(f"{what}: give 'plate_mm' or 'plate_photo_px'.")
+
+        src, dst = [], []
         for i, p in enumerate(pairs or []):
             if "photo" not in p:
                 raise APIError(f"pair {i + 1}: give 'photo' [x, y] and 'plate_mm' or 'plate_photo_px'.")
             src.append([number(p["photo"][0], "x"), number(p["photo"][1], "y")])
-            if "plate_mm" in p:
-                dst.append([number(p["plate_mm"][0], "x"), number(p["plate_mm"][1], "y")])
-            elif "plate_photo_px" in p:
-                plate_photo = plate_photo or self._photo(plate_photo_id, "plate")
-                dst.append(plate_photo.plate([p["plate_photo_px"]])[0].tolist())
-            else:
-                raise APIError(f"pair {i + 1}: give 'plate_mm' or 'plate_photo_px'.")
+            dst.append(plate_point(p, f"pair {i + 1}"))
+        fit = None
         try:
-            t, rms = pair_transform(src, dst)
+            if direction is not None:
+                line = direction if isinstance(direction, dict) else {}
+                ends = line.get("photo")
+                key = next((k for k in ("plate_mm", "plate_photo_px") if k in line), None)
+                if not ends or len(ends) != 2 or key is None or len(line[key]) != 2:
+                    raise APIError("direction: give 'photo' [[x, y], [x, y]] and 'plate_mm' or 'plate_photo_px' "
+                                   "[[x, y], [x, y]] (two points A -> B along the same direction on both).")
+                line_px = [[number(e[0], "x"), number(e[1], "y")] for e in ends]
+                line_mm = [plate_point({key: e}, "direction") for e in line[key]]
+                fit = line_transform(line_px, line_mm, src, dst)
+                t, rms = fit.t, fit.rms
+            else:
+                t, rms = pair_transform(src, dst)
         except ValueError as exc:
             raise APIError(str(exc)) from None
         rgb = read_image(path) if path else None
         pid = photo_id or (Path(path).stem if path else f"device_photo{len(self.photos) + 1}")
         size = (int(rgb.shape[1]), int(rgb.shape[0])) if rgb is not None else None
         self.photos[pid] = _Photo(pid, "device", t, str(path) if path else None, size, rgb=rgb, rms=rms)
-        kind = {2: "similarity (rotation, scale, shift)", 3: "affine"}.get(len(src), "perspective")
-        return {"photo_id": pid, "transform": kind, "pair_rms_mm": rounded(rms, 4),
-                "mm_per_px": rounded(float(np.sqrt(abs(np.linalg.det(t[:2, :2])))), 6),
-                "next": "add_device(sample, name, photo_px=[x, y], photo_id=...) for each device on this photo."}
+        out = {"photo_id": pid, "pair_rms_mm": rounded(rms, 4),
+               "mm_per_px": rounded(float(np.sqrt(abs(np.linalg.det(t[:2, :2])))), 6),
+               "next": "add_device(sample, name, photo_px=[x, y], photo_id=...) for each device on this photo."}
+        if fit is not None:
+            out["transform"] = "rotation from the direction + scale + shift (least squares, no distortion)"
+            out["rotation_deg"] = rounded(fit.angle, 2)
+            out["pair_residual_mm"] = [rounded(float(r), 4) for r in fit.residuals]
+            if fit.angle_check is not None:
+                out["points_angle_check_deg"] = rounded(fit.angle_check, 2)
+            warn = []
+            if rms > 0.02:
+                warn.append(f"pair {int(np.argmax(fit.residuals)) + 1} is the farthest off: check it.")
+            if len(src) >= 3 and fit.angle_check is not None and abs(fit.angle_check) > 2:
+                warn.append(f"the points would turn the photo {fit.angle_check:+.1f} deg more than the direction: "
+                            "check that the direction lines follow the same feature on both.")
+            out["warnings"] = warn
+        else:
+            out["transform"] = {2: "similarity (rotation, scale, shift)", 3: "affine"}.get(len(src), "perspective")
+            out["hint"] = ("Give 'direction' (along the same edge on both) to set the orientation: the pairs then fit only scale "
+                           "and shift, by least squares, and more pairs do not distort the photo.")
+        return out
 
     def _w(self, height: float | None) -> float:
         """Height above the back face of a surface `height` mm above the plate surface (sample area)."""

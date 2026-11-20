@@ -30,11 +30,11 @@ COLOR_NEXT = QtGui.QColor("#e00000")
 COLOR_TODO = QtGui.QColor("#808080")
 DRAG_PX = 4  # a left press moved less than this is a click
 # the steps of a window (tabs, radio buttons): each in its own colour, in bold
-STEP_COLORS = ("#0060c0", "#c05000")
+STEP_COLORS = ("#0060c0", "#c05000", "#7a2ea0")
 
 
 def step_style(step: int) -> str:
-    """Style sheet of the label / button of step 1, 2: bold, in the step's colour."""
+    """Style sheet of the label / button of step 1, 2, 3: bold, in the step's colour."""
     return f"font-weight: bold; color: {STEP_COLORS[(step - 1) % len(STEP_COLORS)]};"
 
 
@@ -197,19 +197,22 @@ class CornerItem(QtWidgets.QGraphicsEllipseItem):
 
     R = 7
 
-    def __init__(self, index: int, on_moved: Callable[[], None]):
+    def __init__(self, index: int, on_moved: Callable[[], None], label: str | None = None, color=None):
         super().__init__(-self.R, -self.R, 2 * self.R, 2 * self.R)
         self.on_moved = on_moved
+        color = COLOR_CORNER if color is None else QtGui.QColor(color)
         self.setFlags(QtWidgets.QGraphicsItem.ItemIsMovable | QtWidgets.QGraphicsItem.ItemSendsGeometryChanges
                       | QtWidgets.QGraphicsItem.ItemIgnoresTransformations)
-        self.setPen(cosmetic_pen(COLOR_CORNER, 2))
-        self.setBrush(QtGui.QBrush(QtGui.QColor(0, 180, 255, 60)))
+        self.setPen(cosmetic_pen(color, 2))
+        fill = QtGui.QColor(color)
+        fill.setAlpha(60)
+        self.setBrush(QtGui.QBrush(fill))
         self.setCursor(Qt.SizeAllCursor)
         self.setZValue(20)
         for x0, y0, x1, y1 in ((-self.R - 4, 0, self.R + 4, 0), (0, -self.R - 4, 0, self.R + 4)):
-            QtWidgets.QGraphicsLineItem(x0, y0, x1, y1, self).setPen(cosmetic_pen(COLOR_CORNER, 1))
-        label = QtWidgets.QGraphicsSimpleTextItem(str(index + 1), self)
-        label.setBrush(QtGui.QBrush(COLOR_CORNER))
+            QtWidgets.QGraphicsLineItem(x0, y0, x1, y1, self).setPen(cosmetic_pen(color, 1))
+        label = QtWidgets.QGraphicsSimpleTextItem(str(index + 1) if label is None else label, self)
+        label.setBrush(QtGui.QBrush(color))
         font = label.font()
         font.setBold(True)
         font.setPointSize(font.pointSize() + 2)

@@ -55,13 +55,16 @@ y up, front view (sample side) with the tab up), not motor positions; the plate 
   deletes / merges; finding them by colour (`detect_samples`, CIELAB ΔE) is left to the agent (`align_detect_samples`).
   H is entered by the user (not visible from above). Photos used while the program runs are kept with their points
   (*recent photos…*, `ui/photo_cache.py`). Tab 2 (`src/quickalignment/ui/device_match.py`): devices located on a second photo
-  (microscope) matched to a crop of the plate photo around a substrate by point pairs the user marks on both (2 pairs:
-  similarity, 3: affine, ≥ 4: perspective, with the residual); devices have no height and are added to the sample they
+  (microscope) matched to a crop of the plate photo around a substrate in two steps: the same direction drawn on both
+  (two points along a substrate edge on each; only the direction counts) sets the in-plane orientation, then ≥ 2
+  point pairs marked on both set the scale and the shift by least squares
+  (`line_transform` in `alignment/photo.py`: rotation + scale + shift only, the photo is never distorted, more pairs
+  average the clicking errors; residual per pair shown); devices have no height and are added to the sample they
   lie on. Optional **3D correction** (off by default) for oblique photos: 8 points at two heights (sample-area
   corners, back plate and tab top corners) give a camera model (`camera_matrix` in `alignment/photo.py`) that corrects
   the perspective at every height. Only numpy + Qt, everything local. Test photo: `tests/data/gating_plate_photo.jpg` (repository root) (SampleA, gating plate).
-- **Device from photo…**: devices added to a substrate already on the plate from a device photo, matched on the
-  substrate corners and the devices already on it (or on a plate photo registered earlier in the run);
+- **Device from photo…**: devices added to a substrate already on the plate from a device photo, matched (same direction,
+  then point pairs) on the substrate edges / corners and the devices already on it (or on a plate photo registered earlier in the run);
   `DeviceFromPhotoDialog` in `ui/device_match.py`.
 - **Samples placed → Stage**: asks whether all samples are marked on the plate; *Yes* opens the Stage & Optics tab
   with a list of the ST / SZ / SN that put each sample on the analyzer focus at the initial rotation

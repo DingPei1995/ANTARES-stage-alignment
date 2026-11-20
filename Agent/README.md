@@ -129,7 +129,7 @@ The same list, with the arguments, is in [`src/quickalignment/agent/API.md`](../
 | `align_clear_samples` | Remove all samples. |
 | `align_add_device` | Add a device on a substrate at plate (x, y) mm or at a pixel of a registered photo (plate or microscope). |
 | `align_remove_device` | Remove a device ('sample/device'). |
-| `align_register_device_photo` | Map a microscope photo of a substrate onto the plate from 2-4+ point pairs (same feature on both). |
+| `align_register_device_photo` | Map a microscope photo of a substrate onto the plate: the same direction on both (orientation) and >= 2 point pairs (scale + shift, least squares, no distortion). |
 | `align_samples` | The samples and devices with their warnings. |
 | `align_sample_positions` | ST / SZ / SN of every sample and device at the start rotation (SRn ref, SRz 0, piezo centred). |
 | `align_set_position` | The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits. |

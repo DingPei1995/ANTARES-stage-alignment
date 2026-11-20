@@ -2,13 +2,22 @@
 
 The photo of the plate shows where a substrate is, but usually not its
 devices; a second, closer photo (microscope, camera) shows the devices but
-often not the substrate edges. The user marks the same features (paint dots,
-pattern corners, scratches …) on both: on the left a crop of the plate photo
-around the substrate, already in plate coordinates, on the right the device
-photo. From these point pairs (2: rotation + scale + shift, 3: affine, 4 or
-more: perspective) the device photo is mapped onto the plate, and the devices
-clicked on it get plate coordinates. Devices have no height: they are on the
-surface of their substrate.
+often not the substrate edges, and is often turned in-plane relative to the
+plate photo. On the left a crop of the plate photo around the substrate,
+already in plate coordinates, on the right the device photo:
+
+1. the user draws a line along the same direction on both (a substrate edge,
+   a long pattern line): only its direction is used, the two points clicked
+   on each photo need not be the same places; it sets the orientation of the
+   device photo on the plate;
+2. the user marks the same features (paint dots, pattern corners, scratches …)
+   on both, at least 2 pairs: they set the scale and the position, by least
+   squares (the total mismatch of all the pairs is the smallest). The photo is
+   only turned, scaled and shifted, never distorted: more pairs average out the
+   clicking errors (the plate photo has a low resolution) instead of bending
+   the photo (alignment.photo.line_transform);
+3. the devices clicked on the device photo get plate coordinates. Devices have
+   no height: they are on the surface of their substrate.
 
 Devices can also be added to a substrate already on the plate (DeviceFromPhotoDialog, "Device from photo…" in the
 Samples tab) without the plate photo: the left view then shows the substrate as drawn, and its corners and the devices
@@ -26,16 +35,17 @@ from .photo_cache import DEVICE, PLATE, photo_cache
 from .photo_widgets import CornerItem, ZoomView, array_to_qimage, read_photo, step_style
 from .plate_editor import cosmetic_pen
 from ..core.geometry import Device, Rect, Sample
-from ..alignment.photo import apply_homography, pair_transform, rectify
+from ..alignment.photo import apply_homography, line_transform, rectify
 
 Qt = QtCore.Qt
 
 COLOR_DEVICE = QtGui.QColor("#e00000")
 COLOR_SUBSTRATE = QtGui.QColor("#ff8c00")
 COLOR_FIXED = QtGui.QColor("#0060d0")  # devices already on the substrate (reference points)
+COLOR_LINE = QtGui.QColor("#d000d0")  # the direction lines (Step 1)
 COLUMNS = ["Device", "on", "x (mm)", "y (mm)", "dx from left (mm)", "dy from bottom (mm)", "Status"]
-PAIRS, DEVICES = range(2)
-TRANSFORM_KIND = {2: "rotation + scale + shift", 3: "affine"}
+RMS_WARN = 0.02  # mm: a larger mismatch of the point pairs is shown in red
+ANGLE_WARN = 2.0  # degrees: points that would turn the photo further than this (with >= 3 pairs): check the direction lines
 MAX_CROP_PX = 1600  # crop of the plate photo: at most this many pixels across
 MAX_PX_PER_MM = 100.0
 SNAP_PX = 12  # schematic view: a click this close (screen px) to a reference point snaps to it
@@ -77,9 +87,13 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         self.h1: np.ndarray | None = None  # plate -> plate photo
         self.substrates: list[tuple[str, Rect]] = []
         self.photo2: np.ndarray | None = None
+        self.left_line: list[CornerItem] = []  # ends A, B of the orientation line (plate view)
+        self.right_line: list[CornerItem] = []  # ... and on the device photo
+        self._line_order: list[CornerItem] = []  # line ends in click order (undo)
         self.left_pts: list[CornerItem] = []
         self.right_pts: list[CornerItem] = []
         self.t: np.ndarray | None = None  # device photo -> plate
+        self.fit = None  # LineMatch of the current matching
         self.rms = 0.0
         self.error = ""
         self.devices: list[DevicePoint] = []
@@ -103,20 +117,29 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         undo_btn.clicked.connect(lambda: self.undo_point())
         QtWidgets.QShortcut(QtGui.QKeySequence.Undo, self, self.undo_point)
         clear_btn = QtWidgets.QPushButton("Clear all points")
-        clear_btn.setToolTip("Remove all the matched points (the devices already marked stay where they are)")
-        clear_btn.clicked.connect(lambda: self.clear_pairs())
-        self.pair_radio = QtWidgets.QRadioButton("Step 1  mark the same point on both")
-        self.pair_radio.setStyleSheet(step_style(1))
-        self.pair_radio.setToolTip("Match the device photo to the plate: click a point on the left, then the same "
-                                   "point on the right (at least 2 pairs)")
-        self.device_radio = QtWidgets.QRadioButton("Step 2  mark devices")
-        self.device_radio.setStyleSheet(step_style(2))
+        clear_btn.setToolTip("Remove the direction lines and all the matched points (the devices already marked stay where "
+                             "they are)")
+        clear_btn.clicked.connect(lambda: self.clear_all())
+        self.line_radio = QtWidgets.QRadioButton("Step 1  draw the same direction on both")
+        self.line_radio.setStyleSheet(step_style(1))
+        self.line_radio.setToolTip("Orientation of the device photo: on each photo click two points A, B along a "
+                                   "direction seen on both (a substrate edge, a long pattern line).\nOnly the direction "
+                                   "counts: A and B need not be the same places on the two photos.")
+        self.pair_radio = QtWidgets.QRadioButton("Step 2  mark the same point on both")
+        self.pair_radio.setStyleSheet(step_style(2))
+        self.pair_radio.setToolTip("Scale and position of the device photo: click a point on the left, then the same "
+                                   "point on the right (at least 2 pairs; more pairs average out the clicking errors, "
+                                   "the photo is never distorted)")
+        self.device_radio = QtWidgets.QRadioButton("Step 3  mark devices")
+        self.device_radio.setStyleSheet(step_style(3))
         self.device_radio.setToolTip("Click on each device in the device photo (or on the left)")
-        self.pair_radio.setChecked(True)
-        self.pair_radio.toggled.connect(lambda _: self.changed.emit())
+        self.line_radio.setChecked(True)
+        for radio in (self.line_radio, self.pair_radio, self.device_radio):
+            radio.toggled.connect(lambda _: self.changed.emit())
         self.file_label = QtWidgets.QLabel("no device photo")
         self.file_label.setStyleSheet("color: #555;")
         self.match_label = QtWidgets.QLabel()
+        self.match_label.setWordWrap(True)
 
         self.left_scene = QtWidgets.QGraphicsScene(self)
         self.left_view = ZoomView(self.left_scene)
@@ -156,6 +179,7 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         top.addWidget(undo_btn)
         top.addWidget(clear_btn)
         top.addSpacing(12)
+        top.addWidget(self.line_radio)
         top.addWidget(self.pair_radio)
         top.addWidget(self.device_radio)
         top.addWidget(self.file_label, 1)
@@ -319,28 +343,62 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         m = 0.15 * max(w, h)
         self.right_scene.setSceneRect(QtCore.QRectF(-m, -m, w + 2 * m, h + 2 * m))
         self.right_view.fit()
-        self.pair_radio.setChecked(True)
-        self.clear_pairs()
+        self.line_radio.setChecked(True)
+        self.clear_all()
 
-    # -- point pairs ---------------------------------------------------------------
+    # -- orientation line and point pairs -------------------------------------------
+    def lines_done(self) -> bool:
+        return len(self.left_line) == 2 and len(self.right_line) == 2
+
     def undo_point(self) -> bool:
         """Remove the last point clicked: the unmatched left point, else the right point of the last pair (its left
-        point then waits for a new right click). False if there is none."""
+        point then waits for a new right click); without pairs, the last point of a direction line. False if there is none."""
         if len(self.left_pts) > len(self.right_pts):
             self.left_scene.removeItem(self.left_pts.pop())
         elif self.right_pts:
             self.right_scene.removeItem(self.right_pts.pop())
+        elif self._line_order:
+            item = self._line_order.pop()
+            line = self.left_line if item in self.left_line else self.right_line
+            line.remove(item)
+            item.scene().removeItem(item)
+            if not self.lines_done():
+                self.line_radio.setChecked(True)
         else:
             return False
         self._match()
         return True
 
     def clear_pairs(self) -> None:
+        """Remove the point pairs (the direction lines stay)."""
         for it in self.left_pts:
             self.left_scene.removeItem(it)
         for it in self.right_pts:
             self.right_scene.removeItem(it)
         self.left_pts, self.right_pts = [], []
+        self._match()
+
+    def clear_lines(self) -> None:
+        for it in self.left_line:
+            self.left_scene.removeItem(it)
+        for it in self.right_line:
+            self.right_scene.removeItem(it)
+        self.left_line, self.right_line, self._line_order = [], [], []
+        self._match()
+
+    def clear_all(self) -> None:
+        """Lines and point pairs: start the matching again (Step 1)."""
+        self.clear_lines()
+        self.clear_pairs()
+        self.line_radio.setChecked(True)
+
+    def set_lines(self, plate_line, photo_line) -> None:
+        """Place the direction lines: two points (A -> B) in plate mm on the left, in device photo pixels on the right;
+        only their directions are used."""
+        self.clear_lines()
+        for (u, v), (x, y) in zip(plate_line, photo_line):
+            self._add_line_end(self.left_scene, self.left_line, u, -v)
+            self._add_line_end(self.right_scene, self.right_line, x, y)
         self._match()
 
     def set_pairs(self, plate_pts, photo_pts) -> None:
@@ -356,6 +414,25 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         markers.append(item)
         scene.addItem(item)
         item.setPos(x, y)
+
+    def _add_line_end(self, scene, line, x, y) -> None:
+        item = CornerItem(len(line), self._match, label="AB"[len(line)], color=COLOR_LINE)
+        line.append(item)
+        self._line_order.append(item)
+        scene.addItem(item)
+        item.setPos(x, y)
+
+    def _line_click(self, scene, line, x, y) -> None:
+        """A click in Step 1: the next point of the direction line on this side (a third click starts it again)."""
+        if len(line) == 2:
+            for it in line:
+                scene.removeItem(it)
+                self._line_order.remove(it)
+            line.clear()
+        self._add_line_end(scene, line, x, y)
+        if self.lines_done() and not self.left_pts:
+            self.pair_radio.setChecked(True)  # both directions drawn: on to the point pairs
+        self._match()
 
     def _snap(self, u: float, v: float) -> tuple[float, float]:
         """A device already placed (and, in the schematic view, a substrate corner) near a click; else the click."""
@@ -380,7 +457,9 @@ class DeviceMatchPanel(QtWidgets.QWidget):
             return
         u, v = self._snap(x, -y)
         x, y = u, -v
-        if len(self.left_pts) > len(self.right_pts):
+        if self.line_radio.isChecked():
+            self._line_click(self.left_scene, self.left_line, x, y)
+        elif len(self.left_pts) > len(self.right_pts):
             self.left_pts[-1].setPos(x, y)  # the point is not matched yet: move it
         else:
             self._add_marker(self.left_scene, self.left_pts, x, y)
@@ -393,18 +472,22 @@ class DeviceMatchPanel(QtWidgets.QWidget):
             if self.t is not None:
                 u, v = apply_homography(self.t, [(x, y)])[0]
                 self.add_device(float(u), float(v), (x, y))
+        elif self.line_radio.isChecked():
+            self._line_click(self.right_scene, self.right_line, x, y)
         elif len(self.right_pts) < len(self.left_pts):
             self._add_marker(self.right_scene, self.right_pts, x, y)
             self._match()
 
     def _match(self) -> None:
         n = min(len(self.left_pts), len(self.right_pts))
-        self.t, self.rms, self.error = None, 0.0, ""
-        if n >= 2:
+        self.t, self.fit, self.rms, self.error = None, None, 0.0, ""
+        if n >= 2 and self.lines_done():
             plate = [(p.pos().x(), -p.pos().y()) for p in self.left_pts[:n]]
             photo = [(p.pos().x(), p.pos().y()) for p in self.right_pts[:n]]
             try:
-                self.t, self.rms = pair_transform(photo, plate)
+                self.fit = line_transform([(p.pos().x(), p.pos().y()) for p in self.right_line],
+                                          [(p.pos().x(), -p.pos().y()) for p in self.left_line], photo, plate)
+                self.t, self.rms = self.fit.t, self.fit.rms
             except ValueError as exc:
                 self.error = str(exc)
         if self.t is not None:
@@ -419,21 +502,34 @@ class DeviceMatchPanel(QtWidgets.QWidget):
         n = min(len(self.left_pts), len(self.right_pts))
         if self.error:
             text, color = self.error, "#c00000"
+        elif not self.lines_done():
+            text = (f"Direction line on the left: {len(self.left_line)}/2 points, on the device photo: "
+                    f"{len(self.right_line)}/2 points (the direction sets the orientation of the device photo).")
+            color = "#555"
         elif self.t is None:
-            text, color = f"{n} point pair(s): at least 2 are needed to place the device photo.", "#555"
+            text, color = (f"Orientation set by the direction; {n} point pair(s): at least 2 are needed for the scale and "
+                           "the position."), "#555"
         else:
-            kind = TRANSFORM_KIND.get(n, "perspective")
-            warn = self.rms > 0.02
-            text = (f"{n} point pairs → {kind}; mismatch of the points {self.rms * 1000:.0f} µm rms"
-                    + (" – check the points (one may be wrong)" if warn else "")
-                    + ("" if n > {2: 2, 3: 3}.get(n, 4) else " (more pairs show the accuracy)"))
+            f = self.fit
+            worst = int(np.argmax(f.residuals))
+            warn = self.rms > RMS_WARN
+            text = (f"direction → photo turned {f.angle:.1f}°; {n} point pairs → scale ({f.mm_per_px * 1000:.2f} µm/px) "
+                    f"+ shift, least squares, no distortion; mismatch {self.rms * 1000:.0f} µm rms, largest at point "
+                    f"{worst + 1} ({f.residuals[worst] * 1000:.0f} µm)")
+            if warn:
+                text += " – check the points (one may be wrong)"
+            if n >= 3 and f.angle_check is not None and abs(f.angle_check) > ANGLE_WARN:
+                text += f" – the points would turn the photo {f.angle_check:+.1f}° more: check the lines"
+                warn = True
+            elif n == 2:
+                text += " (more pairs show the accuracy)"
             color = "#c00000" if warn else "#207020"
         self.match_label.setStyleSheet(f"color: {color};")
         self.match_label.setText(text)
 
     def step(self) -> int:
-        """1: matching the photos (same point on both), 2: marking devices."""
-        return 2 if self.device_radio.isChecked() else 1
+        """1: the orientation line, 2: matching the photos (same point on both), 3: marking devices."""
+        return 3 if self.device_radio.isChecked() else 2 if self.pair_radio.isChecked() else 1
 
     def instruction(self) -> str:
         sub = self.current_substrate()
@@ -443,17 +539,38 @@ class DeviceMatchPanel(QtWidgets.QWidget):
             return f"Open a photo showing the devices of {sub[0]} (it need not show the substrate edges)."
         if self.device_radio.isChecked():
             if self.t is None:
-                return "Mark at least 2 point pairs first (Step 1: “mark the same point on both”)."
-            return ("Step 2: click on each device in the device photo (or on the left). Name them in the table; "
-                    "switch back to Step 1 “mark the same point on both” to add or drag points.")
+                return ("Draw the direction (Step 1) and mark at least 2 point pairs (Step 2: “mark the same point on "
+                        "both”) first.")
+            return ("Step 3: click on each device in the device photo (or on the left). Name them in the table; "
+                    "switch back to Step 1 / Step 2 to redraw the direction or to add or drag points.")
+        if not self.line_radio.isChecked() and not self.lines_done():
+            return ("Draw the direction on both photos first: switch to Step 1 “draw the same direction on both” (it "
+                    "sets the orientation of the device photo).")
+        if self.line_radio.isChecked():
+            what = ("along an edge of the substrate (e.g. two of its corners; clicks snap to them)" if self.schematic
+                    else "along a straight feature seen on both photos (substrate edge, long pattern line)")
+            left, right = len(self.left_line), len(self.right_line)
+            if self.lines_done():
+                return ("Step 1 done: the direction is drawn on both photos (drag its points to adjust). Go to Step 2 "
+                        "“mark the same point on both”.")
+            if left < 2:
+                side = f"click point {'AB'[left]} of the direction line on the left, {what}"
+            else:
+                side = (f"click point {'AB'[right]} along the same direction on the device photo (right; A → B pointing "
+                        "the same way as on the left)")
+            return (f"Step 1: {side}. Only the direction counts (it sets the orientation of the device photo): A and B "
+                    "need not be the same places on both photos. Drag them to adjust, a third click draws the line "
+                    "again. Wheel = zoom, middle drag = pan.")
         n = len(self.left_pts)
         if n > len(self.right_pts):
-            return f"Step 1: click the same point {n} on the device photo (right). A wrong point: Undo last point (Ctrl+Z)."
-        more = "" if n < 2 else " Enough points: go to Step 2 “mark devices”, or add more pairs for accuracy."
+            return (f"Step 2: click the same point {n} on the device photo (right). A wrong point: Undo last point "
+                    "(Ctrl+Z).")
+        more = ("" if n < 2 else " Enough points: go to Step 3 “mark devices”, or add more pairs: they average out the "
+                "clicking errors (the photo is never distorted).")
         what = ("a corner of the substrate or a device already placed (blue; clicks snap to them)" if self.schematic
                 else "a feature you also see on the device photo (paint dot, pattern corner, scratch)")
-        return (f"Step 1: click point {n + 1} on the left: {what}, then the same point on the right. Wheel = zoom, middle "
-                f"drag = pan.{more}")
+        return (f"Step 2: click point {n + 1} on the left: {what}, then the same point on the right. Wheel = zoom, "
+                f"middle drag = pan.{more}")
 
     # -- devices -------------------------------------------------------------------
     def add_device(self, u: float, v: float, px: tuple[float, float] | None = None) -> DevicePoint:
@@ -525,6 +642,11 @@ class DeviceMatchPanel(QtWidgets.QWidget):
             self.right_scene.removeItem(it)
         self._left_items, self._right_items = [], []
         sub = self.current_substrate()
+        for scene, line, items in ((self.left_scene, self.left_line, self._left_items),
+                                   (self.right_scene, self.right_line, self._right_items)):
+            if len(line) == 2:
+                a, b = line[0].pos(), line[1].pos()
+                items.append(scene.addLine(a.x(), a.y(), b.x(), b.y(), cosmetic_pen(COLOR_LINE, 2, Qt.DashLine)))
         if self._has_left():
             for name, (u0, v0, u1, v1) in self.substrates:
                 mine = name == sub[0]

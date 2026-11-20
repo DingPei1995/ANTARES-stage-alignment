@@ -116,3 +116,39 @@ def test_pair_transform():
         pair_transform(photo[:1], plate[:1])
     with pytest.raises(ValueError):
         pair_transform([(0, 0), (0, 0)], plate[:2])
+
+
+def test_line_transform():
+    from quickalignment.alignment.photo import line_transform
+
+    # device photo: 80 px/mm, turned 30°, shifted, image y down; the direction sets the rotation, the points the rest
+    c, s = np.cos(np.radians(30)), np.sin(np.radians(30))
+    t_true = np.array([[c, -s, 1.0], [s, c, 2.0], [0, 0, 1]]) @ np.diag([1 / 80, -1 / 80, 1])
+    photo = np.array([(100.0, 120.0), (900.0, 200.0), (300.0, 700.0), (820.0, 640.0), (500.0, 400.0)])
+    plate = apply_homography(t_true, photo)
+    line_px, line_mm = [(50.0, 50.0), (950.0, 80.0)], apply_homography(t_true, [(50.0, 50.0), (950.0, 80.0)])
+    for n in (2, 3, 5):
+        m = line_transform(line_px, line_mm, photo[:n], plate[:n])
+        assert np.allclose(m.t, t_true) and m.rms < 1e-9
+        assert m.angle == pytest.approx(30.0) and m.mm_per_px == pytest.approx(1 / 80)
+        assert m.angle_check == pytest.approx(0.0, abs=1e-6)
+    # pointing the other way, between other places on the same direction: same result
+    assert np.allclose(line_transform([(725.0, 72.5), (275.0, 57.5)], line_mm, photo, plate).t, t_true)
+    # clicking errors are averaged, never turned into a distortion: still a similarity, error below the worst click
+    rng = np.random.default_rng(1)
+    noisy = plate + rng.normal(0, 0.03, plate.shape)
+    m = line_transform(line_px, line_mm, photo, noisy)
+    a = m.t[:2, :2]
+    assert np.allclose(m.t[2], [0, 0, 1]) and np.allclose(a @ a.T, np.eye(2) * abs(np.linalg.det(a)))
+    assert m.angle == pytest.approx(30.0)
+    assert np.abs(apply_homography(m.t, photo) - plate).max() < np.abs(noisy - plate).max()
+    assert m.rms == pytest.approx(np.sqrt((m.residuals ** 2).mean()))
+    # a line drawn on another feature shows: the points want another angle
+    tilted = apply_homography(t_true, [(50.0, 50.0), (950.0, 200.0)])
+    assert abs(line_transform(line_px, tilted, photo, plate).angle_check) > 5
+    with pytest.raises(ValueError):
+        line_transform(line_px, line_mm, photo[:1], plate[:1])
+    with pytest.raises(ValueError):
+        line_transform([(0, 0), (0, 0)], line_mm, photo, plate)
+    with pytest.raises(ValueError):
+        line_transform(line_px, line_mm, [(1, 1), (1, 1)], plate[:2])

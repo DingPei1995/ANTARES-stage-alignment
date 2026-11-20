@@ -48,7 +48,7 @@ def test_no_colour_detection_in_window(app):
     assert dlg.draw_btn.isChecked() and dlg.reg.plate_view.drag_enabled
     assert dlg.draw_btn.text() == "Draw box on plate model (right side)"
     assert [dlg.tabs.tabText(i).split()[:2] for i in range(2)] == [["Step", "1"], ["Step", "2"]]
-    assert [dlg.tabs.tabBar().tabTextColor(i).name() for i in range(2)] == list(STEP_COLORS)
+    assert [dlg.tabs.tabBar().tabTextColor(i).name() for i in range(2)] == list(STEP_COLORS[:2])
 
 
 def test_dialog_returns_drawn_samples(app):
@@ -205,22 +205,32 @@ def test_devices_from_second_photo_by_point_pairs(app):
     t_true = np.array([[c, -s_, -2.5], [s_, c, 3.0], [0, 0, 1]]) @ np.diag([1 / 200, -1 / 200, 1])
     panel.set_photo(np.full((500, 700, 3), 90, np.uint8))
     dlg.tabs.setCurrentIndex(1)
-    assert "point 1 on the left" in dlg.instruction.text() and dlg.instruction.text().startswith("Step 1")
-    assert panel.pair_radio.text().startswith("Step 1") and panel.device_radio.text().startswith("Step 2")
-    # pairs by clicking: left (plate photo crop, scene = (u, -v)) then right (device photo)
+    assert "point A of the direction line on the left" in dlg.instruction.text() and dlg.instruction.text().startswith("Step 1")
+    assert panel.line_radio.text().startswith("Step 1") and panel.pair_radio.text().startswith("Step 2")
+    assert panel.device_radio.text().startswith("Step 3")
+    # Step 1: the same direction on both (left: plate photo crop, scene = (u, -v); right: device photo)
+    line = [(-3.8, 2.0), (-1.2, 2.3)]
+    for u, v in line:
+        panel._on_left_click(u, -v)
+    assert "same direction on the device photo" in dlg.instruction.text()
+    for x, y in apply_homography(np.linalg.inv(t_true), [(-3.3, 2.06), (-1.8, 2.06 + 1.5 * 0.3 / 2.6)]):  # other places, same direction
+        panel._on_right_click(x, y)
+    assert panel.step() == 2 and "point 1 on the left" in dlg.instruction.text()
+    assert dlg.instruction.text().startswith("Step 2")
+    # Step 2: pairs by clicking, left then right
     plate_pts = [(-3.5, 2.5), (-1.5, 3.6), (-2.0, 2.2)]
     photo_pts = apply_homography(np.linalg.inv(t_true), plate_pts)
     for (u, v), (x, y) in zip(plate_pts[:2], photo_pts[:2]):
         panel._on_left_click(u, -v)
         assert "same point" in dlg.instruction.text()
         panel._on_right_click(x, y)
-    assert panel.t is not None and "rotation + scale + shift" in panel.match_label.text()
+    assert panel.t is not None and "no distortion" in panel.match_label.text()
     panel._on_left_click(*np.array(plate_pts[2]) * [1, -1])
     panel._on_right_click(*photo_pts[2])
-    assert "affine" in panel.match_label.text() and panel.rms < 1e-6
+    assert "3 point pairs" in panel.match_label.text() and panel.rms < 1e-6
     # devices clicked on the device photo get plate coordinates
     panel.device_radio.setChecked(True)
-    assert dlg.instruction.text().startswith("Step 2") and STEP_COLORS[1] in dlg.instruction.styleSheet()
+    assert dlg.instruction.text().startswith("Step 3") and STEP_COLORS[2] in dlg.instruction.styleSheet()
     target = (u0 + 0.8, v0 + 0.6)
     (x, y), = apply_homography(np.linalg.inv(t_true), [target])
     panel._on_right_click(x, y)

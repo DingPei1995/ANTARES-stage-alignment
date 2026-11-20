@@ -144,9 +144,13 @@ TOOLS = [
     tool("align_remove_device", "alignment", "remove_device", "Remove a device ('sample/device').",
          {"target": STR}, ["target"]),
     tool("align_register_device_photo", "alignment", "register_device_photo",
-         "Map a microscope photo of a substrate onto the plate from 2-4+ point pairs (same feature on both).",
+         "Map a microscope photo of a substrate onto the plate: the same direction on both (orientation) and >= 2 "
+         "point pairs (scale + shift, least squares, no distortion).",
          {"pairs": d("[{photo: [x, y], plate_photo_px: [x, y]} or {photo: [x, y], plate_mm: [x, y]}]", type="array",
                      items={"type": "object"}),
+          "direction": d("{photo: [[x, y], [x, y]], plate_mm or plate_photo_px: [[x, y], [x, y]]}: two points A -> B "
+                         "along the same direction (a substrate edge) on both; only the direction counts; recommended",
+                         type="object"),
           "path": STR, "photo_id": STR, "plate_photo_id": STR}, ["pairs"]),
     tool("align_samples", "alignment", "samples", "The samples and devices with their warnings."),
     tool("align_sample_positions", "alignment", "sample_positions",

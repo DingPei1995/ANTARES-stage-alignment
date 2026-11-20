@@ -99,9 +99,11 @@ dispositif D1 (sélectionné, repère bleu). La croix rouge est le centre de la 
   dispositifs suivent leur substrat ; un substrat avec dispositifs n'apparaît que par ses dispositifs dans les listes
   de cibles (par ex. *SampleA/D1*).
 - **Device from photo…** : ajoute des dispositifs au substrat sélectionné depuis une photo au microscope, sans
-  retrouver les échantillons. La photo est appariée sur les coins du substrat tel qu'il est dessiné et sur les
-  dispositifs déjà placés (ou sur une photo de plaquette utilisée plus tôt pendant que le programme tourne) ; les
-  dispositifs cliqués sont ajoutés, ceux déjà présents ne changent pas.
+  retrouver les échantillons. Comme dans l'onglet 2, la même direction tracée sur les deux (par ex. le long d'un bord
+  du substrat) fixe l'orientation, puis des paires de points sur les coins du substrat tel qu'il est dessiné et sur
+  les dispositifs déjà placés (les clics s'y accrochent) fixent l'échelle et la position par moindres carrés, sans
+  déformer la photo (ou appariement sur une photo de plaquette utilisée plus tôt pendant que le programme tourne) ;
+  les dispositifs cliqués sont ajoutés, ceux déjà présents ne changent pas.
 - **Status** : `ok`, ou le problème (hors de la zone, chevauchement, dispositif hors du substrat). Les éléments rouges
   du dessin ont un problème.
 - Molette = zoom, bouton du milieu = déplacer, clic droit = plaquette entière, Suppr = effacer la sélection (*Delete
@@ -155,30 +157,48 @@ fond tout autour : si un coin est faux, toute la plaquette est déformée.
 #### Onglet 2 : dispositifs sur une deuxième photo
 
 La photo de la plaquette montre où est un substrat, mais rarement ses dispositifs ; une photo plus proche (microscope,
-appareil) montre les dispositifs mais souvent pas les bords du substrat. Les deux photos sont mises en correspondance
-par des points que vous marquez sur les deux :
+appareil) montre les dispositifs mais souvent pas les bords du substrat, et elle n'est souvent pas tournée comme la
+photo de la plaquette. Les deux photos sont mises en correspondance en deux temps : la même direction tracée sur les deux
+fixe l'orientation, puis des points marqués sur les deux fixent l'échelle et la position :
 
 ![Dispositifs sur une deuxième photo](images/guide/photo_devices.png)
 
 1. Choisir le **substrat** (ou sélectionner son cadre dans l'onglet 1). La vue de gauche montre la photo de la
    plaquette autour de lui, déjà en coordonnées plaquette. **Open device photo…** (vue de droite).
-2. *mark the same point on both* : cliquer à gauche un détail visible aussi sur la photo des dispositifs (point de
-   laque, coin d'un motif, rayure), puis le même détail à droite ; repères numérotés, déplaçables. Avec 2 paires la
-   photo est placée par rotation + échelle + translation, avec 3 par une application affine, avec 4 ou plus par une
-   perspective. La ligne au-dessus des vues donne l'écart des points (µm) : avec plus de paires que nécessaire, il
-   révèle un point faux. Le contour du substrat (orange) est tracé sur la photo des dispositifs pour vérifier.
-3. *mark devices* : cliquer chaque dispositif sur la photo des dispositifs (ou à gauche). Le tableau donne sa position
-   sur la plaquette, son substrat et dx, dy aux bords gauche / bas du substrat ; y renommer les dispositifs, effacer les
-   faux. Les dispositifs n'ont pas de hauteur : ils sont à la surface de leur substrat.
-4. Une autre photo de dispositifs (autre substrat, autre partie) peut être ouverte : les dispositifs déjà marqués
-   gardent leur position. *Add to plate* ajoute chaque dispositif à l'échantillon sur lequel il se trouve (ceux hors de
-   tout échantillon sont écartés).
+2. *Step 1 draw the same direction on both* : sur chaque photo, cliquer deux points **A**, **B** le long d'un élément
+   droit visible sur les deux (un bord du substrat, une longue ligne du motif, ou l'axe passant par deux détails),
+   d'abord à gauche, puis sur la photo des dispositifs. **Seule la direction compte** : A et B n'ont pas besoin d'être
+   les mêmes endroits sur les deux photos (un bord plus long que la photo des dispositifs convient), mais A → B doit
+   pointer dans le même sens sur les deux (en sens inverse cela marche aussi : la photo est alors tournée de 180° de
+   plus). Prendre les points éloignés : plus ils le sont, plus l'angle est précis. Les lignes de direction (tirets
+   magenta) donnent l'angle de la photo des dispositifs sur la plaquette ; faire glisser leurs points pour ajuster, un
+   troisième clic d'un côté retrace la ligne de ce côté. Quand les deux sont tracées, Step 2 est sélectionné.
+3. *Step 2 mark the same point on both* : cliquer à gauche un détail visible aussi sur la photo des dispositifs (point
+   de laque, coin d'un motif, rayure), puis le même détail à droite ; repères numérotés, déplaçables. Il faut au moins
+   2 paires. La photo des dispositifs est seulement **tournée (par la direction), mise à l'échelle et déplacée**, jamais
+   déformée : l'échelle et la translation sont celles pour lesquelles l'écart total de toutes les paires est le plus
+   petit (moindres carrés). La photo de la plaquette a une faible résolution, chaque clic y est donc un peu décalé :
+   plus de paires moyennent ces erreurs, au lieu de tordre la photo comme le ferait un ajustement passant par chaque
+   point. La ligne au-dessus des vues donne l'angle, l'échelle (µm par pixel), l'écart des points (µm rms) et le point
+   le plus décalé : un grand écart révèle un point faux. Avec 3 paires ou plus, elle avertit aussi quand les points
+   seuls tourneraient la photo de plus de 2° par rapport à la direction (les lignes de direction ne suivent sans doute pas le
+   même élément sur les deux). Le contour du substrat (orange) est tracé sur la photo des dispositifs pour vérifier.
+4. *Step 3 mark devices* : cliquer chaque dispositif sur la photo des dispositifs (ou à gauche). Le tableau donne sa
+   position sur la plaquette, son substrat et dx, dy aux bords gauche / bas du substrat ; y renommer les dispositifs,
+   effacer les faux. Les dispositifs n'ont pas de hauteur : ils sont à la surface de leur substrat.
+5. Une autre photo de dispositifs (autre substrat, autre partie) peut être ouverte : les dispositifs déjà marqués
+   gardent leur position, la direction et les points recommencent. *Undo last point* (Ctrl+Z) enlève le dernier point
+   cliqué (un point d'une ligne de direction s'il n'y a pas de paire) ; *Clear all points* enlève les lignes de
+   direction et les paires.
+   *Add to plate* ajoute chaque dispositif à l'échantillon sur lequel il se trouve (ceux hors de tout échantillon sont
+   écartés).
 
-Dans l'exemple, la photo des dispositifs est une image au microscope du centre de SampleA. Deux détails se voient sur
-les deux photos : le point **1**, la goutte de laque d'argent au-dessus du centre (une tache noire au microscope), et
-le point **2**, le trou rond du motif d'électrodes (le disque violet). D1 est ensuite cliqué sur le flocon du canal
-entre les deux : x = 1,712, y = 3,090 mm. Avec deux paires seulement l'écart vaut toujours 0 µm ; une troisième paire,
-quand un détail s'y prête, vérifie la correspondance.
+Dans l'exemple, la photo des dispositifs est une image au microscope du centre de SampleA. Deux détails se voient
+sur les deux photos : la goutte de laque d'argent au-dessus du centre (une tache noire au microscope) et le trou rond du motif d'électrodes (le disque violet). La direction est tracée le
+long de l'axe du canal, de la goutte (A) au trou (B), et ces deux mêmes détails sont les paires **1** et **2**. D1 est
+ensuite cliqué sur le flocon du canal entre les deux : x = 1,712, y = 3,090 mm. Avec deux paires seulement l'écart vaut
+toujours 0 µm ; une troisième paire, quand un détail s'y prête, vérifie la correspondance et moyenne les erreurs de
+clic.
 
 La précision est celle de la photo de la plaquette (clics des coins, 0,1–0,3 mm) plus celle de la mise en
 correspondance.

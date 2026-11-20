@@ -1,4 +1,5 @@
-"""Devices added to a substrate already on the plate, undo of the last point, photos kept for the run."""
+"""Devices added to a substrate already on the plate, the orientation line and the least-squares matching, undo of
+the last point, photos kept for the run."""
 
 import os
 import time
@@ -40,10 +41,22 @@ def _save(img, path):
     return str(path)
 
 
+def draw_line(panel, a, b):
+    """Step 1: the same direction (plate mm a -> b) clicked on the left, then on the device photo."""
+    panel.line_radio.setChecked(True)
+    for u, v in (a, b):
+        panel._on_left_click(u, -v)
+    for u, v in (a, b):
+        panel._on_right_click(*px(u, v))
+
+
 def test_undo_last_point_removes_only_it(app):
     p = DeviceMatchPanel(schematic=True)
     p.set_substrates([("S1", (0.0, 0.0, 4.0, 5.0))])
     p.set_photo(np.full((300, 300, 3), 90, np.uint8))
+    assert p.step() == 1 and "point A of the direction line on the left" in p.instruction()
+    draw_line(p, (0.0, 0.0), (4.0, 0.0))
+    assert p.lines_done() and p.step() == 2  # both lines drawn: on to the point pairs
     for u, v in ((1.0, 1.0), (3.0, 1.5)):
         p._on_left_click(u, -v)
         p._on_right_click(*px(u, v))
@@ -55,7 +68,36 @@ def test_undo_last_point_removes_only_it(app):
     p._on_right_click(*px(3.0, 1.5))  # the pair is completed again
     assert p.t is not None and p.rms < 1e-6
     p.clear_pairs()
+    assert p.lines_done() and p.t is None  # the lines stay
+    assert p.undo_point() and len(p.right_line) == 1 and not p.lines_done() and p.step() == 1
+    p.clear_all()
     assert not p.undo_point()
+
+
+def test_line_sets_the_orientation_and_points_never_distort(app):
+    p = DeviceMatchPanel(schematic=True)
+    p.set_substrates([("S1", (0.0, 0.0, 4.0, 5.0))])
+    p.set_photo(np.full((900, 900, 3), 90, np.uint8))
+    # along the bottom edge, not between the same places, and pointing opposite ways: the same orientation
+    p.line_radio.setChecked(True)
+    for u, v in ((0.0, 0.0), (4.0, 0.0)):
+        p._on_left_click(u, -v)
+    for u, v in ((3.0, 0.0), (0.5, 0.0)):
+        p._on_right_click(*px(u, v))
+    assert p.lines_done()
+    # four pairs, two of them clicked 40 µm off (low resolution plate photo): no perspective, a least-squares fit
+    good = [(1.0, 1.0), (3.0, 1.5), (1.2, 4.0), (3.5, 4.2)]
+    clicked = [(1.04, 1.0), (3.0, 1.46), (1.2, 4.0), (3.5, 4.2)]
+    for (u, v), (cu, cv) in zip(good, clicked):
+        p._on_left_click(cu, -cv)
+        p._on_right_click(*px(u, v))
+    assert p.t is not None and np.allclose(p.t[2], [0, 0, 1])  # rotation + scale + shift only
+    assert p.fit.angle == pytest.approx(25.0, abs=1e-6)  # from the direction, exactly
+    a = p.t[:2, :2]
+    assert np.allclose(a @ a.T, np.eye(2) * abs(np.linalg.det(a)))  # no shear, no stretch
+    assert 0.005 < p.rms < 0.04 and "least squares" in p.match_label.text()
+    (u, v), = apply_homography(p.t, [px(2.0, 3.0)])
+    assert (u, v) == pytest.approx((2.0, 3.0), abs=0.03)
 
 
 def test_device_from_photo_on_a_drawn_substrate(app):
@@ -69,8 +111,14 @@ def test_device_from_photo_on_a_drawn_substrate(app):
     assert panel.schematic and panel.fixed == [("D1", 1.5, 3.0)]
     assert not dlg.add_btn.isEnabled()
     panel.set_photo(np.full((900, 900, 3), 90, np.uint8))
+    assert "edge of the substrate" in dlg.instruction.text()
+    # Step 1: the bottom edge of the substrate (clicks a little off snap to its corners), on both
+    for u, v in ((0.0, 0.0), (4.0, 0.0)):
+        panel._on_left_click(u + 0.03, -(v - 0.02))
+    for u, v in ((0.0, 0.0), (4.0, 0.0)):
+        panel._on_right_click(*px(u, v))
     assert "corner of the substrate" in dlg.instruction.text()
-    # reference points: two substrate corners and the device already placed; clicks a little off snap to them
+    # Step 2, reference points: two substrate corners and the device already placed; clicks snap to them
     for u, v in ((0.0, 0.0), (4.0, 0.0), (1.5, 3.0)):
         panel._on_left_click(u + 0.03, -(v - 0.02))
         panel._on_right_click(*px(u, v))

@@ -172,15 +172,17 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     photo.reg._show_cursor(1.71, 3.09)
     save(photo, "photo_dialog", app)
 
-    # tab 2, devices from a second photo: the microscope photo of the substrate centre. Matched points: the
-    # silver paint dot above the centre and the centre circle (black blob and round purple pad under the
-    # microscope); device D1 clicked on the flake of the channel between them
+    # tab 2, devices from a second photo: the microscope photo of the substrate centre. Direction (orientation):
+    # the channel axis, from the silver paint dot above the centre to the centre circle; matched points: the same two
+    # features (black blob and round purple pad under the microscope); device D1 clicked on the flake of the channel
+    # between them
     panel = photo.devices_panel
     photo.tabs.setCurrentIndex(1)
     panel.select_substrate("SampleA")
     device_photo = HERE / "tests" / "data" / "gating_device_photo.jpg"
     panel.load_photo(str(device_photo))
     panel.file_label.setText(device_photo.name)
+    panel.set_lines([(1.51, 3.66), (1.73, 2.49)], [(235.5, 103.9), (279.1, 328.1)])
     panel.set_pairs([(1.51, 3.66), (1.73, 2.49)], [(235.5, 103.9), (279.1, 328.1)])
     panel.device_radio.setChecked(True)
     panel._on_right_click(275.0, 213.0)

@@ -95,8 +95,11 @@ sample area (gating plate: 11 × 10.5 mm above the contact block).
   and the line under it also give the device position x, y on the plate. Devices move with their substrate. A
   substrate with devices is listed by its devices only in the target lists (e.g. *SampleA/D1*).
 - **Device from photo…**: adds devices to the selected substrate from a microscope photo, without finding the samples
-  again. The photo is matched on the corners of the substrate as drawn and the devices already on it (or on a plate
-  photo used earlier while the program runs); the devices clicked are added, those already there are not changed.
+  again. As in [tab 2](#tab-2-devices-from-a-second-photo), the same direction drawn on both (e.g. along an edge of the
+  substrate) sets the orientation, then point pairs on the corners of the substrate as drawn and the devices
+  already on it (clicks snap to them) set the scale and the position by least squares, without distorting the photo
+  (or match on a plate photo used earlier while the program runs); the devices clicked are added, those already there
+  are not changed.
 - **Status**: `ok`, or what is wrong (outside the sample area, overlapping, device outside its substrate). Red items
   on the drawing have a problem.
 - Wheel = zoom, middle drag = pan, right click = whole plate, Del = delete the selection (*Delete selected*). The
@@ -147,28 +150,45 @@ whole plate is distorted.
 #### Tab 2: devices from a second photo
 
 The plate photo shows where a substrate is, but usually not its devices; a closer photo (microscope, camera) shows the
-devices but often not the substrate edges. The two photos are matched by points you mark on both:
+devices but often not the substrate edges, and it is often not turned the same way as the plate photo. The two photos
+are matched in two steps: the same direction drawn on both sets the orientation, then points marked on both set the
+scale and the position:
 
 ![Devices from a second photo](images/guide/photo_devices.png)
 
 1. Choose the **substrate** (or select its box in tab 1). The left view shows the plate photo around it, already in
    plate coordinates. **Open device photo…** (right view).
-2. *mark the same point on both*: click a feature on the left that you also see on the device photo (a paint dot, a
-   pattern corner, a scratch), then the same feature on the right; numbered markers, draggable. With 2 pairs the device
-   photo is placed by rotation + scale + shift, with 3 by an affine map, with 4 or more by a perspective map. The line
-   above the views gives the mismatch of the points (µm): with more pairs than needed it shows a wrong point. The
-   substrate outline (orange) is drawn on the device photo as a check.
-3. *mark devices*: click on each device in the device photo (or on the left). The table gives its plate position, its
-   substrate and dx, dy from the left / bottom substrate edges; rename the devices there, delete wrong ones. Devices have
-   no height: they are on the surface of their substrate.
-4. Another device photo (for another substrate, or another part) can be opened: the devices already marked keep their
-   positions. *Add to plate* adds each device to the sample it lies on (devices on no sample are left out).
+2. *Step 1 draw the same direction on both*: on each photo, click two points **A**, **B** along a straight feature seen
+   on both (a substrate edge, a long pattern line, or the axis through two features), first on the left, then on the
+   device photo. **Only the direction counts**: A and B need not be the same places on the two photos (an edge longer
+   than the device photo is fine), but A → B should point the same way on both (pointing the other way still works:
+   the photo is then turned by 180° more). Take the points far apart: the farther, the more precise the angle. The
+   direction lines (dashed, magenta) give the angle of the device photo on the plate; drag their points to adjust, a
+   third click on one side draws the line again there. When both are drawn, Step 2 is selected.
+3. *Step 2 mark the same point on both*: click a feature on the left that you also see on the device photo (a paint
+   dot, a pattern corner, a scratch), then the same feature on the right; numbered markers, draggable. At least 2 pairs
+   are needed. The device photo is only **turned (by the direction), scaled and shifted**, never distorted: the scale and
+   the shift are those for which the total mismatch of all the pairs is the smallest (least squares). The plate photo
+   has a low resolution, so every click there is a little off: more pairs average these errors out, instead of bending
+   the photo as a fit through every point would. The line above the views gives the angle, the scale (µm per pixel),
+   the mismatch of the points (µm rms) and the point that is the farthest off: a large mismatch shows a wrong point.
+   With 3 pairs or more, it also warns when the points alone would turn the photo by more than 2° from the direction
+   (the direction lines probably do not follow the same feature on both). The substrate outline (orange) is drawn on the device photo as a
+   check.
+4. *Step 3 mark devices*: click on each device in the device photo (or on the left). The table gives its plate
+   position, its substrate and dx, dy from the left / bottom substrate edges; rename the devices there, delete wrong
+   ones. Devices have no height: they are on the surface of their substrate.
+5. Another device photo (for another substrate, or another part) can be opened: the devices already marked keep their
+   positions, the direction and the points start again. *Undo last point* (Ctrl+Z) removes the last point clicked (a
+   point of a direction line when there are no pairs); *Clear all points* removes the direction lines and the pairs. *Add to plate* adds each device
+   to the sample it lies on (devices on no sample are left out).
 
-In the example the device photo is a microscope picture of the centre of SampleA. Two features are seen on both
-photos: point **1**, the silver paint dot above the centre (a black blob under the microscope), and point **2**, the
-round hole of the electrode pattern (the purple disc). D1 is then clicked on the flake of the channel between them:
-x = 1.712, y = 3.090 mm. With only two pairs the mismatch is always 0 µm; a third pair, when one is visible, checks
-the match.
+In the example the device photo is a microscope picture of the centre of SampleA.
+Two features are seen on both photos: the silver paint dot above the centre (a black blob under the microscope) and
+the round hole of the electrode pattern (the purple disc). The direction is drawn along the channel axis, from the
+dot (A) to the hole (B), and the same two features are the point pairs **1** and **2**. D1 is then clicked on the flake of the
+channel between them: x = 1.712, y = 3.090 mm. With only two pairs the mismatch is always 0 µm; a third pair, when
+one is visible, checks the match and averages the clicking errors.
 
 The accuracy is that of the plate photo (corner clicks, 0.1–0.3 mm) plus the point matching.
 

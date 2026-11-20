@@ -41,8 +41,11 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    sample is found in focus with the zone plate / capillary, the program's 'Fine tunings by ZPS/CPS' corrects H
    precisely (the optic's focal distance is fixed) and brings the sample back onto the analyzer focus.
 5. Devices (small structures on a substrate): read them on the plate photo (align_add_device with photo_px), or on a
-   microscope photo of the substrate registered with align_register_device_photo (2-4 point pairs: the same
-   substrate corners / marks on the microscope photo and on the plate photo). Show align_photo_overlay again.
+   microscope photo of the substrate registered with align_register_device_photo: first the same DIRECTION on both
+   (two points A -> B along a substrate edge on the microscope photo and on the plate photo; only the direction
+   counts; the two photos are often not turned the same way), then >= 2 point pairs (the same corners / marks on
+   both). The direction fixes the orientation, the pairs the scale and the shift by least squares (more pairs
+   average the clicking errors, never distort). Show align_photo_overlay again.
 5b. ALWAYS ASK whether the user is satisfied with the samples found (show the overlay). If not, offer:
    (i) they tell you what to change (which sample, where, its size or height) -> align_update_sample /
    align_remove_sample / align_add_sample; (ii) MANUAL ANNOTATION: align_manual_annotation opens the photo window on

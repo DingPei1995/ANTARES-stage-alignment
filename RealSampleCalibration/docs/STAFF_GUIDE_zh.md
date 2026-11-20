@@ -12,8 +12,9 @@ ANTARES 线站（SOLEIL）· 用 RealSampleCalibration 标定样品台模型，�
 6. [光学 + 电机（完整标定）](#光学--电机完整标定)
 7. [测试点：检查与修正](#测试点检查与修正)
 8. [保存，以及 QuickAlignment 如何使用该文件](#保存以及-quickalignment-如何使用该文件)
-9. [程序维护](#程序维护)
-10. [故障排查](#故障排查)
+9. [2026 年 11 月标定的结论](#2026-年-11-月标定的结论)
+10. [程序维护](#程序维护)
+11. [故障排查](#故障排查)
 
 ---
 
@@ -137,11 +138,22 @@ SRn = 120°（托竖直、tab 朝上）为机械参考；标定时 PIX = PIY = 1
 
 分析器前端、zone plate 与 OSA、capillary 用简单实体表示（见 QuickAlignment/README.md 的 *Anti-collision*）。zone plate / OSA 的尺寸是 **占位值**（capillary 的工作距离 7.2 mm 为线站给出的值）：请测量（各前端到焦点的距离、宽度、厚度；OSA 还需对应的 OSA_S 位置），写入配置文件的 `"collision"` 项（修改副本后另存为新文件）。RealSampleCalibration 会沿用同一元件上一份配置中的实体模型。
 
+## 2026 年 11 月标定的结论
+
+报告：`RealSampleCalibration/docs/reports/`（2026-11-14 capillary，2026-11-15 zone plate / SRz 轴）。
+
+- **好的配置给用户带来什么。** 2026-11-14 标定之后，转动预测误差为 22 µm（device，SRn 120 → 150 / SRz −10）和 27 µm（Cav，SRz −26.9，SN 修正），由 SPEM 扫描图验证，capillary 保持同一 CPS：样品仍在同一张 300 × 300 µm 扫描图上并保持聚焦。测量前预测的检验点误差在 34 µm 以内。
+- **拟合权重。** 位置读数 ±0.02 mm，聚焦位置 capillary 为 ±0.10 mm，zone plate 为 ±0.02 mm（`realsample/fit.py` 中的 `measurement_sigmas`）。
+- **SRz 轴垂直于光束方向的位置只能从聚焦看出。** 它对 ST 只有二阶影响，ST / SZ 读数定不出来，capillary 的聚焦也不够精确：2026-11-15 用 zone plate 做了 SRz −5 … −20 的系列（SN 不变，记录 ZPS），发现它偏了 0.97 mm。尽量用 zone plate 测 SRz 组，并覆盖实际要用的 SRz 范围（到 −20 / −25）。
+- **SN_f** 是在相机参考线上目测的；2026-11-14 表面在 SN −0.3 而不是 0 时聚焦。请用已知厚度的样品测一次。
+- **另一种样品托。** 用 gating plate 做的配置也用于标准托，反之亦然：2026-11-19 发现 gating plate 在样品座中的高度与标准托相同（误差 0.08 mm 以内）。
+- **读数与模型矛盾时**，列出不符之处，逐一用全部数据检验可能的原因，而不是放开更多常数去吸收它们（SRz 轴误差就是这样找到的）。
+
 ## 程序维护
 
 **安装**（Python ≥ 3.9）：`pip install -r requirements.txt`（PyQt5 或 PySide6、numpy、matplotlib；测试需要 pytest）。用 `QuickAlignment/QuickAlignment.py` / `RealSampleCalibration/RealSampleCalibration.py` 启动（Windows 下 `.pyw` 不弹出控制台）。
 
-**测试**：在仓库根目录运行 `python -m pytest`（约 200 个测试，约 2 分钟；Qt 在后台运行）。测试覆盖样品台模型、转动、标定拟合、文件读取和主窗口。
+**测试**：在仓库根目录运行 `python -m pytest`（约 230 个测试，约 1 分钟；Qt 在后台运行）。测试覆盖样品台模型、转动、标定拟合、文件读取和主窗口。
 
 **可能需要修改的限值**（各在一处）：
 

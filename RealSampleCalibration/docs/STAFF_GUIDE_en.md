@@ -12,8 +12,9 @@ ANTARES beamline (SOLEIL) · calibrating the stage model with RealSampleCalibrat
 6. [Optics + motors (full calibration)](#optics--motors-full-calibration)
 7. [Test points: checking and correcting](#test-points-checking-and-correcting)
 8. [Saving and how QuickAlignment uses the file](#saving-and-how-quickalignment-uses-the-file)
-9. [Looking after the program](#looking-after-the-program)
-10. [Troubleshooting](#troubleshooting)
+9. [What the November 2026 calibrations showed](#what-the-november-2026-calibrations-showed)
+10. [Looking after the program](#looking-after-the-program)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -172,12 +173,34 @@ The zone plate / OSA dimensions are **placeholders** (the capillary working dist
 them in the configuration under `"collision"` (edit a copy, then save it as a new file). RealSampleCalibration keeps the
 solids of the previous configuration of the same optic.
 
+## What the November 2026 calibrations showed
+
+Reports: `RealSampleCalibration/docs/reports/` (2026-11-14 capillary, 2026-11-15 zone plate / SRz axis).
+
+- **What a good configuration gives users.** After the 2026-11-14 calibration, rotations were predicted within
+  22 µm (device, SRn 120 → 150 / SRz −10) and 27 µm (Cav, SRz −26.9 with SN corrected), checked on SPEM maps, with
+  the capillary left at the same CPS: the sample stays on the same 300 × 300 µm map and in focus. Check points
+  predicted before they were measured agreed within 34 µm.
+- **Weights of the fit.** Positions are read to ±0.02 mm, the optic focus to ±0.10 mm with the capillary and
+  ±0.02 mm with the zone plate (`measurement_sigmas` in `realsample/fit.py`).
+- **The SRz axis across the beam is seen only in the focus.** It changes ST only to second order, so ST / SZ readings
+  cannot fix it, and capillary foci are not precise enough: on 2026-11-15 a series SRz −5 … −20 with the zone plate
+  (SN kept, ZPS noted) showed it 0.97 mm off. Measure SRz sets with the zone plate when possible, in the SRz range
+  that will be used (down to −20 / −25).
+- **SN_f** is judged on the camera reference line; on 2026-11-14 the surface was in focus at SN −0.3 instead of 0.
+  Measure it once on a sample of known thickness.
+- **Another plate.** A configuration made with the gating plate is used for the standard plate and vice versa: on
+  2026-11-19 the gating plate was found to sit at the same height in the holder as the standard plate (within
+  0.08 mm).
+- **When readings contradict the model**, list the mismatches and test the possible causes one by one against all the
+  data, instead of freeing more constants to absorb them (how the SRz-axis error was found).
+
 ## Looking after the program
 
 **Installation** (Python ≥ 3.9): `pip install -r requirements.txt` (PyQt5 or PySide6, numpy, matplotlib; pytest for the
 tests). Start with `QuickAlignment/QuickAlignment.py` / `RealSampleCalibration/RealSampleCalibration.py` (`.pyw` on Windows without console).
 
-**Tests**: `python -m pytest` in the repository folder (about 200 tests, ~2 min; Qt runs off-screen). They cover
+**Tests**: `python -m pytest` in the repository folder (about 230 tests, ~1 min; Qt runs off-screen). They cover
 the stage model, rotations, calibration fits, file loading and the main windows.
 
 **Limits that may need editing** (one place each):

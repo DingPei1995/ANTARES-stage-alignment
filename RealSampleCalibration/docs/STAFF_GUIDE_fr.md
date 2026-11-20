@@ -12,8 +12,9 @@ Ligne ANTARES (SOLEIL) · étalonner le modèle de la platine avec RealSampleCal
 6. [Optique + moteurs (étalonnage complet)](#optique--moteurs-étalonnage-complet)
 7. [Points de test : vérifier et corriger](#points-de-test--vérifier-et-corriger)
 8. [Enregistrer, et comment QuickAlignment utilise le fichier](#enregistrer-et-comment-quickalignment-utilise-le-fichier)
-9. [Entretien du programme](#entretien-du-programme)
-10. [Dépannage](#dépannage)
+9. [Ce qu'ont montré les calibrations de novembre 2026](#ce-quont-montré-les-calibrations-de-novembre-2026)
+10. [Entretien du programme](#entretien-du-programme)
+11. [Dépannage](#dépannage)
 
 ---
 
@@ -177,12 +178,35 @@ la valeur de la ligne) : les mesurer (distance de chaque face avant au foyer, la
 correspondante) et les mettre dans la configuration sous `"collision"` (modifier une copie, puis l'enregistrer comme
 nouveau fichier). RealSampleCalibration reprend les solides de la configuration précédente de la même optique.
 
+## Ce qu'ont montré les calibrations de novembre 2026
+
+Rapports : `RealSampleCalibration/docs/reports/` (2026-11-14 capillaire, 2026-11-15 zone plate / axe SRz).
+
+- **Ce qu'une bonne configuration apporte aux utilisateurs.** Après la calibration du 2026-11-14, les rotations ont
+  été prédites à 22 µm près (dispositif, SRn 120 → 150 / SRz −10) et 27 µm (Cav, SRz −26.9 avec SN corrigé),
+  vérifiées sur des cartes SPEM, le capillaire laissé au même CPS : l'échantillon reste sur la même carte de
+  300 × 300 µm et au point. Les points de contrôle prédits avant d'être mesurés concordaient à 34 µm près.
+- **Poids de l'ajustement.** Positions lues à ±0,02 mm, foyer de l'optique à ±0,10 mm avec le capillaire et
+  ±0,02 mm avec la zone plate (`measurement_sigmas` dans `realsample/fit.py`).
+- **L'axe SRz en travers du faisceau ne se voit que dans la mise au point.** Il ne change ST qu'au second ordre : les
+  lectures ST / SZ ne le fixent pas, et les foyers du capillaire ne sont pas assez précis. Le 2026-11-15, une série
+  SRz −5 … −20 avec la zone plate (SN gardé, ZPS noté) l'a trouvé décalé de 0,97 mm. Mesurer les jeux SRz avec la
+  zone plate si possible, dans la plage de SRz qui sera utilisée (jusqu'à −20 / −25).
+- **SN_f** est jugé sur la ligne de référence de la caméra ; le 2026-11-14 la surface était au point à SN −0,3 au lieu
+  de 0. Le mesurer une fois sur un échantillon d'épaisseur connue.
+- **Autre plaquette.** Une configuration faite avec la plaquette gating sert pour la plaquette standard et
+  inversement : le 2026-11-19, la plaquette gating s'est révélée à la même hauteur dans le porte-échantillon que la
+  standard (à 0,08 mm près).
+- **Quand les lectures contredisent le modèle**, lister les écarts et tester les causes possibles une à une contre
+  toutes les données, au lieu de libérer d'autres constantes pour les absorber (c'est ainsi que l'erreur d'axe SRz a
+  été trouvée).
+
 ## Entretien du programme
 
 **Installation** (Python ≥ 3.9) : `pip install -r requirements.txt` (PyQt5 ou PySide6, numpy, matplotlib ; pytest pour
 les tests). Lancer `QuickAlignment/QuickAlignment.py` / `RealSampleCalibration/RealSampleCalibration.py` (`.pyw` sous Windows, sans console).
 
-**Tests** : `python -m pytest` dans le dossier du dépôt (environ 200 tests, ~2 min ; Qt hors écran). Ils couvrent
+**Tests** : `python -m pytest` dans le dossier du dépôt (environ 230 tests, ~1 min ; Qt hors écran). Ils couvrent
 le modèle de la platine, les rotations, les ajustements d'étalonnage, la lecture des fichiers et les fenêtres
 principales.
 

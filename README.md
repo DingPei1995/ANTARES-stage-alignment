@@ -1,168 +1,86 @@
 # QuickAlignment (ANTARES, SOLEIL)
 
-Find your samples on the ANTARES sample stage in minutes, and keep them on the beam when you rotate them.
-Two programs share one stage model, and an AI assistant can drive both:
+Find your samples on the ANTARES sample stage in minutes, turn them without losing them, and keep them in focus.
 
 | | program | what it is for | who |
 |---|---|---|---|
 | 🔎 | [**QuickAlignment**](QuickAlignment/) | photo of the plate → sample positions (ST, SZ, SN) → rotations, optic focus | users |
-| 🧪 | [**RealSampleCalibration**](RealSampleCalibration/) | calibrate the stage with one feature of a real sample | beamline staff |
-| 🤖 | [**Agent**](Agent/) | let an AI assistant (Claude) do all of the above with you, from photos | everyone |
-
-## QuickAlignment — find the samples
-
-Mark the samples on the plate (by hand or **from a photo**), and the program gives the motor positions of each one,
-then the new positions after turning SRn / SRz, the optic position for focus, and warns before a collision.
-
-![Samples on the plate](QuickAlignment/docs/images/guide/samples_tab.png)
-
-![Turning the sample: new ST / SZ / SN and optic](QuickAlignment/docs/images/guide/rotate_tab.png)
+| 🧪 | [**RealSampleCalibration**](RealSampleCalibration/) | calibrate the stage on one feature of a real sample | beamline staff |
+| 🤖 | [**Agent**](Agent/) | optional: the same computations for an AI assistant (MCP) | – |
 
 User guide: [English](QuickAlignment/docs/pdf/QuickAlignment_user_guide_en.pdf) ·
 [中文](QuickAlignment/docs/pdf/QuickAlignment_user_guide_zh.pdf) ·
 [Français](QuickAlignment/docs/pdf/QuickAlignment_user_guide_fr.pdf)
 
-## Calibrating the stage — RealSampleCalibration
+## What QuickAlignment does
 
-The positions are only as good as the stage calibration in `configs/`. **RealSampleCalibration** measures one small,
-sharp feature of a real sample at a few stage rotations, fits the stage constants (ST0, SZ0, SN_f, SRn axis, SRz axis,
-optic reference), checks them at predicted test points and saves a new configuration that QuickAlignment loads at its
-next start.
+The beam spot is micrometric, the sample plate 18 × 15.5 mm, and every rotation of SRn / SRz moves the sample away
+from the beam and out of focus. QuickAlignment turns the plate geometry and the stage calibration into motor
+positions. It never moves a motor: it gives the numbers, you type them in the beamline control.
 
-![RealSampleCalibration](RealSampleCalibration/docs/images/guide/ic_window.png)
+**1 · Mark the samples on a photo of the plate.** Open a phone photo of the plate, click the four corners of the
+sample area and draw a box on each sample; devices are placed on a microscope photo of the substrate. Typing the
+heights H finishes the plate.
 
-**The latest calibrations (2026-11-14 … 19):**
+![Samples on the plate](QuickAlignment/docs/images/guide/samples_tab.png)
 
-1. **Capillary, full calibration (2026-11-14).** One gold-pad corner of a device on Si, five sets (SRn 120 / 140 / 100,
-   SRz 0 / −10 / −5, SN kept in the rotated sets, capillary refocused). The two check sets were predicted from the
-   first three within 34 µm; all five are fitted with an rms of 6.7 µm.
-2. **Zone plate, optics recalibration + SRz axis (2026-11-15).** After exchanging the capillary for the zone plate,
-   only the beam spot (ST0, SZ0) and the ZPS reference were fitted, the mechanics kept. One point of sample Cav was
-   then tracked with SPEM maps: an SRn 140 map moved the SRn axis by ~0.15 mm, and a series SRz −5 … −20 with the
-   zone-plate focus showed that the SRz axis was 0.97 mm off *across the beam* — a direction only the focus can see,
-   which the capillary had not resolved. With the corrected axis, a test at SRn 140 / SRz −15 was predicted at ZPS
-   54.30 and found at 54.33.
+**2 · Go to a sample.** The Stage & Optics tab lists, for every sample and device, the ST / SZ / SN that put it on the
+beam in the analyzer focus at the start orientation (SRn 120°, SRz 0°), and the optic position (ZPS / CPS) for focus.
+Once the first sample is found on the beam, **Found here** corrects the drawing (the whole plate in SZ, the sample
+in ST / height): the other samples then come out right too.
 
-![Redundant SRz series with the zone plate](RealSampleCalibration/docs/images/calculation/srz_series.png)
+![Stage & Optics tab](QuickAlignment/docs/images/guide/stage_tab.png)
 
-3. **Zone plate on the standard plate (2026-11-19).** One device found on the beam at SRn 120 / SRz 0 gave ST0 / SZ0
-   for the standard plate; the zone-plate working distance, SN_f and the rotation axes of 2026-11-15 / 17 were kept.
-   It also showed that the gating plate does not sit 1 mm higher than the standard plate in the holder (within
-   0.08 mm).
+**3 · Turn it without losing it.** Enter the wanted SRn / SRz: the Rotate sample tab gives the new ST / SZ that keep
+the same point on the beam and the optic position that refocuses on it. After an SRz turn the point also slides along
+the beam, away from the analyzer focus (2 mm at SRz −24°): the program says how far, and **Correct SN** gives the SN,
+ST, SZ that put it back on the analyzer focus. Positions out of the motor ranges or where the plate would touch the
+optic or the analyzer are refused. If the sample is then seen off the piezo centre on a map, one more step recentres
+it.
 
-Configurations in use (the newest per optic): `configs/calibration_2026-11-19_123901_zone_plate.json` and
-`configs/calibration_2026-11-15_151356_capillary.json`. Reports:
-[2026-11-14 capillary](RealSampleCalibration/docs/reports/2026-11-14_capillary_real_sample_calibration.pdf) ·
-[2026-11-15 zone plate / SRz axis](RealSampleCalibration/docs/reports/2026-11-15_zone_plate_calibration_srz_axis.pdf).
+![Turning the sample: new ST / SZ / SN and optic](QuickAlignment/docs/images/guide/rotate_tab.png)
 
-How every constant is computed (formulas, step by step, and how redundant sets and test points refine the
-configuration): [RealSampleCalibration/README.md → *How the calibration is computed*](RealSampleCalibration/README.md#how-the-calibration-is-computed).
+**No time to prepare?** For a sample found on the beam with nothing prepared, the *Quick sample rotation* tab locates
+it on the plate from the optic position in focus and gives the position after the rotation.
 
-Staff guide: [English](RealSampleCalibration/docs/pdf/RealSampleCalibration_staff_guide_en.pdf) ·
-[中文](RealSampleCalibration/docs/pdf/RealSampleCalibration_staff_guide_zh.pdf) ·
-[Français](RealSampleCalibration/docs/pdf/RealSampleCalibration_staff_guide_fr.pdf) ·
-short [protocol](RealSampleCalibration/docs/protocol.md)
+## Tested at the beamline
 
-## Quick alignment with an AI assistant
+With the configuration of the capillary calibration of 2026-11-14, two rotations were checked with
+SPEM maps (300 × 300 µm, 10 µm steps) before and after the turn
+([report](RealSampleCalibration/docs/reports/2026-11-14_capillary_real_sample_calibration.pdf)):
 
-The same computations are available to an AI assistant (Claude Desktop, Claude Code, or any MCP client) through the
-MCP server in [`Agent/`](Agent/). You talk to it at the beamline in your own language, send it photos and the
-numbers you read on the motors; it does the geometry, tells you where to go, and keeps track of what was measured.
+| sample | rotation | stage moved | sample found from the prediction | focus |
+|---|---|---|---|---|
+| device D1 (gating plate) | SRn 120 → 150, SRz 0 → −10, SN corrected | 0.15 mm ST, 0.09 mm SZ, 0.15 mm SN | **22 µm** | capillary not touched, same spectra |
+| graphene Cav | SRz 0 → −26.9, SN corrected | 0.94 mm ST, 1.95 mm SN | **27 µm** | capillary not touched, same spectra |
 
-![The plate model drawn on the photo](Agent/images/photo_overlay.png)
+![Device D1: the same electrodes on the map before and after the rotation](RealSampleCalibration/docs/reports/src/report_figs/spem_compare.png)
 
-### Connect it (once)
+![Cav before and after SRz −26.9°: same place, same spectrum](RealSampleCalibration/docs/reports/src/report_figs/cav_compare.png)
 
-* **Claude Code**: open Claude Code in this repository; `.mcp.json` registers the `quickalignment` server — approve it.
-* **Claude Desktop**: add the server to `claude_desktop_config.json` (Settings → Developer → Edit config):
+- **Found within 50 µm.** Once the first sample is found and corrected, the predicted positions are within 50 µm:
+  22 and 27 µm after the rotations above, ≤ 34 µm at the calibration check points predicted before they were
+  measured. The sample is on the first SPEM map at the new position; no search is needed. From the photo alone, the
+  first sample is found within ~0.1 mm (D1: 0.10 mm in x and y on a blurred photo).
+- **Not lost by the rotation.** The stage moved by up to 2 mm and the plate turned by 27°; the sample stayed on the
+  beam, on the same map. On 2026-10-24 (user guide example) a turn of SRn −28° / SRz −24° was found within
+  8 µm in ST and 12 µm in SZ.
+- **Focus corrected automatically.** With *Correct SN* the point is put back on the analyzer focus, so the optic
+  stays where it was (CPS 61.38 before and after the Cav turn, same spectral shape). With SN kept, the program gives
+  the optic position instead: ZPS 54.30 predicted, 54.33 found (zone plate, SRn 140 / SRz −15,
+  [2026-11-15 report](RealSampleCalibration/docs/reports/2026-11-15_zone_plate_calibration_srz_axis.pdf)).
 
-  ```json
-  { "mcpServers": { "quickalignment": {
-      "command": "C:\\Path\\To\\python.exe",
-      "args": ["C:\\Path\\To\\QuickAlignment\\Agent\\quickalignment_mcp.py"] } } }
-  ```
+The positions are as good as the stage calibration in `configs/`, made by the beamline staff with
+RealSampleCalibration ([staff guide](RealSampleCalibration/docs/pdf/RealSampleCalibration_staff_guide_en.pdf)).
+If *Found here* moves a sample by more than 0.3 mm, or all samples the same way, ask the staff to recalibrate.
 
-* Check from a console:
+## AI assistant (optional)
 
-  ```bash
-  python Agent/quickalignment_mcp.py --list-tools
-  ```
-
-Give the assistant photos as **file paths** (the server reads them at full resolution and can detect samples by
-colour); a photo only pasted into the chat can be read by eye, less precisely. Details: [Agent/README.md](Agent/README.md).
-
-### How a session goes
-
-The assistant always starts by asking **what you want to do** (find samples or calibrate), **which plate** is mounted
-(standard, gating, custom) and **which optic** (capillary or zone plate) — it never guesses them, since they change
-every position.
-
-**1 · From a photo to motor positions**
-
-| you | the assistant | tools |
-|---|---|---|
-| "Here is my plate: `D:\photos\plate.jpg`, gating plate, zone plate." | starts a session with the newest configuration of that optic | `align_start` |
-| | looks at the photo with a pixel grid, zooms on the four corners of the sample area and reads them to a few pixels | `align_photo_grid` |
-| | registers the photo on the plate model and **shows you the overlay** to confirm | `align_register_photo`, `align_photo_overlay` |
-| | finds the samples (colour detection + its own reading), asks you their **heights** (not visible from above) and names | `align_detect_samples`, `align_add_sample_from_photo` |
-| "The flake on S2 is at the lower-left corner." | adds devices on a substrate, also from a microscope photo matched to the plate photo | `align_add_device`, `align_register_device_photo` |
-| | asks whether you are satisfied; if not, you say what to change, or mark the samples yourself in the photo window it opens (**manual annotation**) | `align_update_sample`, `align_manual_annotation`, `align_load_annotation` |
-| | gives the table of **ST / SZ / SN** of every sample and device at SRn 120 / SRz 0 | `align_sample_positions` |
-
-An oblique photo can optionally be corrected in 3D (points at several heights: riser, back plate, tab corners;
-`align_register_photo_3d`).
-
-**2 · At the beamline: correct from what you find**
-
-* "I'm at ST −3.50, SZ 36.54, SN −0.05, I want S3" → ST / SZ that put S3 on the beam with SN kept, or with SN
-  corrected to the analyzer focus if it is too far (`align_bring_to_beam`).
-* "Found S1 at ST …, SZ …, SN …" → the SZ shift moves the whole plate in its holder (all samples), the ST / SN shift
-  corrects S1, and every position is recomputed (`align_found_here`). Several samples off by more than ~0.3 mm in the same way → the assistant suggests a
-  calibration.
-* "S2 is on the camera reference line at SN …" → its height H, kept for the next moves (`align_check_height`).
-* "What does the beam hit here, and where is the focus?" → `align_beam_on`, `align_set_position`.
-
-**3 · Rotations**
-
-* "Go to SRn 140, SRz −15 and keep this point" → new ST / SZ / SN and **optic position** (SN kept and SN corrected,
-  with the recommended one), motor-range and **collision** checks (`align_rotate`, `align_collision_check`).
-* "Turn this edge along the slit" (two points on the photo) → the SRn to set (`align_align_edge`).
-* "Put the K point at the slit centre" (Γ and K read on a measured map, its SRn / SRz and hv) → SRn / SRz
-  (`align_bz_angles`), or a K / M point moved to chosen angles at another photon energy (`align_bz_point_to`).
-
-**4 · Calibration with the assistant**
-
-The assistant leads a real-sample calibration one step at a time and never writes a configuration without your
-explicit "save":
-
-1. It asks whether **only the optic was realigned** (mode *optics*, the usual case — e.g. capillary → zone plate) or
-   the **motors were re-homed** (mode *full*), the reference feature (plate x, y, height H) and, in optics mode,
-   whose mechanics to keep (`rsc_start(configuration=…)` — on 2026-11-15 the recent capillary configuration was kept
-   rather than an old zone-plate one).
-2. For every set it says **what to set** (SRn, SRz, PIX / PIY) and **where the feature should be** (from the previous
-   configuration, then from every set already measured), and collects ST, SZ, SN and the optic position
-   (`rsc_guide`, `rsc_measure_set`). With SPEM maps it reads the motors and optic from the `.nxs` file and asks you
-   at which PIX / PIY the tracked point is (`rsc_read_spem`).
-3. `rsc_fit`: fitted constants with uncertainties, change from the previous configuration, residuals per set,
-   χ²/dof and the **least-determined combination** (it warns, for example, that the SRz axis across the beam needs
-   zone-plate foci at SRz −20 / −25).
-4. Test points one by one ("go to SRn 150, SRz 0: ST …, SZ …, SN …, ZPS …; found?") → `rsc_answer_test`, refit,
-   next round, until a round is all found.
-5. When readings contradict the model, it lists the mismatches and possible causes for you to judge instead of
-   freeing more constants to absorb them — this is how the SRz-axis error of 2026-11-15 was traced.
-6. `rsc_save` only when you ask.
-
-**Prompts** offered by the server: `start` (choose what to do), `find_samples` (photo → positions), `calibrate`
-(step-by-step calibration). The instructions the assistant follows are in `src/quickalignment/agent/workflow.py`; the
-full tool reference is generated in [`src/quickalignment/agent/API.md`](src/quickalignment/agent/API.md).
-
-**Good to know**
-
-* The assistant never invents measured values (motor or optic positions): it asks you.
-* Numbers are always written with "." as decimal separator, whatever the language of the computer.
-* Photo reading is approximate (a few pixels ≈ tens of µm); your beamline feedback (*found here*) always wins.
-* The same API works from Python without an assistant: `from quickalignment.agent import AgentAPI`
-  (example in [Agent/README.md](Agent/README.md#python-api)).
+The same computations are available to an AI assistant (Claude or any MCP client) through the MCP server in
+[`Agent/`](Agent/): it can read plate photos, keep track of what was measured and guide a calibration. It is not
+needed: everything above is done in the QuickAlignment window. The only feature without a window is the
+Brillouin-zone helper (SRn / SRz that bring K or M to the slit centre). Set-up and tools:
+[Agent/README.md](Agent/README.md).
 
 ## Start
 

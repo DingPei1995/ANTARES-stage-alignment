@@ -22,7 +22,7 @@ plate; *Change plate…* in the toolbar switches later) and which focusing optic
 capillary), then loads the most recently written configuration for that optic from `configs/` (see below). New / Open / Save store the experiment (plate, samples, devices, motor positions)
 in one JSON file; the first *Save* asks for the file name.
 
-![Plate and optic at start-up](docs/images/plate_choice.png)
+![Plate and optic at start-up](docs/images/guide/setup_dialog.png)
 
 ### Configuration files (`configs/`)
 
@@ -51,15 +51,18 @@ y up, front view (sample side) with the tab up), not motor positions; the plate 
 - **From photo…** (`src/quickalignment/alignment/photo.py`): samples found on a photo of the
   plate taken from above (sample side). The four sample area corners are numbered in the plate model (next one in
   red) and clicked in that order on the photo; a homography maps the photo onto the plate model (cursor read-out in
-  plate mm). Samples are the regions within ΔE (CIELAB) of colours picked on samples (default; leaves out silver
-  paint), or differing from the bare plate by more than ΔE. All listed boxes are added; boxes are selected by clicking
-  and deleted / merged, or drawn by hand (kept when the detection runs again); H is entered by the user (not visible
-  from above). Tab 2 (`src/quickalignment/ui/device_match.py`): devices located on a second photo
+  plate mm). The samples are boxes the user draws on the plate model over the mapped photo (rounded to 0.05 mm), then
+  deletes / merges; finding them by colour (`detect_samples`, CIELAB ΔE) is left to the agent (`align_detect_samples`).
+  H is entered by the user (not visible from above). Photos used while the program runs are kept with their points
+  (*recent photos…*, `ui/photo_cache.py`). Tab 2 (`src/quickalignment/ui/device_match.py`): devices located on a second photo
   (microscope) matched to a crop of the plate photo around a substrate by point pairs the user marks on both (2 pairs:
   similarity, 3: affine, ≥ 4: perspective, with the residual); devices have no height and are added to the sample they
   lie on. Optional **3D correction** (off by default) for oblique photos: 8 points at two heights (sample-area
   corners, back plate and tab top corners) give a camera model (`camera_matrix` in `alignment/photo.py`) that corrects
   the perspective at every height. Only numpy + Qt, everything local. Test photo: `tests/data/gating_plate_photo.jpg` (repository root) (SampleA, gating plate).
+- **Device from photo…**: devices added to a substrate already on the plate from a device photo, matched on the
+  substrate corners and the devices already on it (or on a plate photo registered earlier in the run);
+  `DeviceFromPhotoDialog` in `ui/device_match.py`.
 - **Samples placed → Stage**: asks whether all samples are marked on the plate; *Yes* opens the Stage & Optics tab
   with a list of the ST / SZ / SN that put each sample on the analyzer focus at the initial rotation
   (SRn = 120, SRz = 0, PIX = PIY = 150 µm). A substrate carrying devices is listed by its devices only (also in
@@ -70,7 +73,7 @@ y up, front view (sample side) with the tab up), not motor positions; the plate 
   and the configuration stay. The list is recomputed and the sample keeps the corrected position from then on
   (saved with the session).
 
-![Samples tab](docs/images/app_samples_tab.png)
+![Samples tab](docs/images/guide/samples_tab.png)
 
 ### Stage & Optics tab
 
@@ -90,7 +93,7 @@ Positions here are **absolute motor values** (ST, SZ, SN, …, optic).
   position needed for focus) and the sample plane in front view (SRn rotation; beam spot, analyzer focus and
   SRn axis with a legend in the same colours; axes in absolute ST / SZ)
 
-![Stage & Optics tab](docs/images/app_stage_tab.png)
+![Stage & Optics tab](docs/images/guide/stage_tab.png)
 
 ### Rotate sample tab
 
@@ -107,6 +110,23 @@ Gives the stage positions that keep a sample point on the beam when the sample i
    every new computation starts unticked (SN kept).
    If a motor range does not allow it, the closest reachable position is given with its distance from the focus.
    *Send to Stage & Optics tab* takes the shown solution (refused if it is out of range).
+4. **Sample seen off the piezo centre** (`ui/piezo_box.py`, `rotation.recentre_piezo`): the PIX / PIY at which the
+   sample is seen at the new position, and the optic position in focus there, give the ST / SZ (SN kept) and the
+   optic that show it with the piezo centred (rotations unchanged); also the ST / SZ / SN that keep it exactly where
+   it was found. *Send corrected position to Stage & Optics tab*.
+
+### Quick sample rotation tab (without pre-setup)
+
+`ui/quick_rotation_panel.py`. For a sample found on the beam with nothing prepared (no photo, no samples drawn):
+from the stage positions and the optic position (ZPS / CPS) in focus, the optics reference and the stage model of
+the configuration in use give the plate point at the optic focus (`stage.focus_point`: x, y and height H); the new
+position after the rotation is computed about it (`rotation.relocate(..., point=...)`), SN kept and SN corrected, with
+the out-of-range and anti-collision checks, and the piezo step 4 (without *Send*). The tab reads only the
+configuration and the plate mounted: no samples, no *Found here* plate offset, and changes nothing in the other tabs.
+It is an estimate: an error δ of the optics reference moves the point by δ along the beam (Cav, 2026-11-14: 0.12 mm
+from the full prediction, which was found within 27 µm).
+
+![Quick sample rotation tab](docs/images/guide/quick_rotation_tab.png)
 
 **Angles for a BZ point** (agent only: `align_bz_angles`, `align_bz_point_to`; no window in the program; 2-D
 hexagonal crystals such as graphene, WSe2): which SRn / SRz bring Γ, K (or only K / only K′) or M to the slit centre
@@ -137,7 +157,7 @@ SZ outside 35 … 45). SN = SN_f (≈ 0) puts the plate surface in the analyzer 
 optic can come before the SN travel limit (−12), given by the anti-collision check; the analyzer front, 35 mm away, is
 beyond the travel.
 
-![Rotate sample tab](docs/images/app_rotate_tab.png)
+![Rotate sample tab](docs/images/guide/rotate_tab.png)
 
 ### Anti-collision (`src/quickalignment/core/collision.py`)
 
@@ -227,7 +247,7 @@ configuration comes from RealSampleCalibration (constants fitted and checked wit
 suggests checking whether the configuration is outdated (motors re-homed): then beamline staff run
 RealSampleCalibration.
 
-![Configuration window](docs/images/calibration_dialog.png)
+![Configuration window](docs/images/guide/configuration_dialog.png)
 
 The optic (zone plate + OSA or capillary) is modelled only as a focus point that moves along the beam with
 the optic motor. ST, SZ and SRn do not change the surface plane, so they need no optic move; SN, SRz and
@@ -272,7 +292,8 @@ Both plates share the same back plate (18 × 15.5 × 1.1 mm Ta with tab), which 
 - Stack (bottom → top): ST/SN/SZ → SRz → SRn → PIX/PIY → plate.
 - **PIX/PIY** piezo stage riding on top of all the above (sample frame), 0–300 µm, centre 150/150.
   Seen from the analyzer: PIX 0→300 = left→right, PIY 0→300 = up→down (against +SZ; checked at the
-  beamline 2026-11-14: a feature seen at a larger PIY needs a larger SZ). PIX not checked yet.
+  beamline 2026-11-14: a feature seen at a larger PIY needs a larger SZ). PIX checked 2026-11-15: a feature seen at a
+  larger PIX needs a smaller ST, as in the model.
 
 Plate frame (x, y), mm: front view (sample side) with the tab up, origin = centre of the 18 × 15.5 mm back
 plate, x right, y up. At the reference orientation (SRn = 120, SRz = 0) a plate point comes onto the beam at

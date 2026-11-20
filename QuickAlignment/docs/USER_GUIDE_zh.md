@@ -11,10 +11,12 @@ ANTARES 线站（SOLEIL）· 在样品托上找到样品、转动时保持样品
 5. [Stage & Optics 页：移动到样品](#stage--optics-页移动到样品)
 6. [Rotate sample 页：转动而不丢失样品](#rotate-sample-页转动而不丢失样品)
 7. [Correct SN：把该点放回分析器焦点](#correct-sn把该点放回分析器焦点)
-8. [为布里渊区高对称点寻找转角](#为布里渊区高对称点寻找转角)
-9. [Session、样品托与配置](#session样品托与配置)
-10. [一次典型的机时流程](#一次典型的机时流程)
-11. [提示信息与处理方法](#提示信息与处理方法)
+8. [Quick sample rotation：无需准备直接转动样品](#quick-sample-rotation无需准备直接转动样品)
+9. [精度：线站上的实测](#精度线站上的实测)
+10. [为布里渊区高对称点寻找转角](#为布里渊区高对称点寻找转角)
+11. [Session、样品托与配置](#session样品托与配置)
+12. [一次典型的机时流程](#一次典型的机时流程)
+13. [提示信息与处理方法](#提示信息与处理方法)
 
 ---
 
@@ -25,12 +27,13 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 - 每个样品或 device 在初始取向（SRn = 120°，SRz = 0°）下的 ST、SZ、SN；
 - 把样品放到光斑上、并位于分析器焦点处所需的 ST / SN / SZ 和聚焦元件位置；
-- 转动（SRn、SRz）之后，让同一点回到光斑上的位置；
+- 转动（SRn、SRz）之后，让同一点回到光斑上的位置，以及保持其聚焦的聚焦元件位置；
+- 对没有做任何准备（没有照片）就在光斑上找到的样品，仅凭聚焦元件位置给出转动后的位置（*Quick sample rotation* 页）；
 - 对二维六角晶体（graphene、WSe2 等），把 Γ、K 或 M 点移到狭缝中心所需的 SRn / SRz，以及达不到时的解决办法。
 
 程序不会移动任何电机，它只给出数值，由你在线站控制系统里输入。
 
-**本指南的例子。** 所有截图都来自同一个真实例子：一块 **gating plate**，上面是衬底 **SampleA**（Si，H = 0.525 mm）和它上面的 device **D1**，2026 年 10 月用 **capillary** 测量。样品从手机拍的托照片中识别，D1 在显微镜照片上定位；在初始取向下把 D1 移到光斑上，找到后修正其位置，然后把托转到 SRn = 92°、SRz = −24°，在线站上于预测位置再次找到了 D1。
+**本指南的例子。** 所有截图都来自同一个真实例子：一块 **gating plate**，上面是衬底 **SampleA**（Si，H = 0.525 mm）和它上面的 device **D1**，2026 年 10 月用 **capillary** 测量（使用该次机时的配置 2026-10-24 23:55）。衬底在手机拍的托照片上标出，D1 在显微镜照片上定位；在初始取向下把 D1 移到光斑上，找到后修正其位置，然后把托转到 SRn = 92°、SRz = −24°，在线站上于预测位置再次找到了 D1。*Quick sample rotation* 页用 2026-11-14 标定报告中的 graphene 样品 **Cav** 作例子。
 
 ## 启动程序
 
@@ -66,11 +69,12 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 ![Samples 页](images/guide/samples_tab.png)
 
-图中是例子用 *From photo…*（下一节）识别后的样品托：衬底 SampleA 及其 device D1（已选中，蓝色标记），以及一块小芯片 S2。红色十字是托中心（x = y = 0），灰色框是样品区（gating plate：接触块上方 11 × 10.5 mm）。
+图中是例子用 *From photo…*（下一节）识别后的样品托：衬底 SampleA 及其 device D1（已选中，蓝色标记）。红色十字是托中心（x = y = 0），灰色框是样品区（gating plate：接触块上方 11 × 10.5 mm）。
 
 - **画样品**：在托的空白处拖动鼠标。拖动样品可 **移动**，拖动边或角可 **改变大小**（鼠标位置取整到 0.1 mm）。也可以按 *Add sample* 后直接输入数值。
 - **表格**：名称、x、y、长 L、宽 W、高 H 都可以精确输入（输入值不取整）。*Default H* 是新样品的默认高度（0.525 mm：标准 Si 片）。*Type* 显示 *sample*，或 *substrate (n)*（n 为其 device 数）。
 - **衬底上的 device**：选中衬底，按 *Add device*，选择两条参考边（*X ref* left/right、*Y ref* bottom/top）以及到 device 中心的距离 dx、dy，也可以拖动蓝色标记。表格及其下方一行还给出 device 在托上的位置 x、y。device 随衬底一起移动。带 device 的衬底在目标列表里只列出它的 device（例如 *SampleA/D1*）。
+- **Device from photo…**：从一张显微镜照片给选中的衬底添加 device，不必重新识别样品。照片通过已画衬底的四个角和衬底上已有的 device（或本次运行中用过的托照片）来匹配；点出的 device 被添加，已有的不变。
 - **Status**：`ok`，或问题说明（超出样品区、重叠、device 不在衬底上）。图上红色的项目有问题。
 - 滚轮 = 缩放，中键拖动 = 平移，右键 = 显示整个托，Del = 删除选中项（*Delete selected*）。最下面一行显示鼠标处的托坐标。
 
@@ -80,20 +84,15 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 ![从照片识别样品](images/guide/photo_dialog.png)
 
-1. *Open photo…*。右图的托模型上标出了样品区的四个角 **1–4**，下一个要点的点显示为 **红色**。在照片上点击这个点，然后点下一个红色的点（1 左上、2 右上（tab 一侧）、3 右下、4 左下；gating plate：3 和 4 是样品区与接触块相交处）。滚轮 = 缩放（可以放大到足够精确地选点），中键拖动 = 平移，右键 = 显示整张照片；之后可以拖动标记微调。*Clear points* 重新开始。
+1. *Open photo…*（或在 *recent photos…* 中选择本次运行中用过的照片，连同已点的点）。右图的托模型上标出了样品区的四个角 **1–4**，下一个要点的点显示为 **红色**。在照片上点击这个点，然后点下一个红色的点（1 左上、2 右上（tab 一侧）、3 右下、4 左下；gating plate：3 和 4 是样品区与接触块相交处）。滚轮 = 缩放（可以放大到足够精确地选点），中键拖动 = 平移，右键 = 显示整张照片；之后可以拖动标记微调。*Undo last point*（Ctrl+Z）撤销最后一个点，*Clear all points* 重新开始。
 2. 照片被映射到托模型上（右图，蓝色轮廓）。检查轮廓是否和照片中的托重合。光标在右图和照片上都会显示托坐标（x、y，mm）。
    **3D 校正（可选，默认关闭）。** 四个角点能把样品区所在的平面准确映射，无论拍摄角度如何。如果照片明显不是从正上方拍的，其他高度上的东西（较厚的样品、底板）会出现偏移。点击之前勾选 **3D correction**：程序会要求在两个高度上点 8 个点（先是 riser 上样品区的 4 个角，然后是底板顶部的 2 个角和 tab（耳朵）顶部的 2 个角，它们高出底面 1.1 mm），拟合一个相机模型，在每个高度上校正透视；之后底板轮廓会画在它自己的高度上，提示行会给出这些点与模型的吻合程度（像素 rms）。照片基本是正上方拍的就不要打开。
-3. 按颜色识别样品（绿色框；品红色 = 被识别的区域）：
-   - *colour of picked samples*（默认）：在照片或右图中点一下样品来取色（其他种类的样品再按 *Pick sample colour* 取色）；只取与这些颜色接近的区域，银胶、胶水不会被算进去。
-   - *colour different from the bare plate*：与裸托颜色不同的都算，银胶、胶水也会被算进去。如果样品盖住了大部分样品区，按 *Pick bare plate colour* 后在裸托上点一下。
-   - *ΔE threshold*：区分两者的色差（CIELAB）；*min. size* 去掉灰尘；*border left out* 忽略样品区边缘；*noise filter* 填补小空隙（反光）并去掉小斑点。
-   - *sample colours* 后面的色块是已取的颜色，*Clear* 清除它们。*show what is taken* 打开 / 关闭品红色覆盖层；*photo opacity* 调节照片叠在托模型上的透明度。
-4. 手动修正。列表中的框都会被添加；在右图中点击框（Ctrl + 点击：多选）或点击表格行来 *选中*，然后：**Delete selected**（或 Del）删除不是样品的框，**Merge selected** 合并被银胶或引线分成几块的样品。按 **Draw box** 后在右图中拖动，可以添加没被找到的样品。改变阈值后这些修改仍然保留；*Undo hand edits* 撤销全部手动修改。在例子中，左边的小芯片被银胶分成了五块：一起选中后合并成 S2（ΔE 显示 "9 (merged)"）。
-   **名称** 直接在表格里输入（这里 S1 → SampleA）；*Devices* 列是在第 2 页标出的 device 数。
+3. **在右图中给每个样品画框**（*Draw box on plate model*，默认打开）：从样品的一个角拖到对角，照片就叠在托模型下面（*photo opacity* 调节透明度）。框按 0.05 mm 取整。点击选中框（Ctrl + 点击：多选）；**Delete selected**（或 Del）删除，**Merge selected** 合并画在同一样品不同部分上的框，*Remove all boxes* 重新开始。例子中在衬底上画了一个框（绿色）；名称直接在表格里输入（S1 → SampleA）；*Devices* 列是在第 2 页标出的 device 数。
+4. 再对照照片检查一遍：列表中的框都会被添加。
 5. 输入 **高度 H**（从上方看不出来；默认为 *Default H*），可以在表格中逐个修改，或用 *Set H of all*。
 6. 需要的话在第二张照片上定位 device（见下面的第 2 页），然后按 **Add to plate**。勾选 *Remove the samples already on the plate* 会替换托上已有的样品。
 
-框是识别区域在托坐标中的外接矩形；之后可以像手画的样品一样移动、改大小、添加 device。精度取决于四个角点得准不准（约 0.1–0.3 mm），剩下的误差由 Stage & Optics 页的 *Found here* 修正。全部在本机计算，不联网。
+框使用托坐标；之后可以像手画的样品一样移动、改大小、添加 device。精度取决于四个角点得准不准（约 0.1–0.3 mm），剩下的误差由 Stage & Optics 页的 *Found here* 修正。全部在本机计算，不联网。
 
 **怎样点准角点。** 角点是 **凸台**（riser 顶面 = 样品区）的角，不是下面更宽的底板的角。角磨损或变圆时，点在两条直边延长线的交点上。在右图中检查蓝色轮廓是否一圈都沿着凸台边缘和底板：只要有一个角点偏了，整个托都会变形。
 
@@ -138,7 +137,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 ![Found here](images/guide/found_here.png)
 
-照片（或手画）的精度为 0.1–0.3 mm，所以 device 通常是在离列出位置稍远处找到的。当它确实 **位于光斑上且在分析器焦点处** 时，输入当前位置，在 *Found* 中选择该 device，按 **Found here: correct its sample**。窗口要求确认，并给出绘图误差（托上的 Δx、Δy，高度 ΔH）；按 *Yes* 后分两部分修正：
+照片（或手画）的精度为 0.1–0.3 mm，所以 device 通常是在离列出位置稍远处找到的。当它确实 **位于光斑上且在分析器焦点处** 时，输入当前位置，在 *Found* 中选择该 device，按 **Found here: correct plate / sample**。窗口要求确认，并给出绘图误差（托上的 Δx、Δy，高度 ΔH）；按 *Yes* 后分两部分修正：
 
 - **Δy（SZ）** 视为 **样品托** 在样品架中插入的高度不同（每次插入高度不一定相同）：整个托一起移动，**所有** 样品的 SZ 改变相同的量。初始位置列表显示 *plate offset*；超过 2.5 mm 时会提醒检查找到的是否是正确的样品。更换样品托时归零。
 - **Δx 和 ΔH** 只修正该样品（连同所有 device），其他样品不动。
@@ -160,6 +159,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 3. **Compute new position**：在压电台居中、**SN 不变** 的情况下给出 ST、SZ，以及重新聚焦所需的元件位置（表格列出 *now*、*new* 和变化量 Δ）。所跟踪的是当前位置下光斑所在的托上那一点（*Point:* 一行：该处是什么及其托坐标 x、y）。文字说明该点距离分析器焦点有多远、在 *downstream*（沿光束更远处）还是 *upstream*，以及按模型计算的当前距离（超过 50 µm 显示为红色：谱会畸变）。只转 SRn 时表面平面不变，转 SRz 时会改变。
 4. 只有当该点离焦点过远时，才勾选 **Correct SN**（每次重新计算都会恢复为不勾选；见下一节），可看到把该点放到 **分析器焦点上** 所需的 SN、ST、SZ 和元件位置。若电机行程不允许，则给出最接近的可达位置及其与焦点的距离。
 5. **Send to Stage & Optics tab** 采用所显示的结果（勾选时为修正后的结果）；超出行程或样品托会碰到东西时拒绝。
+6. **Sample seen off the piezo centre at the new position?** 如果在新位置上，样品在 PIX / PIY 扫描图上找到了，但不在 piezo 中心（150 µm），输入 **看到它时的 PIX 和 PIY** 以及在那里聚焦的聚焦元件位置，按 **Centre the piezo: correct ST / SZ / SN and the optic**。表格给出 piezo 居中时能看到它的 ST / SZ（SN 不变）和聚焦元件位置（转角不变），以及样品沿光束移动了多少；*Send corrected position to Stage & Optics tab* 把它们送到 Stage 页。
 
 **例子。** D1 在 SRn = 120°、SRz = 0° 时位于光斑上（ST = −2.4601，SZ = 37.8095，SN = 0，capillary 59.6926）；目标：SRn = 92°，SRz = −24°。SN 不变时，ST = −6.0561、SZ = 38.9759、capillary 61.7277 能把 D1 放回光斑上，但它在分析器焦点下游 2035 µm（红色：谱会畸变）。勾选 *Correct SN*：ST = −4.6171，SZ = 38.9759，SN = −1.4390，capillary 不变：D1 位于分析器焦点上。在勾选状态下按 *Send to Stage & Optics tab*：
 
@@ -167,7 +167,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 此时 Stage 页显示在新角度下 **再次找到** 了 D1：样品平面视图中托转到了 SRn = 92°（相对初始取向转了 28°），光斑（×）落在 D1 上，并与分析器焦点（+）重合；俯视图中托转过了 SRz = −24°。在该页按 *Bring target onto the beam* / *Correct SN* 会得到同样的位置。
 
-**线站上的验证**：在 SRn = 92°、SRz = −24°、SN 保持 0 时，D1 实际在 ST = −6.0479、SZ = 38.9880、capillary 61.74 处找到，与上面 SN 不变的预测相差 8 µm、12 µm 和 0.01。
+**线站上的验证**：在 SRn = 92°、SRz = −24°、SN 保持 0 时，D1 实际在 ST = −6.0479、SZ = 38.9880、capillary 61.74 处找到，与上面 SN 不变的预测相差 8 µm、12 µm 和 0.01：转动不会丢失样品，同时给出聚焦所需的聚焦元件位置。
 
 ## Correct SN：把该点放回分析器焦点
 
@@ -183,6 +183,37 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 例子中（左：SN 不变，右：Correct SN，均为 SRn = 92°、SRz = −24°），SN 不变时 D1 上的光斑在分析器焦点下游 2.0 mm；SN = −1.439、ST = −4.617 把它放回焦点，capillary 与转动前一样为 59.6926。
 
 默认保持 SN 不变，一是因为样品台平时就这样操作（表面留在相机的线上，聚焦元件重新聚焦），二是因为 *Correct SN* 是绝对计算：它依赖配置中的 SN_f 和转轴参数。距离显示为红色时再使用它，并检查防碰撞一行：SN 降低会使表面靠近聚焦元件和分析器。在 Stage 页中 *Correct SN* 是一个按钮（针对所选目标和输入的角度），在 Rotate 页中是一个勾选框。
+
+## Quick sample rotation：无需准备直接转动样品
+
+![Quick sample rotation 页](images/guide/quick_rotation_tab.png)
+
+用于 **没有做任何准备** 就在光斑上找到的样品：没有照片，Samples 页里也没有画样品。只需输入样品台位置和样品聚焦时的聚焦元件位置（ZPS / CPS）。
+
+**原理。** zone plate / capillary 的工作距离不变，所以聚焦时的聚焦元件位置说明了样品表面沿光束在哪里。利用 **当前配置** 的光学参考和样品台模型，就能求出样品在托上的位置（x、y）和高度 H，再绕这一点计算转动。本页不使用其他页的任何内容（没有样品，没有 *Found here* 修正），也不会改变其他页。说明文字下方一行给出所用的配置、样品托和光学参考。
+
+1. **Current position**：样品在光斑上且聚焦时的 ST、SZ、SN、SRn、SRz、PIX、PIY，以及聚焦元件位置。
+2. **Wanted angles**，然后按 **Locate the sample and compute the new position**。
+3. 结果：样品在托上的位置（x、y、H，由聚焦位置估算）；**SN 不变** 时新的 ST / SZ 和重新聚焦的聚焦元件位置；此时样品距分析器焦点多远（超过 50 µm 为红色）；勾选 **Correct SN** 时，把它放到分析器焦点上的 SN、ST、SZ 和聚焦元件位置。超出行程或样品托会碰到东西时用红色标出。
+4. **Sample seen off the piezo centre**，与 Rotate sample 页相同（没有 *Send* 按钮：本页独立）。
+
+**例子：Cav，2026-11-14**（配置 2026-11-14 17:37:43 capillary，gating plate）。graphene 样品 Cav 在 SRn = 120°、SRz = 0° 时于 ST = −4.30、SZ = 36.35、SN = −0.05、capillary CPS 61.38 处找到；需要转到 SRz = −26.9°，把 K 点移到狭缝中心。仅凭 CPS，本页给出 Cav 在托上 x = 2.779、y = 4.666 mm，H = 0.840 mm。SN 不变时样品会在分析器焦点下游 2.7 mm（红色），capillary 重新聚焦到 64.21；勾选 *Correct SN*：ST = −5.3615，SZ = 36.35，SN = −1.9613，capillary 61.51（回到分析器焦点）。第 4 步中，若样品在 PIX = 127 µm（偏 23 µm）处看到，piezo 居中时 ST 为 −5.3924。
+
+**估算的精度。** 光学参考的误差 δ 会使该点沿光束移动 δ。对于 Cav，其高度由相机参考线上的 SN 得到更准确的值（H = 0.748），完整预测（Stage & Optics / Rotate 页）为 ST = −5.238、SN = −2.002，实际在 27 µm 以内找到了 Cav（见下一节）；快速估算与之相差 0.12 mm，仍在一张 300 × 300 µm 的 SPEM 扫描图之内。到新位置后在相机 / 谱上确认样品，并用第 4 步把它居中。
+
+## 精度：线站上的实测
+
+使用 2026 年 11 月标定得到的配置测量（报告见 `RealSampleCalibration/docs/reports/`）。位置读数精度 ±0.02 mm；偏差在 SPEM 扫描图（300 × 300 µm，步长 10 µm）上测得。
+
+| 测试 | 转动 | 样品台移动 | 预测误差 | 聚焦 |
+|---|---|---|---|---|
+| device D1（gating plate），2026-11-14 | SRn 120 → 150，SRz 0 → −10，SN 修正 | ST 0.15 mm，SZ 0.09 mm，SN 0.15 mm | **22 µm** | capillary 不变（61.51），谱相同 |
+| 样品 Cav（graphene），2026-11-14 | SRz 0 → −26.9，SN 修正 | ST 0.94 mm，SN 1.95 mm | **27 µm** | capillary 不变（61.38），谱相同 |
+| 标定检验点，2026-11-14 | SRn 100、SRn 100 / SRz −5（测量前预测） | – | ≤ **34 µm** | CPS 预测 61.764，实测 61.76 |
+| Cav 用 zone plate，2026-11-15 | SRn 140 / SRz −15，SN 不变 | – | – | ZPS 预测 54.30，实测 **54.33** |
+| SampleA / D1（本指南），2026-10-24 | SRn 120 → 92，SRz 0 → −24，SN 不变 | ST 3.6 mm，SZ 1.2 mm | **8 µm / 12 µm**（ST / SZ） | capillary 预测 61.73，实测 61.74 |
+
+也就是说，找到并修正（*Found here*）第一个样品后，转动后样品仍在 **50 µm 以内**——在同一张 SPEM 扫描图上——而聚焦元件位置（或 SN 修正）让它保持 **聚焦**，即使是 25° 的 SRz 转动（否则该点会沿光束滑动 2–3 mm）。仅凭照片，第一个样品可在 0.1–0.3 mm 内找到（2026-11-14 的 D1：在一张模糊照片上 x、y 各偏 0.10 mm）。预测的好坏取决于配置：如果 *Found here* 使某个样品移动超过 0.3 mm，或几个样品移动相同的量，请告知线站人员。
 
 ## 为布里渊区高对称点寻找转角
 
@@ -218,11 +249,11 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 ## 一次典型的机时流程
 
 1. 启动 QuickAlignment，确认样品托和聚焦元件。
-2. 在 mount 照片上识别样品（*From photo…*），在显微镜照片上定位 device（第 2 页），或者手画；也可以打开机时前准备好的 session。按 *Samples placed → Stage*。
+2. 在 mount 照片上标出样品（*From photo…*），在显微镜照片上定位 device（第 2 页），或者手画；也可以打开机时前准备好的 session。按 *Samples placed → Stage*。（没时间？先在光斑上找到样品，再用 *Quick sample rotation* 页。）
 3. 用列出的 ST / SZ / SN（SRn = 120°，SRz = 0°）移到第一个样品或 device，用光斑找到它（相机、光电子 map）。
 4. *Found here*：修正它的位置，其他样品随之也会更准。
 5. 在 SRn = 120°、SRz = 0° 测一张 map；在 ARPES viewer 中读出 Γ 和一个 K / M 点。
-6. 请 agent 给出布里渊区点的转角 → 填入 *Wanted angles* → *Compute new position*（若该点距分析器焦点超过 50 µm，勾选 *Correct SN*）→ *Send to Stage & Optics tab*。
+6. 请 agent 给出布里渊区点的转角 → 填入 *Wanted angles* → *Compute new position*（若该点距分析器焦点超过 50 µm，勾选 *Correct SN*）→ *Send to Stage & Optics tab*。如果之后在扫描图上看到样品不在 piezo 中心，用 Rotate 页的第 6 步把它居中。
 7. 保存 session。
 
 ## 提示信息与处理方法

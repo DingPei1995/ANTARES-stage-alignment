@@ -28,7 +28,11 @@ HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE / "src"))
 
 import numpy as np  # noqa: E402
+import matplotlib  # noqa: E402
 from matplotlib.transforms import Bbox  # noqa: E402
+
+# the schematic as drawn by the program on the beamline computers (Windows: 72 dpi figure text scale)
+matplotlib.rcParams["figure.dpi"] = 90
 
 from quickalignment.core.calibration import CalibrationStore  # noqa: E402
 from quickalignment.core.geometry import STANDARD_PLATE, SampleLayout  # noqa: E402
@@ -39,6 +43,8 @@ from quickalignment.ui._qt import QtCore, QtGui, QtWidgets  # noqa: E402
 USER_OUT = HERE / "QuickAlignment" / "docs" / "images" / "guide"
 STAFF_OUT = HERE / "RealSampleCalibration" / "docs" / "images" / "guide"
 Qt = QtCore.Qt
+BEAMTIME_CONFIG = "calibration_2026-10-24_235500_capillary.json"  # the user guide example (SampleA / D1, 2026-10-24)
+CAV_CONFIG = "calibration_2026-11-14_173743_capillary.json"  # the Cav rotation test of the 2026-11-14 report
 
 
 def settle(app, n: int = 5) -> None:
@@ -141,6 +147,7 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     dlg.close()
 
     win = MainWindow(Session(SampleLayout(plate=GATING_PLATE, samples=[])), store=store, optic="capillary")
+    win._on_record(record(store, BEAMTIME_CONFIG))  # the configuration of the beamtime of the example
     win.resize(1450, 860)
     win.show()
     editor = win.editor
@@ -221,7 +228,7 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     st.update_view()
 
     # Rotate sample tab: to SRn 92, SRz -24 (the second rotation of the beamtime)
-    win.resize(1450, 860)
+    win.resize(1450, 1000)
     win.tabs.setCurrentWidget(win.rotation)
     rp = win.rotation
     rp.copy_from_stage()
@@ -245,11 +252,43 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     save(win, "rotate_found", app)
     correct_sn_figure(kept, top_view(st))
 
+    quick_rotation_shots(app, store)
+
     win.open_calibration()
     win.cal_dialog.store = store
     hide_tmp_folder(win.cal_dialog)
     save(win.cal_dialog, "configuration_dialog", app)
     win.cal_dialog.close()
+    win.close()
+
+
+def record(store: CalibrationStore, name: str):
+    """The configuration saved in the file `name` of configs/."""
+    return next(r for r in store.records() if r.path.name == name)
+
+
+def quick_rotation_shots(app, store: CalibrationStore) -> None:
+    """Quick sample rotation tab, on the test of the 2026-11-14 capillary report (section 9): sample Cav on the
+    gating plate found at SRn 120 / SRz 0 (ST -4.30, SZ 36.35, SN -0.05, CPS 61.38), turned to SRz -26.9 with SN
+    corrected; on the SPEM map after the turn it was seen 23 um off in PIX (step 4)."""
+    from quickalignment.ui.main_window import MainWindow
+    from quickalignment.core.geometry import GATING_PLATE
+
+    win = MainWindow(Session(SampleLayout(plate=GATING_PLATE, samples=[])), store=store, optic="capillary")
+    win._on_record(record(store, CAV_CONFIG))
+    win.resize(1450, 1400)
+    win.show()
+    q = win.quick_rotation
+    win.tabs.setCurrentWidget(q)
+    q.measured.set_value(MotorPositions(st=-4.30, sn=-0.05, sz=36.35, srn=120, srz=0))
+    q.measured_optic.setValue(61.38)
+    q.new_srn.setValue(120.0)
+    q.new_srz.setValue(-26.9)
+    q.compute()
+    q.correct_sn.setChecked(True)
+    q.piezo.pix.setValue(150.0 - 23.0)
+    q.piezo.compute()
+    save(win, "quick_rotation_tab", app)
     win.close()
 
 

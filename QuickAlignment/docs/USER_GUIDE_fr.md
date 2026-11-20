@@ -12,10 +12,12 @@ choisir la rotation pour un point de la zone de Brillouin
 5. [Onglet Stage & Optics : aller sur un échantillon](#onglet-stage--optics--aller-sur-un-échantillon)
 6. [Onglet Rotate sample : tourner sans perdre l'échantillon](#onglet-rotate-sample--tourner-sans-perdre-léchantillon)
 7. [Correct SN : remettre le point au foyer de l'analyseur](#correct-sn--remettre-le-point-au-foyer-de-lanalyseur)
-8. [Trouver les angles pour un point de la zone de Brillouin](#trouver-les-angles-pour-un-point-de-la-zone-de-brillouin)
-9. [Sessions, plaquette et configuration](#sessions-plaquette-et-configuration)
-10. [Un temps de faisceau type](#un-temps-de-faisceau-type)
-11. [Messages et que faire](#messages-et-que-faire)
+8. [Quick sample rotation : un échantillon trouvé sans préparation](#quick-sample-rotation--un-échantillon-trouvé-sans-préparation)
+9. [Quelle précision : tests sur la ligne](#quelle-précision--tests-sur-la-ligne)
+10. [Trouver les angles pour un point de la zone de Brillouin](#trouver-les-angles-pour-un-point-de-la-zone-de-brillouin)
+11. [Sessions, plaquette et configuration](#sessions-plaquette-et-configuration)
+12. [Un temps de faisceau type](#un-temps-de-faisceau-type)
+13. [Messages et que faire](#messages-et-que-faire)
 
 ---
 
@@ -26,17 +28,22 @@ traduit la géométrie de la plaquette et des échantillons en **positions moteu
 
 - où se trouve chaque échantillon ou dispositif à l'orientation de départ (ST, SZ, SN à SRn = 120°, SRz = 0°) ;
 - les ST / SN / SZ et la position de l'optique qui mettent un échantillon sous le faisceau, au foyer de l'analyseur ;
-- après une rotation (SRn, SRz), les positions qui ramènent le même point sous le faisceau ;
+- après une rotation (SRn, SRz), les positions qui ramènent le même point sous le faisceau, avec la position de
+  l'optique qui le garde au point ;
+- pour un échantillon trouvé sous le faisceau sans aucune préparation (sans photo), la même chose après une
+  rotation, à partir de la seule position de l'optique (onglet *Quick sample rotation*) ;
 - pour un cristal hexagonal 2D (graphène, WSe2, …), les SRn / SRz qui amènent Γ, K ou M au centre de la fente, et
   que faire quand la platine ne peut pas les atteindre.
 
 Le programme ne déplace jamais de moteur : il calcule des nombres, que vous entrez dans le contrôle-commande de la ligne.
 
 **L'exemple de ce guide.** Toutes les images suivent un cas réel : une **plaquette gating** portant le substrat
-**SampleA** (Si, H = 0,525 mm) et son dispositif **D1**, mesurés avec le **capillaire** en octobre 2026. Les
-échantillons sont trouvés sur une photo de téléphone de la plaquette, D1 sur une photo au microscope ; D1 est amené
-sous le faisceau à l'orientation de départ, sa position est corrigée une fois trouvé, puis la plaquette est tournée à
-SRn = 92°, SRz = −24°, où D1 a été retrouvé sur la ligne à la position prédite.
+**SampleA** (Si, H = 0,525 mm) et son dispositif **D1**, mesurés avec le **capillaire** en octobre 2026 (avec la
+configuration de ce temps de faisceau, 2026-10-24 23:55). Le substrat est marqué sur une photo de téléphone de la
+plaquette, D1 sur une photo au microscope ; D1 est amené sous le faisceau à l'orientation de départ, sa position est
+corrigée une fois trouvé, puis la plaquette est tournée à SRn = 92°, SRz = −24°, où D1 a été retrouvé sur la ligne à
+la position prédite. L'onglet *Quick sample rotation* est montré sur l'échantillon de graphène **Cav** du rapport de
+calibration du 2026-11-14.
 
 ## Démarrer le programme
 
@@ -78,7 +85,7 @@ configuration). Les champs moteurs refusent les valeurs hors course.
 ![Onglet Samples](images/guide/samples_tab.png)
 
 L'image montre la plaquette de l'exemple après *From photo…* (section suivante) : le substrat SampleA avec son
-dispositif D1 (sélectionné, repère bleu), et une petite puce S2. La croix rouge est le centre de la plaquette
+dispositif D1 (sélectionné, repère bleu). La croix rouge est le centre de la plaquette
 (x = y = 0) ; le cadre gris est la zone d'échantillons (plaquette gating : 11 × 10,5 mm au-dessus du bloc de contact).
 
 - **Dessiner un échantillon** : glisser sur une partie vide de la plaquette. Le **déplacer** en le faisant glisser,
@@ -91,6 +98,10 @@ dispositif D1 (sélectionné, repère bleu), et une petite puce S2. La croix rou
   bleu. Le tableau et la ligne en dessous donnent aussi la position x, y du dispositif sur la plaquette. Les
   dispositifs suivent leur substrat ; un substrat avec dispositifs n'apparaît que par ses dispositifs dans les listes
   de cibles (par ex. *SampleA/D1*).
+- **Device from photo…** : ajoute des dispositifs au substrat sélectionné depuis une photo au microscope, sans
+  retrouver les échantillons. La photo est appariée sur les coins du substrat tel qu'il est dessiné et sur les
+  dispositifs déjà placés (ou sur une photo de plaquette utilisée plus tôt pendant que le programme tourne) ; les
+  dispositifs cliqués sont ajoutés, ceux déjà présents ne changent pas.
 - **Status** : `ok`, ou le problème (hors de la zone, chevauchement, dispositif hors du substrat). Les éléments rouges
   du dessin ont un problème.
 - Molette = zoom, bouton du milieu = déplacer, clic droit = plaquette entière, Suppr = effacer la sélection (*Delete
@@ -103,11 +114,13 @@ Au lieu de les dessiner, les échantillons peuvent être trouvés sur une photo 
 
 ![Échantillons depuis une photo](images/guide/photo_dialog.png)
 
-1. *Open photo…*. La vue de droite montre le modèle de la plaquette avec les quatre coins de la zone d'échantillons
+1. *Open photo…* (ou une photo déjà utilisée pendant que le programme tourne, avec ses points, dans *recent
+   photos…*). La vue de droite montre le modèle de la plaquette avec les quatre coins de la zone d'échantillons
    numérotés **1–4** ; celui à cliquer ensuite est en **rouge**. Cliquer ce point sur la photo, puis le rouge suivant
    (1 haut gauche, 2 haut droit côté languette, 3 bas droit, 4 bas gauche ; plaquette gating : 3 et 4 sont où la zone
    rencontre le bloc de contacts). Molette = zoom (zoomer autant que nécessaire pour placer le point), bouton du milieu
-   = déplacer, clic droit = photo entière ; faire glisser les repères ensuite pour affiner. *Clear points* recommence.
+   = déplacer, clic droit = photo entière ; faire glisser les repères ensuite pour affiner. *Undo last point* (Ctrl+Z)
+   retire le dernier point, *Clear all points* recommence.
 2. La photo est projetée sur le modèle de la plaquette (vue de droite, contours bleus). Vérifier que les contours sont
    sur la plaquette. Le curseur donne les coordonnées plaquette (x, y en mm) dans la vue de droite et sur la photo.
    **Correction 3D (optionnelle, désactivée par défaut).** Quatre coins projettent exactement le plan de la zone
@@ -118,31 +131,19 @@ Au lieu de les dessiner, les échantillons peuvent être trouvés sur une photo 
    et corrige la perspective à toutes les hauteurs ; le contour de la plaque de base est alors dessiné à sa hauteur et
    la ligne d'instructions indique l'accord des points (rms en pixels). Pour une photo prise à peu près à la verticale,
    la laisser désactivée.
-3. Les échantillons sont trouvés par leur couleur (cadres verts, magenta = ce qui est retenu) :
-   - *colour of picked samples* (par défaut) : cliquer sur un échantillon, sur la photo ou dans la vue de droite, pour
-     prendre sa couleur (*Pick sample colour* pour une autre sorte d'échantillon) ; seules les régions proches de ces
-     couleurs sont retenues, sans la laque d'argent ni la colle.
-   - *colour different from the bare plate* : tout ce qui est sur la plaquette, laque d'argent et colle comprises. Si
-     les échantillons couvrent presque toute la zone, *Pick bare plate colour* puis cliquer sur la plaquette nue.
-   - *ΔE threshold* : l'écart de couleur (CIELAB) qui les sépare ; *min. size* écarte les poussières ; *border left
-     out* ignore le bord de la zone ; *noise filter* comble les petits trous (reflets) et retire les points isolés.
-   - Les pastilles après *sample colours* sont les couleurs prises ; *Clear* les oublie. *show what is taken* affiche
-     ou cache le magenta ; *photo opacity* règle la transparence de la photo sur le modèle.
-4. Corriger à la main. Tous les cadres de la liste sont ajoutés ; *sélectionner* des cadres en cliquant dessus dans la
-   vue de droite (Ctrl + clic : plusieurs) ou sur leurs lignes, puis : **Delete selected** (ou Suppr) retire ce qui
-   n'est pas un échantillon, **Merge selected** réunit les morceaux d'un échantillon coupé par de la laque ou des fils.
-   **Draw box** puis glisser dans la vue de droite ajoute un échantillon non trouvé. Ces corrections restent quand le
-   seuil change ; *Undo hand edits* les oublie. Dans l'exemple, la petite puce de gauche est coupée en cinq morceaux
-   par sa laque d'argent : ils sont sélectionnés ensemble et réunis en S2 (ΔE « 9 (merged) »).
-   Les **noms** se tapent dans le tableau (ici S1 → SampleA) ; la colonne *Devices* compte les dispositifs marqués dans
-   l'onglet 2.
+3. **Dessiner un cadre sur chaque échantillon** dans la vue de droite (*Draw box on plate model*, actif par défaut) :
+   glisser d'un coin de l'échantillon au coin opposé, sur la photo placée sous le modèle (*photo opacity* règle sa
+   transparence). Les cadres sont arrondis à 0,05 mm. Un clic sélectionne un cadre (Ctrl + clic : plusieurs) ;
+   **Delete selected** (ou Suppr) le retire, **Merge selected** réunit les cadres dessinés sur les morceaux d'un même
+   échantillon, *Remove all boxes* recommence. Dans l'exemple un cadre est dessiné sur le substrat (vert) ; son nom se
+   tape dans le tableau (S1 → SampleA) ; la colonne *Devices* compte les dispositifs marqués dans l'onglet 2.
+4. Comparer encore une fois les cadres à la photo : tous les cadres de la liste sont ajoutés.
 5. Entrer la **hauteur H** (invisible d'en haut ; par défaut *Default H*), par échantillon dans le tableau ou avec
    *Set H of all*.
 6. Si besoin, placer les dispositifs sur une deuxième photo (onglet 2, ci-dessous), puis **Add to plate**. *Remove the
    samples already on the plate* remplace les échantillons présents.
 
-Les cadres sont les rectangles englobants de ce qui a été trouvé, en coordonnées plaquette ; ils se déplacent, se
-redimensionnent et reçoivent des dispositifs comme les échantillons dessinés. La précision dépend des clics sur les
+Les cadres sont en coordonnées plaquette ; ils se déplacent, se redimensionnent et reçoivent des dispositifs comme les échantillons dessinés. La précision dépend des clics sur les
 coins (environ 0,1–0,3 mm) ; *Found here* dans l'onglet Stage & Optics corrige le reste. Tout est calculé sur
 l'ordinateur, rien n'est envoyé.
 
@@ -240,7 +241,7 @@ pour repère).
 
 La photo (ou le dessin) est juste à 0,1–0,3 mm près : un dispositif se trouve donc en général un peu à côté de sa
 position listée. Une fois qu'il est vraiment **sous le faisceau et au foyer de l'analyseur**, entrer les positions,
-choisir le dispositif sous *Found* et appuyer sur **Found here: correct its sample**. La fenêtre demande confirmation
+choisir le dispositif sous *Found* et appuyer sur **Found here: correct plate / sample**. La fenêtre demande confirmation
 et donne l'erreur du dessin (Δx, Δy sur la plaquette, ΔH en hauteur) ; *Yes* l'applique en deux parties :
 
 - **Δy (SZ)** est attribué à la **plaquette**, entrée à une autre hauteur dans le porte-échantillon (elle n'entre pas
@@ -290,6 +291,12 @@ Garder une distance de sécurité et surveiller la caméra.
    course moteur ne le permet pas, la position atteignable la plus proche est donnée avec sa distance au foyer.
 5. **Send to Stage & Optics tab** reprend la solution affichée (cochée : la solution corrigée), refusé si hors course
    ou si la plaquette touchait quelque chose.
+6. **Sample seen off the piezo centre at the new position?** Si, à la nouvelle position, l'échantillon est trouvé sur
+   une carte PIX / PIY mais pas au centre du piezo (150 µm), entrer les **PIX et PIY où il est vu** et la position de
+   l'optique au point à cet endroit, puis **Centre the piezo: correct ST / SZ / SN and the optic**. Le tableau donne
+   les ST / SZ (SN gardé) et la position de l'optique qui le montrent avec le piezo centré (les rotations ne changent
+   pas), et de combien l'échantillon se déplace le long du faisceau ; *Send corrected position to Stage & Optics
+   tab* les reprend.
 
 **Exemple.** D1 est sous le faisceau à SRn = 120°, SRz = 0° (ST = −2.4601, SZ = 37.8095, SN = 0, capillaire
 59.6926) ; voulu : SRn = 92°, SRz = −24°. Avec SN gardé, ST = −6.0561, SZ = 38.9759 et le capillaire à 61.7277
@@ -305,7 +312,8 @@ foyer de l'analyseur (+) ; la vue de dessus montre la plaquette tournée de SRz 
 *Correct SN* y donnent les mêmes positions.
 
 **Vérifié sur la ligne** : à SRn = 92°, SRz = −24° avec SN gardé à 0, D1 a été trouvé à ST = −6.0479,
-SZ = 38.9880, capillaire 61.74, à 8 µm, 12 µm et 0.01 de la prédiction avec SN gardé ci-dessus.
+SZ = 38.9880, capillaire 61.74, à 8 µm, 12 µm et 0.01 de la prédiction avec SN gardé ci-dessus : la rotation ne
+fait pas perdre l'échantillon, et la position de l'optique pour la mise au point est donnée avec elle.
 
 ## Correct SN : remettre le point au foyer de l'analyseur
 
@@ -337,6 +345,66 @@ refocalise) et parce que *Correct SN* est absolu : il repose sur le SN_f et les 
 L'utiliser quand la distance est en rouge, et regarder la ligne d'anticollision : un SN plus bas rapproche la surface
 de l'optique et de l'analyseur. Dans l'onglet Stage, *Correct SN* est un bouton (pour la cible choisie aux angles
 entrés) ; dans l'onglet Rotate, une case à cocher.
+
+## Quick sample rotation : un échantillon trouvé sans préparation
+
+![Onglet Quick sample rotation](images/guide/quick_rotation_tab.png)
+
+Pour un échantillon trouvé sous le faisceau **sans aucune préparation** : pas de photo, pas d'échantillons dessinés
+dans l'onglet Samples. On entre seulement les positions de la platine et la position de l'optique (ZPS / CPS) où
+l'échantillon est au point.
+
+**Principe.** La distance de travail de la zone plate / du capillaire ne change pas : la position de l'optique au
+point indique où se trouve la surface le long du faisceau. Avec la référence optique et le modèle de platine de la
+**configuration utilisée**, on en déduit où est l'échantillon sur la plaquette (x, y) et sa hauteur H, et la rotation
+est calculée autour de ce point. L'onglet n'utilise rien des autres onglets (ni échantillons, ni correction *Found
+here*) et n'y change rien. La ligne sous l'explication donne la configuration, la plaquette et la référence optique
+utilisées.
+
+1. **Current position** : ST, SZ, SN, SRn, SRz, PIX, PIY avec l'échantillon sous le faisceau et au point, et la
+   position de l'optique.
+2. **Wanted angles**, puis **Locate the sample and compute the new position**.
+3. Le résultat : où est l'échantillon sur la plaquette (x, y, H, estimés depuis le foyer de l'optique) ; les nouveaux
+   ST / SZ avec **SN gardé** et la position de l'optique qui refait le point ; la distance au foyer de l'analyseur
+   (en rouge au-delà de 50 µm) ; et, avec **Correct SN** coché, SN, ST, SZ et l'optique qui le mettent au foyer de
+   l'analyseur. Une position hors course ou où la plaquette toucherait quelque chose est écrite en rouge.
+4. **Sample seen off the piezo centre**, comme dans l'onglet Rotate sample (sans bouton *Send* : l'onglet reste
+   indépendant).
+
+**Exemple : Cav, 2026-11-14** (configuration 2026-11-14 17:37:43 capillary, plaquette gating). L'échantillon de
+graphène Cav a été trouvé à SRn = 120°, SRz = 0° à ST = −4.30, SZ = 36.35, SN = −0.05, capillaire CPS 61.38 ; il
+fallait le tourner à SRz = −26.9° pour amener le point K au centre de la fente. À partir du seul CPS, l'onglet place
+Cav à x = 2.779, y = 4.666 mm sur la plaquette, H = 0.840 mm. Avec SN gardé l'échantillon serait à 2,7 mm en aval du
+foyer de l'analyseur (rouge), capillaire refocalisé à 64.21 ; avec *Correct SN* : ST = −5.3615, SZ = 36.35,
+SN = −1.9613, capillaire 61.51 (de retour au foyer de l'analyseur). À l'étape 4, un échantillon vu à PIX = 127 µm
+(23 µm à côté) donne ST −5.3924 avec le piezo centré.
+
+**Ce que vaut l'estimation.** Une erreur δ de la référence optique déplace le point de δ le long du faisceau. Pour
+Cav, dont la hauteur était mieux connue par son SN sur la ligne de la caméra (H = 0.748), la prédiction complète
+(onglets Stage & Optics / Rotate) était ST = −5.238, SN = −2.002, et Cav y a été retrouvé à 27 µm près (section
+suivante) ; l'estimation rapide en est à 0,12 mm, bien à l'intérieur d'une seule carte SPEM de 300 × 300 µm. Vérifier
+l'échantillon sur la caméra / le spectre à la nouvelle position, et le centrer avec l'étape 4.
+
+## Quelle précision : tests sur la ligne
+
+Mesuré avec les configurations des calibrations de novembre 2026 (rapports dans
+`RealSampleCalibration/docs/reports/`). Positions lues à ±0,02 mm ; écarts mesurés sur des cartes SPEM
+(300 × 300 µm, pas de 10 µm).
+
+| test | rotation | déplacement de la platine | erreur de prédiction | mise au point |
+|---|---|---|---|---|
+| dispositif D1 (plaquette gating), 2026-11-14 | SRn 120 → 150, SRz 0 → −10, SN corrigé | ST 0,15 mm, SZ 0,09 mm, SN 0,15 mm | **22 µm** | capillaire inchangé (61.51), mêmes spectres |
+| échantillon Cav (graphène), 2026-11-14 | SRz 0 → −26.9, SN corrigé | ST 0,94 mm, SN 1,95 mm | **27 µm** | capillaire inchangé (61.38), mêmes spectres |
+| points de contrôle de la calibration, 2026-11-14 | SRn 100, SRn 100 / SRz −5 (prédits avant la mesure) | – | ≤ **34 µm** | CPS 61.764 prédit, 61.76 trouvé |
+| Cav avec la zone plate, 2026-11-15 | SRn 140 / SRz −15, SN gardé | – | – | ZPS 54.30 prédit, **54.33** trouvé |
+| SampleA / D1 (ce guide), 2026-10-24 | SRn 120 → 92, SRz 0 → −24, SN gardé | ST 3,6 mm, SZ 1,2 mm | **8 µm / 12 µm** (ST / SZ) | capillaire 61.73 prédit, 61.74 trouvé |
+
+Ainsi, une fois le premier échantillon trouvé et corrigé (*Found here*), une rotation le garde **à moins de 50 µm**
+— sur la même carte SPEM — et la position de l'optique (ou la correction de SN) le garde **au point**, même pour des
+rotations SRz de 25° où le point glisserait sinon de 2–3 mm le long du faisceau. Sur la photo seule, le premier
+échantillon est trouvé à 0,1–0,3 mm (D1 le 2026-11-14 : 0,10 mm en x et en y sur une photo floue). Les prédictions
+valent ce que vaut la configuration : si *Found here* déplace un échantillon de plus de 0,3 mm, ou plusieurs
+échantillons de la même quantité, prévenir le personnel de la ligne.
 
 ## Trouver les angles pour un point de la zone de Brillouin
 
@@ -394,14 +462,16 @@ lors d'un nouveau type de mesure, vérifier que le point apparaît là où l'age
 ## Un temps de faisceau type
 
 1. Lancer QuickAlignment, confirmer plaquette et optique.
-2. Trouver les échantillons sur la photo de montage (*From photo…*), placer les dispositifs sur une photo au
-   microscope (onglet 2), ou les dessiner ; ou ouvrir la session préparée avant. *Samples placed → Stage*.
+2. Marquer les échantillons sur la photo de montage (*From photo…*), placer les dispositifs sur une photo au
+   microscope (onglet 2), ou les dessiner ; ou ouvrir la session préparée avant. *Samples placed → Stage*. (Pas le
+   temps ? Trouver l'échantillon sous le faisceau et utiliser l'onglet *Quick sample rotation*.)
 3. Aller au premier échantillon ou dispositif avec les ST / SZ / SN listés (SRn = 120°, SRz = 0°) ; le trouver avec le
    faisceau (caméra, carte de photoémission).
 4. *Found here* : corriger sa position. Les autres tombent alors juste aussi.
 5. Mesurer une carte à SRn = 120°, SRz = 0° ; lire Γ et un point K / M dans ARPES viewer.
 6. Demander à l'agent les angles du point de zone → *Wanted angles* → *Compute new position* (cocher *Correct SN* si le point est à
-   plus de 50 µm du foyer) → *Send to Stage & Optics tab*.
+   plus de 50 µm du foyer) → *Send to Stage & Optics tab*. Si l'échantillon est ensuite vu hors du centre du piezo
+   sur une carte, l'étape 6 de l'onglet Rotate le recentre.
 7. Enregistrer la session.
 
 ## Messages et que faire

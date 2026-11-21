@@ -455,6 +455,7 @@ class PlateEditor(QtWidgets.QWidget):
         # height check: H is often not known or not measured. The sample top surface is driven onto the camera
         # reference line (analyzer focal plane) at SRn ref, SRz 0, and the SN read there gives H (by eye).
         self.config_getter = None  # set by the main window: the StageConfig in use (SN_f, SRn ref)
+        self.height_exact_getter = None  # set by the main window: H of a sample confirmed exact (Stage & Optics)
         self.check_combo = QtWidgets.QComboBox()
         self.check_combo.setToolTip("Sample whose top surface was put on the reference line")
         self.check_sn = QtWidgets.QDoubleSpinBox()
@@ -468,6 +469,7 @@ class PlateEditor(QtWidgets.QWidget):
         self._check_sn_typed = False  # an SN typed in the field but not set yet (asked at "Samples placed")
         self.check_sn.valueChanged.connect(lambda _v: self._on_check_sn_typed(True))
         self.check_combo.currentTextChanged.connect(lambda _t: self._on_check_sn_typed(self._check_sn_typed))
+        self.check_combo.currentTextChanged.connect(lambda _t: self._refresh_sn_hint())
         check_btn = QtWidgets.QPushButton(SET_SN_BUTTON)
         check_btn.setToolTip("Rough height by eye: the SN at which the sample top surface is on the camera reference\n"
                              "line gives the sample height H (about ±0.05 mm), and 'Bring target onto the beam' then\n"
@@ -478,6 +480,10 @@ class PlateEditor(QtWidgets.QWidget):
         self.check_label = QtWidgets.QLabel()
         self.check_label.setWordWrap(True)
         self.check_label.setStyleSheet("color: #555;")
+        # the SN that the sample's H gives, and which SN the start positions use (from H, or the SN set by eye)
+        self.sn_hint = QtWidgets.QLabel()
+        self.sn_hint.setWordWrap(True)
+        self.sn_hint.setTextInteractionFlags(Qt.TextSelectableByMouse)
         check_box = QtWidgets.QGroupBox("Set SN by eye (optional, rough ±0.05 mm): top surface on the camera "
                                         "reference line")
         cb = QtWidgets.QGridLayout(check_box)
@@ -486,7 +492,8 @@ class PlateEditor(QtWidgets.QWidget):
         cb.addWidget(QtWidgets.QLabel("SN at SRn 120°, SRz 0°"), 0, 2)
         cb.addWidget(self.check_sn, 0, 3)
         cb.addWidget(check_btn, 0, 4)
-        cb.addWidget(self.check_label, 1, 0, 1, 5)
+        cb.addWidget(self.sn_hint, 1, 0, 1, 5)
+        cb.addWidget(self.check_label, 2, 0, 1, 5)
         cb.setColumnStretch(1, 1)
 
         self.info = QtWidgets.QLabel()
@@ -887,6 +894,37 @@ class PlateEditor(QtWidgets.QWidget):
         self.check_label.setText("Checked: " + "; ".join(done) if done else
                                  "Drive the sample top surface onto the camera reference line at SRn 120°, SRz 0°, "
                                  f"type the SN read there and press {SET_SN_BUTTON}.")
+        self._refresh_sn_hint()
+
+    def sn_from_h(self, sample) -> float:
+        """SN putting the top surface of `sample` (its H) on the camera reference line at SRn 120°, SRz 0°."""
+        from ..core.stage import StageConfig, sn_from_height
+        config = self.config_getter() if self.config_getter else StageConfig()
+        return sn_from_height(config, sample.height, self.layout_model.plate)
+
+    def _refresh_sn_hint(self) -> None:
+        """Which SN the start positions use for the chosen sample: the SN set by eye if there is one, else the SN
+        from its height H (in red: right only if H is exact, otherwise set the SN by eye)."""
+        sample = next((s for s in self.layout_model.samples if s.name == self.check_combo.currentText()), None)
+        if sample is None:
+            self.sn_hint.hide()
+            return
+        sn = round(self.sn_from_h(sample), 3) + 0.0  # no "-0.000"
+        if sample.sn_checked is not None:
+            color = "#207020"
+            text = (f"{sample.name}: the SN set by eye, {sample.sn_checked:.3f} mm, is used (H = {sample.height:.3f} mm "
+                    "follows from it).")
+        elif self.height_exact_getter is not None and self.height_exact_getter(sample):
+            color = "#207020"
+            text = (f"{sample.name}: H = {sample.height:.3f} mm is exact, so its SN is <b>{sn:.3f} mm</b> (used for the "
+                    "start positions); no need to set it by eye.")
+        else:
+            color = "#c00000"
+            text = (f"If H = {sample.height:.3f} mm of {sample.name} is exact, its SN is <b>{sn:.3f} mm</b> (from H and "
+                    f"SN_f; used for the start positions). If H is not exact, correct it with {SET_SN_BUTTON}.")
+        self.sn_hint.setStyleSheet(f"color: {color};")
+        self.sn_hint.setText(text)
+        self.sn_hint.show()
 
     def apply_height_check(self, sn: float | None = None, name: str | None = None) -> float | None:
         """H of the chosen sample from the SN at which its top surface is on the reference line; returns ΔH."""

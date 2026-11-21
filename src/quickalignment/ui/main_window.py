@@ -30,6 +30,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stage = StagePanel(lambda: self.editor.layout_model)
         self.editor.config_getter = self.stage.config  # SN_f of the configuration in use, for the height check
         self.stage.default_height_getter = self.editor.default_height  # to tell an H never entered
+        self.editor.height_exact_getter = self.stage.is_exact  # the SN hint of Set SN by eye
+        self.stage.heightConfirmed.connect(self.editor._refresh_sn_hint)
         self.editor.layoutChanged.connect(self.stage.refresh_targets)
         self.editor.samplesPlaced.connect(self.go_to_stage)
         self.stage.layoutCorrected.connect(self._on_layout_corrected)

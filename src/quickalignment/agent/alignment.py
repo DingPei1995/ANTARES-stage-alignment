@@ -786,8 +786,11 @@ class AlignmentSession:
             m = MotorPositions(st=st, sn=sn, sz=sz, srn=c.srn_ref, srz=0.0, pix=c.pi_center, piy=c.pi_center)
             row = {"target": label, "x": rounded(u, 3), "y": rounded(v, 3), "ST": rounded(st), "SZ": rounded(sz),
                    "SN": rounded(sn), "out_of_range": out_of_range(m)}
-            if label != "plate centre" and checked_sn(self.layout, label) is not None:
-                row["height_checked"] = True
+            if label != "plate centre":
+                checked = checked_sn(self.layout, label) is not None
+                row["SN_source"] = "set by eye" if checked else "from H (right only if H is exact)"
+                if checked:
+                    row["height_checked"] = True
             rows.append(row)
         return {"rotation": {"SRn": c.srn_ref, "SRz": 0.0, "PIX": c.pi_center, "PIY": c.pi_center},
                 "configuration": self.record.label, "plate_offset_mm": rounded(self.layout.plate_offset_v, 4),

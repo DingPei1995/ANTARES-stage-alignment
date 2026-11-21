@@ -115,6 +115,7 @@ class MotorForm(QtWidgets.QWidget):
 
 class StagePanel(QtWidgets.QWidget):
     layoutCorrected = Signal(str)  # a sample was moved to where its target was found
+    heightConfirmed = Signal()  # the H of a sample was confirmed as exact (SN hint of the Samples tab)
 
     def __init__(self, layout_getter, parent=None):
         super().__init__(parent)
@@ -510,6 +511,9 @@ class StagePanel(QtWidgets.QWidget):
         changed = abs(sample.height - h) > 5e-7 or sample.sn_checked is not None
         sample.height, sample.sn_checked = h, None
         self._exact[id(sample)] = h
+        self.heightConfirmed.emit()
+        if not self.start_box.isHidden():
+            self.show_start_positions()
         if changed:
             self.layoutCorrected.emit(sample.name)
             self.refresh_targets()
@@ -798,7 +802,9 @@ class StagePanel(QtWidgets.QWidget):
         rows = []
         for label in ["plate centre", *self.target_labels()]:
             st, sz, sn = (unsigned_zero(x, 3) for x in model.reference_motors(*self.target_point(label)))
-            mark = " (H checked)" if checked_sn(layout, label) is not None else ""
+            sample = layout.sample_of(label)
+            mark = ("" if sample is None else " (by eye)" if sample.sn_checked is not None
+                    else " (exact H)" if self.is_exact(sample) else " (from H)")
             rows.append(f"<tr><td>{label}</td><td align=right>{st:.3f}</td><td align=right>{sz:.3f}</td>"
                         f"<td align=right>{sn:.3f}{mark}</td></tr>")
         if layout.plate_offset_v:
@@ -810,7 +816,8 @@ class StagePanel(QtWidgets.QWidget):
             "<table cellspacing=0 cellpadding=3><tr><th align=left>sample</th><th>ST (mm)</th><th>SZ (mm)</th>"
             f"<th>SN (mm)</th></tr>{''.join(rows)}</table>"
             f"(ST = ST0 − x, SZ = SZ0 − y with ST0 = {c.st0:g}, SZ0 = {c.sz0:g}; SN puts the sample surface "
-            "in the analyzer focal plane.) <i>Bring target onto the beam</i> gives ST, SZ for the entered SN, rotations "
+            "in the analyzer focal plane: <i>by eye</i> the SN set by eye, <i>from H</i> / <i>exact H</i> from the "
+            "sample height H, right only if H is exact: otherwise set the SN by eye in the Samples tab.) <i>Bring target onto the beam</i> gives ST, SZ for the entered SN, rotations "
             "and piezo, and how far the target then is from the analyzer focus; <i>Correct SN</i> only if that is too far."
         )
         self.start_box.show()

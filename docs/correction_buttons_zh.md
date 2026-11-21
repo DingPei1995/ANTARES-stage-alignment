@@ -11,7 +11,7 @@
 
 | 按钮（页面） | 输入 / 假设 | 计算 | 改变 |
 |---|---|---|---|
-| **Set SN by eye**（Samples 页；*Samples placed → Stage* 前确认） | 在 SRn 120°、SRz 0° 下，样品上表面位于相机参考线（= 分析器焦平面）时目测读到的 SN | H = SN − SN_f + 5.0 − 托面高度（`height_from_sn`）；H < 0 时拒绝 | 该样品的 **H**（粗测）；记住这个 SN（*H checked*），之后 *Bring target onto the beam* 对该样品使用它。按 *Samples placed → Stage* 时询问这个 SN 是否正确（SN 框里有未设置的值时也询问）。精度：目测约 ±0.05 mm，并依赖 SN_f |
+| **Set SN by eye**（Samples 页；*Samples placed → Stage* 前确认） | 在 SRn 120°、SRz 0° 下，样品上表面位于相机参考线（= 分析器焦平面）时目测读到的 SN | H = SN − SN_f + 5.0 − 托面高度（`height_from_sn`）；H < 0 时拒绝 | 该样品的 **H**（粗测）；记住这个 SN（*by eye*），之后 *Bring target onto the beam* 对该样品使用它。按 *Samples placed → Stage* 时询问这个 SN 是否正确（SN 框里有未设置的值时也询问）。精度：目测约 ±0.05 mm，并依赖 SN_f |
 | **Fine tunings by ZPS/CPS** —— *修正位置和 H*（Stage & Optics 页；取代原来的 *Found here*） | 原理：聚焦元件的焦距是精确值。Target 在输入的电机位置和聚焦元件位置下位于光斑上且聚焦 | **SRz 0**：焦点处的托坐标点（由聚焦元件位置得到沿光束的 y）减去目标点：Δx、Δy、ΔH（`found_offset(..., y)`，与转轴无关；ΔH 精度 zone plate ±0.014、capillary ±0.07 mm）。聚焦元件在配置中对应分析器焦点的位置时（y = 0），就是原来 *Found here* 的计算。**SRz 转动后**（\|SRz\| ≥ 0.01°，聚焦元件与预测相差 > 0.05 mm）：用一个 ΔH 同时拟合 ST、SZ 和聚焦元件的误差（权重：位置 ±0.02 mm，聚焦 zone plate ±0.02 / capillary ±0.10；`fit_height`），三者剩余误差都 ≤ 0.03 mm 才算能解释 | 回答 *Yes*：SRz 0 时 **Δy → 托偏移**（托在样品座中高度不同：所有样品的 SZ 都变），**Δx → 该样品 x**，**ΔH → 该样品 H**（含其 device；已设置的 SN 随之更新）；x、y < 0.001 mm 且 H < 0.002 mm 时不提示。Δx 或 ΔH > 0.3 mm 时提醒（配置过时？找错 Target？），托偏移 > 2.5 mm 时提醒。SRz 转动后只改 **H**；不能解释时不改变任何东西，结果中给出可能原因（托上位置 x、y → 在 SRz 0 用本按钮；SRz 轴；SN_f） |
 | **Change plate…**（工具栏） | 换了样品托 | – | 样品托；*Fine tunings by ZPS/CPS* 的托偏移清零；样品保留并检查 |
 | **Use selected**（*Configuration…*） | 本次 session 使用较早的配置 | – | 当前配置（ST0、SZ0、SN_f、转轴、光学参考） |

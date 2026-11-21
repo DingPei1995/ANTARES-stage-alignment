@@ -198,9 +198,16 @@ The height H of a sample is often not known or not measured. Below the table, *S
 surface onto the **camera reference line** (the analyzer focal plane) at SRn = 120°, SRz = 0°, choose the sample, type
 the **SN read there** and press **Set SN by eye**. H is computed from this SN and SN_f of the configuration (by eye:
 about ±0.05 mm); the line below lists the samples set. *Bring target onto the beam* then keeps this SN for the targets
-of that sample (exact at SRn = 120°, SRz = 0°), and the start positions mark it *(H checked)*. Typing H by hand in the
+of that sample (exact at SRn = 120°, SRz = 0°), and the start positions mark it *(by eye)*. Typing H by hand in the
 table drops it. This is rough: once the sample is found in focus, *Fine tunings by ZPS/CPS* (Stage & Optics tab)
 corrects H precisely.
+
+**Which SN is used.** When H is known exactly (e.g. a wafer of known thickness), the SN follows from it and need not
+be set by eye: for the sample chosen, the line under the SN field says in red *If H = … mm of S1 is exact, its SN is
+… mm (from H and SN_f; used for the start positions). If H is not exact, correct it with Set SN by eye.* (SN = SN_f +
+plate top − 5.0 + H.) The start positions use **the SN from H** (marked *(from H)*, or *(exact H)* once H is confirmed
+exact in Stage & Optics: the line then turns green) **unless an SN was set by eye**: then that SN is used (marked *(by
+eye)*, the line green: *the SN set by eye … is used*).
 
 When all samples are drawn, press **Samples placed → Stage**. If a sample has an SN set by eye, or an SN is typed in
 the field but not set, you are asked first whether this is the SN at which the top surface is on the reference line;

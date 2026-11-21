@@ -619,7 +619,7 @@ def test_samples_placed_goes_to_stage(window, monkeypatch):
     assert ed.confirm_samples_placed()
     assert window.tabs.currentWidget() is window.stage and not window.stage.start_box.isHidden()
     # ST = ST0 - x, SZ = SZ0 - y, SN = SN_f + H
-    assert "<td>A</td><td align=right>-1.000</td><td align=right>38.000</td><td align=right>0.400</td>" \
+    assert "<td>A</td><td align=right>-1.000</td><td align=right>38.000</td><td align=right>0.400 (from H)</td>" \
         in window.stage.start_label.text()
     monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: QtWidgets.QMessageBox.Discard)
 
@@ -808,7 +808,7 @@ def test_height_check_then_bring_to_beam_keeps_its_sn(window, monkeypatch):
     assert "S1: SN" in ed.check_label.text()
     monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: QtWidgets.QMessageBox.Yes)
     ed.confirm_samples_placed()
-    assert "(H checked)" in st.start_label.text()
+    assert "(by eye)" in st.start_label.text()
     # the Set SN by eye button uses the typed SN (its clicked(bool) used to arrive as sn = False, i.e. SN 0)
     ed.check_sn.setValue(sn_f + 0.7)
     next(b for b in ed.findChildren(QtWidgets.QPushButton) if b.text() == "Set SN by eye").click()
@@ -975,3 +975,27 @@ def test_rounded_zero_is_shown_without_sign():
     assert f"{unsigned_zero(-1e-16, 3):.3f}" == "0.000"
     assert f"{unsigned_zero(-4e-5, 4):+.4f}" == "+0.0000"
     assert f"{unsigned_zero(-0.2024, 3):.3f}" == "-0.202"
+
+
+def test_sn_from_h_unless_set_by_eye(window, monkeypatch):
+    """Next to Set SN by eye: the SN that H gives (red: right only if H is exact, else set it by eye). The start
+    positions use that SN, or the SN set by eye once there is one; an H confirmed exact turns the note green."""
+    ed, st = window.editor, window.stage
+    s = ed.add_sample(Sample("S1", u=1.0, v=1.0, length=2, width=2, height=0.525))
+    sn_h = st.config().sn_f - 5.0 + ed.layout_model.plate.total_thickness + 0.525
+    ed.check_combo.setCurrentText("S1")
+    assert f"its SN is <b>{sn_h:.3f} mm</b>" in ed.sn_hint.text() and "#c00000" in ed.sn_hint.styleSheet()
+    assert "correct it with Set SN by eye" in ed.sn_hint.text()
+    st.show_start_positions()
+    assert f"{sn_h:.3f} (from H)" in st.start_label.text()
+    # confirmed exact in Stage & Optics: green, "exact H"
+    monkeypatch.setattr(st, "_known_height", lambda smp: smp.height)
+    st.target_combo.setCurrentText("S1")
+    st.height_exact.setChecked(True)
+    assert "is exact" in ed.sn_hint.text() and "#207020" in ed.sn_hint.styleSheet()
+    assert f"{sn_h:.3f} (exact H)" in st.start_label.text()
+    # set by eye: that SN is used
+    ed.check_sn.setValue(sn_h + 0.05)
+    ed.apply_height_check()
+    assert f"{sn_h + 0.05:.3f} mm, is used" in ed.sn_hint.text()
+    assert f"{sn_h + 0.05:.3f} (by eye)" in st.start_label.text()

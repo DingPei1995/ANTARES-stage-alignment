@@ -102,7 +102,9 @@ Positions here are **absolute motor values** (ST, SZ, SN, …, optic).
   focus gives where the Target really is (`core.stage.found_offset` with `y` = the optic focus): Δx and ΔH of its
   sample and Δy of the plate (plate offset), applied after a confirmation (`ui/stage_panel.py: correct_found_at_srz0`;
   nothing is offered below `FOUND_POSITION_MIN` in x, y and `HEIGHT_FOCUS_MIN` in H). *Set SN by eye*
-  (Samples tab) is the rough height by eye (SN on the camera line), confirmed at *Samples placed → Stage*.
+  (Samples tab) is the rough height by eye (SN on the camera line), confirmed at *Samples placed → Stage*. Without
+  it the start SN follows from H (SN = SN_f + plate top − 5.0 + H, marked *from H* / *exact H*; a red line next to
+  *Set SN by eye* gives that SN and says to set the SN by eye if H is not exact); with it, the SN set by eye (*by eye*).
   After an SRz turn (|SRz| ≥ 0.01°), if the optic is more than 0.05 mm off its prediction for the Target, one height
   change ΔH is fitted to the ST, SZ and optic errors together (`core.stage.fit_height`, weights from
   `realsample.fit.measurement_sigmas`); if it leaves all three within 0.03 mm the user is asked to correct H of the

@@ -114,7 +114,9 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 #### Set SN by eye（H 未知时，粗测）
 
-样品高度 H 常常未知或没有测量。表格下方的 *Set SN by eye*：在 SRn = 120°、SRz = 0° 时把样品上表面移到 **相机参考线**（分析器焦平面）上，选择该样品，输入 **此时读到的 SN**，按 **Set SN by eye**。程序由该 SN 和配置中的 SN_f 算出 H（目测，约 ±0.05 mm）；下方一行列出已设置的样品。之后 *Bring target onto the beam* 对该样品的目标保持这个 SN（在 SRn = 120°、SRz = 0° 时准确），初始位置列表中标为 *(H checked)*。在表格中手动输入 H 会取消该设置。这只是粗测：找到样品并用 ZPS / CPS 对焦后，用 Stage & Optics 页的 *Fine tunings by ZPS/CPS* 精确修正 H。
+样品高度 H 常常未知或没有测量。表格下方的 *Set SN by eye*：在 SRn = 120°、SRz = 0° 时把样品上表面移到 **相机参考线**（分析器焦平面）上，选择该样品，输入 **此时读到的 SN**，按 **Set SN by eye**。程序由该 SN 和配置中的 SN_f 算出 H（目测，约 ±0.05 mm）；下方一行列出已设置的样品。之后 *Bring target onto the beam* 对该样品的目标保持这个 SN（在 SRn = 120°、SRz = 0° 时准确），初始位置列表中标为 *(by eye)*。在表格中手动输入 H 会取消该设置。这只是粗测：找到样品并用 ZPS / CPS 对焦后，用 Stage & Optics 页的 *Fine tunings by ZPS/CPS* 精确修正 H。
+
+**用哪个 SN。** 若 H 精确已知（例如厚度已知的硅片），SN 可以直接由 H 得出，不必目测：对所选样品，SN 输入框下方一行用红色写出 *If H = … mm of S1 is exact, its SN is … mm (from H and SN_f; used for the start positions). If H is not exact, correct it with Set SN by eye.*（即：若该样品高度精确，SN 应为 …；若不精确，请用 Set SN by eye 修正。SN = SN_f + 托顶面 − 5.0 + H。）初始位置使用 **由 H 推出的 SN**（标为 *(from H)*；在 Stage & Optics 页确认 H 精确后标为 *(exact H)*，该行变为绿色），**除非用 Set SN by eye 设置过 SN**：此时使用目测的 SN（标为 *(by eye)*，该行为绿色：*the SN set by eye … is used*）。
 
 样品画完后，按 **Samples placed → Stage**。若某个样品已用 *Set SN by eye* 设置过，或 SN 框里输入了还没设置的值，程序会先询问：样品上表面到达参考线时的 SN 是否就是这个值？选 *No*（已设置的）或 *Cancel*（未设置的）可留在本页修改。
 

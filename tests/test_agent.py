@@ -197,7 +197,11 @@ def test_found_here_not_in_focus_and_old_configuration(api):
     assert out["sample"]["height"] == pytest.approx(0.748) and out["shift_mm"]["dH"] == 0
     assert "marked exact" in out["height_kept"] and out["sample"]["x"] == pytest.approx(hit[0], abs=2e-3)
     # an H from the SN set by eye is not exact unless the known height is given; given, it replaces it (check kept)
+    rows = {r["target"]: r for r in a.sample_positions()["positions"]}
+    assert rows["Cav"]["SN_source"].startswith("from H")
     a.check_height("Cav", 0.9)
+    rows = {r["target"]: r for r in a.sample_positions()["positions"]}
+    assert rows["Cav"]["SN_source"] == "set by eye" and rows["Cav"]["SN"] == pytest.approx(0.9, abs=1e-4)
     with pytest.raises(APIError, match="SN set by eye"):
         a.found_here("Cav", m, height_exact=True)
     out = a.found_here("Cav", m, height_exact=True, height=0.525)

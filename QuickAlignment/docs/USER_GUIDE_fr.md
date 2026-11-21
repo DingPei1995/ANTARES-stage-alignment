@@ -210,9 +210,16 @@ surface de l'échantillon sur la **ligne de référence de la caméra** (plan fo
 SRz = 0°, choisir l'échantillon, entrer le **SN lu à cet endroit** et appuyer sur **Set SN by eye**. H est calculée à
 partir de ce SN et du SN_f de la configuration (à l'œil : environ ±0,05 mm) ; la ligne en dessous liste les
 échantillons réglés. *Bring target onto the beam* garde ensuite ce SN pour les cibles de cet échantillon (exact à
-SRn = 120°, SRz = 0°), et les positions de départ le marquent *(H checked)*. Entrer H à la main dans le tableau
+SRn = 120°, SRz = 0°), et les positions de départ le marquent *(by eye)*. Entrer H à la main dans le tableau
 l'annule. C'est une estimation : une fois l'échantillon trouvé et focalisé, *Fine tunings by ZPS/CPS* (onglet Stage &
 Optics) corrige H précisément.
+
+**Quel SN est utilisé.** Quand H est connue exactement (par ex. une plaquette d'épaisseur connue), le SN en découle et
+n'a pas besoin d'être réglé à l'œil : pour l'échantillon choisi, la ligne sous le champ SN indique en rouge *If H = …
+mm of S1 is exact, its SN is … mm (from H and SN_f; used for the start positions). If H is not exact, correct it with
+Set SN by eye.* (SN = SN_f + dessus de la plaquette − 5,0 + H.) Les positions de départ utilisent **le SN tiré de H**
+(marqué *(from H)*, ou *(exact H)* une fois H confirmée exacte dans Stage & Optics : la ligne passe au vert) **sauf si
+un SN a été réglé à l'œil** : ce SN est alors utilisé (marqué *(by eye)*, ligne verte : *the SN set by eye … is used*).
 
 Une fois les échantillons dessinés, appuyer sur **Samples placed → Stage**. Si un échantillon a un SN réglé à l'œil, ou
 si un SN est entré dans le champ sans être réglé, le programme demande d'abord si c'est bien le SN pour lequel la

@@ -492,9 +492,11 @@ class PlateEditor(QtWidgets.QWidget):
         cb.addWidget(QtWidgets.QLabel("SN at SRn 120°, SRz 0°"), 0, 2)
         cb.addWidget(self.check_sn, 0, 3)
         cb.addWidget(check_btn, 0, 4)
+        self.check_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
+        self.check_combo.setMinimumContentsLength(10)  # names are short (S1, Sample1)
         cb.addWidget(self.sn_hint, 1, 0, 1, 5)
         cb.addWidget(self.check_label, 2, 0, 1, 5)
-        cb.setColumnStretch(1, 1)
+        cb.setColumnStretch(5, 1)  # the free space after the button, not in the sample list
 
         self.info = QtWidgets.QLabel()
         self.info.setWordWrap(True)

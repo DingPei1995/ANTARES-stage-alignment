@@ -708,14 +708,14 @@ def test_anti_collision_in_stage_and_rotate_tabs(window, monkeypatch):
     st.motors.set_value(MotorPositions(sn=0.5))  # A on the analyzer focus, optic at its reference (zone plate)
     st.optic_pos.setValue(st.calibration().optic_position)
     st.update_view()
-    text = st.limits_label.text()
+    text = st.describe_limits(st.motors.value())[0]
     assert "Anti-collision" in text and "SN " in text and "(OSA)" in text and "COLLISION" not in text
     assert any("OSA (fixed)" in t.get_text() for t in st.figure.axes[0].texts)  # drawn in the top view
 
     # SN far below the surface in focus: the plate is in the OSA
     st.motors.set_value(MotorPositions(sn=-0.5))
     st.update_view()
-    assert "COLLISION now with OSA" in st.limits_label.text()
+    assert "COLLISION now with OSA" in st.describe_limits(st.motors.value())[0]
     assert "COLLISION" in st.figure.axes[0].get_title()
 
     # a move into the OSA is refused, positions unchanged
@@ -739,20 +739,14 @@ def test_anti_collision_in_stage_and_rotate_tabs(window, monkeypatch):
     assert warned and "would touch OSA" in warned[0]
 
 
-def test_working_distances_can_be_entered(window):
+def test_working_distances_only_from_the_configuration(window):
+    """The working distances of the optic solids (anti-collision) are not entered in QuickAlignment: they come from
+    the configuration (beamline staff, RealSampleCalibration)."""
     st = window.stage
-    st.optic_type.setCurrentText("zone plate + OSA")
-    names = [st.distance_form.itemAt(i, QtWidgets.QFormLayout.LabelRole).widget().text()
-             for i in range(st.distance_form.rowCount())]
-    assert names == ["OSA working distance", "zone plate working distance"]
-    st.distance_boxes[0].setValue(20.0)
-    osa = st.record.collision_geometry().optics[0]
-    assert osa.distance == 20.0 and not osa.moves
+    assert not hasattr(st, "distance_boxes") and not hasattr(st, "limits_label")
+    assert not [w for w in st.findChildren(QtWidgets.QLabel) if "working distance" in w.text()]
     st.optic_type.setCurrentText("capillary")  # another optic: its own (default) solids
     assert [b.distance for b in st.record.collision_geometry().optics] == pytest.approx([7.2, 7.9, 11.4, 18.3])
-    assert st.distance_form.rowCount() == 1  # the capillary is one assembly: one working distance
-    st.distance_boxes[0].setValue(15.0)  # moves all its parts
-    assert [b.distance for b in st.record.collision_geometry().optics] == pytest.approx([15.0, 15.7, 19.2, 26.1])
 
 
 def test_found_device_corrects_its_sample(window, monkeypatch):
@@ -999,3 +993,32 @@ def test_sn_from_h_unless_set_by_eye(window, monkeypatch):
     ed.apply_height_check()
     assert f"{sn_h + 0.05:.3f} mm, is used" in ed.sn_hint.text()
     assert f"{sn_h + 0.05:.3f} (by eye)" in st.start_label.text()
+
+
+def test_bring_target_centres_the_piezo_and_centre_the_piezo_button(window, monkeypatch):
+    """After a fine tuning at a piezo scan position, Bring target onto the beam for another device puts PIX / PIY
+    back to the centre; "Centre the piezo" turns a sample seen at PIX / PIY off centre into ST / SZ with the piezo
+    centred (same SRn / SRz, SN kept)."""
+    ed, st = window.editor, window.stage
+    ed.add_sample(Sample("S1", u=1.0, v=1.0, length=2, width=2, height=0.5))
+    ed.add_sample(Sample("S2", u=-2.0, v=1.0, length=2, width=2, height=0.5))
+    st.refresh_targets()
+    st.motors.set_value(MotorPositions(st=0.0, sz=40.0, sn=0.5, srn=120.0, srz=-10.0, pix=138.0, piy=162.0))
+    st.target_combo.setCurrentText("S2")
+    m = st.bring_target_on_beam()
+    assert (m.pix, m.piy) == (150.0, 150.0) and (m.srn, m.srz) == (120.0, -10.0)
+    assert st.model().beam_position(m, -2.0, 1.0, st.model().plate.total_thickness + 0.5) is not None
+    # S2 seen in a piezo scan at PIX 140, PIY 155: the piezo-centred ST / SZ show the same point
+    model = st.model()
+    seen = replace(m, pix=140.0, piy=155.0)
+    st.motors.set_value(seen)
+    p = st.centre_piezo()
+    new = st.motors.value()
+    assert (new.pix, new.piy, new.sn, new.srn, new.srz) == (150.0, 150.0, seen.sn, seen.srn, seen.srz)
+    hit_seen = model.plate_to_lab(seen, 0.0, 0.0, 0.0) - model.plate_to_lab(new, 0.0, 0.0, 0.0)
+    assert abs(hit_seen[0]) < 1e-4 and abs(hit_seen[2]) < 1e-4  # same plate point on the beam (only along it)
+    assert st.optic_pos.value() == pytest.approx(p.optic_new, abs=1e-4) and "piezo centred" in st.goto_label.text()
+    # already centred: nothing to do
+    info = []
+    monkeypatch.setattr(QtWidgets.QMessageBox, "information", lambda *a, **k: info.append(a[2]))
+    assert st.centre_piezo() is None and info

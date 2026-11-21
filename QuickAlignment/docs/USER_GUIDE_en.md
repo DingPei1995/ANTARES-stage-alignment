@@ -221,14 +221,20 @@ The green box lists, for every sample and device, the **ST / SZ / SN at the star
 SRz = 0°, PIX = PIY = 150 µm) that put its centre on the beam in the analyzer focus. In the example D1 is listed at
 ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back plate, for reference).
 
-1. Enter the current motor positions (absolute values, as on the control system). PIX, PIY are the piezo stage: the
-   computations use them as entered (the start positions above are for the piezo centred).
+1. Enter the current motor positions (absolute values, as on the control system). PIX, PIY are the piezo stage (the
+   start positions above are for the piezo centred).
 2. Choose a **Target** and press **Bring target onto the beam**: ST and SZ are computed for the entered SN, SRn,
-   SRz, PIX, PIY (**SN kept**, as the stage is usually run). The text below says how far the target then is from the
+   SRz, with the **piezo centred** (PIX = PIY = 150 µm, even if the fields still hold a scan position from the last
+   sample) and **SN kept**, as the stage is usually run. The text below says how far the target then is from the
    analyzer focus along the beam (red above 50 µm: the spectra would be distorted) and the ΔSN that would remove it.
-   Only if you judge it too far, press **Correct SN**: SN, ST, SZ that put the target on the analyzer focus (see
+   Only if you judge it too far, press **Correct SN** (box *Analyzer focus (SN)* under the stage): SN, ST, SZ that put
+   the target on the analyzer focus (see
    [Correct SN](#correct-sn-putting-the-point-back-on-the-analyzer-focus)). If a motor would leave its range, or
-   the plate would touch the optic or the analyzer, nothing is changed and you are told why. In the picture, D1 is
+   the plate would touch the optic or the analyzer, nothing is changed and you are told why.
+   **Centre the piezo** (next to *Bring target onto the beam*): when the sample shows up in a PIX / PIY scan away
+   from 150 / 150 µm, enter that PIX, PIY (and the optic position in focus there) and press it: the ST / SZ that show
+   it with the piezo centred at the same SRn, SRz (SN kept) and the refocused optic are put in the fields, as in the
+   last step of the Rotate sample tab. In the picture, D1 is
    brought onto the beam at SRn = 120°, SRz = 0°: with SN = 0 kept it is on the analyzer focus.
 3. **Focusing optic**: *Type* is the optic in use (zone plate + OSA, or capillary); enter the optic position; press
    **Update schematic & optics**. The schematic shows the beam, the analyzer focus, the optic and the position
@@ -317,15 +323,14 @@ sample to be exactly on the analyzer focus instead of reading the focus from the
 
 ### Anti-collision
 
-After *Update*, the line under the motors gives the **collision-free range** of ST, SN and SZ at the entered positions
-(one motor moved, the others and the optic kept) and what sets each limit, e.g. *SN −4.1 (OSA) … 65*. The top view
+The top view
 draws the analyzer nose (MBS A1, 35 mm from the focus), the zone plate and OSA (thin plates; the OSA stays where it is
 when the zone plate refocuses) or the capillary at scale, in red when the plate touches them. *Bring target onto the
 beam*, *Correct SN* and the Rotate tab refuse a position where the plate would touch something. Lowering SN brings the
 surface towards the optic and the analyzer: SN is limited from below only. ST and SZ are free for a plate parallel to
 the focal plane, and limited when SRz tilts it or when something stands out (gating plate screws). The dimensions are
-estimates kept in the configuration: if you know better, type the **working distances** (OSA, zone plate or
-capillary front from the focus) in the fields under the optic position (for this session). Keep a safe distance and
+estimates kept in the configuration (the **working distances** of the OSA, zone plate or capillary front from the
+focus); only beamline staff change them, in the configuration file (RealSampleCalibration). Keep a safe distance and
 watch the camera.
 
 ## Rotate sample tab: turning without losing the sample
@@ -393,8 +398,8 @@ as before the turn.
 
 SN is kept by default because the stage is run that way (the surface stays on the camera line, the optic is
 refocused), and because *Correct SN* is absolute: it relies on the configuration's SN_f and rotation axes. Use it
-when the distance is red, and check the anti-collision line: a lower SN brings the surface towards the optic and the
-analyzer. In the Stage tab, *Correct SN* is a button (for the chosen target at the entered angles); in the Rotate
+when the distance is red, and watch the camera: a lower SN brings the surface towards the optic and the
+analyzer (a move into a collision is refused). In the Stage tab, *Correct SN* is a button in its own box (for the chosen target at the entered angles); in the Rotate
 tab, a tick box.
 
 ## Quick sample rotation: a sample found without any preparation

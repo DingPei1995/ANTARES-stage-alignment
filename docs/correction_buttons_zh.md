@@ -16,7 +16,6 @@
 | **Change plate…**（工具栏） | 换了样品托 | – | 样品托；*Fine tunings by ZPS/CPS* 的托偏移清零；样品保留并检查 |
 | **Use selected**（*Configuration…*） | 本次 session 使用较早的配置 | – | 当前配置（ST0、SZ0、SN_f、转轴、光学参考） |
 | **Apply limits / Defaults**（*Configuration…*，*Motor limits*） | 电机行程 | – | 输入框范围、超程和防碰撞检查；保存在 `configs/motor_limits.json` |
-| 工作距离（Stage & Optics 页聚焦元件位置下方的输入框） | 聚焦元件前端的真实距离 | – | 防碰撞实体，仅本次 session |
 
 为什么 SRz 0 和 SRz 转动后做法不同：在 SRz 0 时样品表面与分析器焦平面平行，焦点直接给出表面高度，不涉及转轴。SRz 转动后，焦点还受 SRz 轴误差影响：H 错误会让 ST 和聚焦 **同时** 偏（都约正比于 sin SRz），SRz 轴在垂直光束方向的误差只让聚焦偏，x、y 错误只让 ST / SZ 偏。只有第一种才作为 H 修正。
 
@@ -24,13 +23,13 @@
 
 | 按钮（页面） | 计算 | 说明 |
 |---|---|---|
-| **Bring target onto the beam**（Stage & Optics） | 在输入的 SRn、SRz、piezo 下，**SN 不变**（或用该样品高度检查的 SN），求把目标放到光斑上的 ST、SZ（`motors_on_beam`）；给出距分析器焦点的 Δy（> 50 µm 为红色）和消除它所需的 ΔSN | 超程或碰撞时拒绝 |
+| **Bring target onto the beam**（Stage & Optics） | 在输入的 SRn、SRz 下，压电台居中（PIX = PIY = 150 µm），**SN 不变**（或用该样品高度检查的 SN），求把目标放到光斑上的 ST、SZ（`motors_on_beam`）；给出距分析器焦点的 Δy（> 50 µm 为红色）和消除它所需的 ΔSN | 超程或碰撞时拒绝 |
 | **Correct SN**（Stage & Optics） | 把目标放到 **分析器焦点上** 的 SN、ST、SZ（`motors_for_target`） | 绝对计算：依赖 ST0、SZ0、SN_f、转轴 **和 H**（H 错 δ，该点离焦点约 √2·δ） |
 | **Fine tunings by ZPS/CPS**（拉回分析器焦点） | 聚焦元件位置 → 焦点的 Δy（光学参考，焦距不变）；该焦点处的点给出 x、y、H（显示）；**ΔSN = −Δy/√2，ΔST = +Δy/√2**（该点保持在光斑上，SZ 不变），聚焦元件 → 配置文件中对应分析器焦点的精确位置 | 超程或碰撞时不移动（已做的 H 修正保留） |
 | **Update schematic & optics**（Stage & Optics） | 光斑位置、聚焦所需的聚焦元件位置、无碰撞范围 | – |
 | **Compute new position**（Rotate sample） | 把当前位置光斑下的托坐标点（用到样品的 **H**）转到新的 SRn / SRz：**SN 不变** 时的 ST、SZ 和重新聚焦的聚焦元件位置（`relocate`）；勾选 **Correct SN** 给出放到分析器焦点上的 SN、ST、SZ | H 通过所跟踪的点和 *Correct SN* 起作用 |
 | **Send to Stage & Optics tab**（Rotate sample） | 复制所显示的结果 | 超程或碰撞时拒绝 |
-| **Centre the piezo: correct ST / SZ / SN and the optic**（Rotate sample、Quick rotation 第 4 步） | 样品在 PIX、PIY ≠ 150 µm 处看到：piezo 偏移是托的平移，ST、SN、SZ 接过它（`same_point`，聚焦元件不动），然后 SN 保持、ST 补偿：该点沿光束滑动 √2·ΔSN，聚焦元件随之重新聚焦（`recentre_piezo`） | 只用到转角和 piezo 方向，不用 ST0 / SZ0 / SN_f / 转轴 |
+| **Centre the piezo: correct ST / SZ / SN and the optic**（Rotate sample、Quick rotation 第 4 步；Stage & Optics 中的 **Centre the piezo**，用输入的 PIX、PIY） | 样品在 PIX、PIY ≠ 150 µm 处看到：piezo 偏移是托的平移，ST、SN、SZ 接过它（`same_point`，聚焦元件不动），然后 SN 保持、ST 补偿：该点沿光束滑动 √2·ΔSN，聚焦元件随之重新聚焦（`recentre_piezo`） | 只用到转角和 piezo 方向，不用 ST0 / SZ0 / SN_f / 转轴 |
 | **Locate the sample and compute the new position**（Quick sample rotation） | 同 *Fine tunings by ZPS/CPS*：由聚焦元件位置得到焦点处的托坐标点（x、y、H），再绕它 `relocate` | 独立：不使用也不改变其他页 |
 
 ## RealSampleCalibration（线站人员）

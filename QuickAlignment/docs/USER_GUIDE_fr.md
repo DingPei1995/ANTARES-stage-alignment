@@ -236,14 +236,18 @@ l'exemple D1 est listé à ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre
 pour repère).
 
 1. Entrer les positions moteurs actuelles (valeurs absolues, comme dans le contrôle-commande). PIX, PIY sont la
-   platine piézo : les calculs les prennent tels qu'entrés (les positions de départ ci-dessus sont pour le piézo
-   centré).
+   platine piézo (les positions de départ ci-dessus sont pour le piézo centré).
 2. Choisir une **Target** et appuyer sur **Bring target onto the beam** : ST et SZ sont calculés pour les SN, SRn,
-   SRz, PIX, PIY entrés (**SN gardé**, comme d'habitude). Le texte indique la distance de la cible au foyer de
+   SRz entrés, avec le **piézo centré** (PIX = PIY = 150 µm, même si les champs gardent une position de scan de
+   l'échantillon précédent) et **SN gardé**, comme d'habitude. Le texte indique la distance de la cible au foyer de
    l'analyseur le long du faisceau (en rouge au-delà de 50 µm : les spectres seraient déformés) et le ΔSN qui
-   l'annulerait. Seulement si elle est jugée trop grande, **Correct SN** donne SN, ST, SZ qui mettent la cible au
+   l'annulerait. Seulement si elle est jugée trop grande, **Correct SN** (cadre *Analyzer focus (SN)* sous la platine) donne SN, ST, SZ qui mettent la cible au
    foyer de l'analyseur (voir [Correct SN](#correct-sn--remettre-le-point-au-foyer-de-lanalyseur)). Si un moteur sortait de sa course, ou si la plaquette touchait
-   l'optique ou l'analyseur, rien n'est changé et la raison est donnée. Sur l'image, D1 est amené sous le faisceau à
+   l'optique ou l'analyseur, rien n'est changé et la raison est donnée. **Centre the piezo** (à côté de *Bring
+   target onto the beam*) : quand l'échantillon apparaît dans un scan PIX / PIY loin de 150 / 150 µm, entrer ces PIX,
+   PIY (et la position de l'optique au point) puis appuyer : les ST / SZ qui le montrent piézo centré aux mêmes SRn,
+   SRz (SN gardé) et l'optique refocalisée sont mis dans les champs, comme la dernière étape de Rotate sample. Sur
+   l'image, D1 est amené sous le faisceau à
    SRn = 120°, SRz = 0° : avec SN = 0 gardé, il est au foyer de l'analyseur.
 3. **Optique** : *Type* est l'optique utilisée (zone plate + OSA, ou capillaire) ; entrer sa position et appuyer sur
    **Update schematic & optics**. Le schéma montre le faisceau, le foyer de l'analyseur, l'optique et la position
@@ -335,15 +339,14 @@ le foyer sur l'optique.)
 
 ### Anticollision
 
-Après *Update*, la ligne sous les moteurs donne la **plage sans collision** de ST, SN et SZ aux positions entrées (un
-moteur déplacé, les autres et l'optique gardés) et ce qui fixe chaque limite, par ex. *SN −4.1 (OSA) … 65*. La vue de
-dessus montre à l'échelle le nez de l'analyseur (MBS A1, à 35 mm du foyer), la zone plate et l'OSA (plaques minces ;
+La vue de dessus montre à l'échelle le nez de l'analyseur (MBS A1, à 35 mm du foyer), la zone plate et l'OSA (plaques minces ;
 l'OSA ne bouge pas quand la zone plate refocalise) ou le capillaire, en rouge quand la plaquette les touche. *Bring
 target onto the beam*, *Correct SN* et l'onglet Rotate refusent une position où la plaquette toucherait quelque
 chose. Baisser SN rapproche la surface de l'optique et de l'analyseur : SN n'est limité que vers le bas. ST et SZ sont
 libres pour une plaquette parallèle au plan focal, et limités quand SRz l'incline ou quand quelque chose dépasse (vis
-de la plaquette gating). Les dimensions sont des estimations gardées dans la configuration : si on les connaît mieux, entrer les **distances de travail** (face avant de
-l'OSA, de la zone plate ou du capillaire au foyer) dans les champs sous la position de l'optique (pour la session).
+de la plaquette gating). Les dimensions sont des estimations gardées dans la configuration (les **distances de
+travail** de la face avant de l'OSA, de la zone plate ou du capillaire au foyer) ; seul le personnel de la ligne les
+change, dans le fichier de configuration (RealSampleCalibration).
 Garder une distance de sécurité et surveiller la caméra.
 
 ## Onglet Rotate sample : tourner sans perdre l'échantillon
@@ -416,8 +419,9 @@ comme avant la rotation.
 
 SN est gardé par défaut parce que la platine se conduit ainsi (la surface reste sur la ligne de la caméra, l'optique
 refocalise) et parce que *Correct SN* est absolu : il repose sur le SN_f et les axes de rotation de la configuration.
-L'utiliser quand la distance est en rouge, et regarder la ligne d'anticollision : un SN plus bas rapproche la surface
-de l'optique et de l'analyseur. Dans l'onglet Stage, *Correct SN* est un bouton (pour la cible choisie aux angles
+L'utiliser quand la distance est en rouge, et surveiller la caméra : un SN plus bas rapproche la surface de l'optique
+et de l'analyseur (un déplacement vers une collision est refusé). Dans l'onglet Stage, *Correct SN* est un bouton dans
+son propre cadre (pour la cible choisie aux angles
 entrés) ; dans l'onglet Rotate, une case à cocher.
 
 ## Quick sample rotation : un échantillon trouvé sans préparation

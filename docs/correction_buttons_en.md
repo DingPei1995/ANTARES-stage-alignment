@@ -19,7 +19,6 @@ focal plane; Δy = position along the beam from the analyzer focus (+ downstream
 | **Change plate…** (toolbar) | another plate is mounted | – | the plate; the plate offset of *Fine tunings by ZPS/CPS* is reset; samples kept and checked |
 | **Use selected** (*Configuration…*) | an older configuration for this session | – | the configuration in use (ST0, SZ0, SN_f, axes, optics reference) |
 | **Apply limits / Defaults** (*Configuration…*, *Motor limits*) | motor travel | – | the limits of the input fields, out-of-range and anti-collision checks; saved in `configs/motor_limits.json` |
-| working distances (fields under the optic, Stage & Optics) | the real front distances of the optic solids | – | anti-collision solids, this session only |
 
 Why SRz 0 and turned are handled differently: at SRz 0 the sample surface is parallel to the analyzer focal plane,
 so the focus gives its height directly, without the rotation axes. After an SRz turn the focus also depends on the
@@ -30,13 +29,13 @@ only the focus, a wrong x, y only ST / SZ. Only the first is corrected as H.
 
 | button (tab) | computation | notes |
 |---|---|---|
-| **Bring target onto the beam** (Stage & Optics) | ST, SZ putting the target on the beam with **SN kept** (or the SN of its height check), for the entered SRn, SRz, piezo (`motors_on_beam`); reports Δy from the analyzer focus (red > 50 µm) and the ΔSN that would remove it | refused if out of range or colliding |
+| **Bring target onto the beam** (Stage & Optics) | ST, SZ putting the target on the beam with **SN kept** (or the SN of its height check), for the entered SRn, SRz, the piezo centred (PIX = PIY = 150 µm, not the entered piezo; `motors_on_beam`); reports Δy from the analyzer focus (red > 50 µm) and the ΔSN that would remove it | refused if out of range or colliding |
 | **Correct SN** (Stage & Optics) | SN, ST, SZ putting the target **on the analyzer focus** (`motors_for_target`) | absolute: relies on ST0, SZ0, SN_f, axes **and H** (an H error δ leaves the point ~√2·δ off the focus) |
 | **Fine tunings by ZPS/CPS** (back onto the analyzer focus) | optic position → Δy of the focus (optics reference, focal distance fixed); the point at that focus gives x, y, H (shown); **ΔSN = −Δy/√2, ΔST = +Δy/√2** (point stays on the beam, SZ kept), optic → the configuration's exact position for the analyzer focus | not moved if out of range or colliding (an H correction already made is kept) |
 | **Update schematic & optics** (Stage & Optics) | beam spot, optic position needed for focus, collision-free ranges | – |
 | **Compute new position** (Rotate sample) | the plate point under the beam at the current position (uses the sample's **H**) is turned to the new SRn / SRz: ST, SZ with **SN kept** and the optic that refocuses (`relocate`); tick **Correct SN** for SN, ST, SZ on the analyzer focus | H enters through the point followed and *Correct SN* |
 | **Send to Stage & Optics tab** (Rotate sample) | copies the shown solution | refused if out of range / colliding |
-| **Centre the piezo: correct ST / SZ / SN and the optic** (Rotate sample, Quick rotation, step 4) | the sample is seen at PIX, PIY ≠ 150 µm: the piezo offset is a translation of the plate; ST, SN, SZ take it over (`same_point`, optic unchanged), then SN is kept with ST compensating: the point slides √2·ΔSN along the beam and the optic refocuses by it (`recentre_piezo`) | only the rotation angles and piezo directions enter, not ST0 / SZ0 / SN_f / axes |
+| **Centre the piezo: correct ST / SZ / SN and the optic** (Rotate sample, Quick rotation, step 4; **Centre the piezo** in Stage & Optics, from the entered PIX, PIY) | the sample is seen at PIX, PIY ≠ 150 µm: the piezo offset is a translation of the plate; ST, SN, SZ take it over (`same_point`, optic unchanged), then SN is kept with ST compensating: the point slides √2·ΔSN along the beam and the optic refocuses by it (`recentre_piezo`) | only the rotation angles and piezo directions enter, not ST0 / SZ0 / SN_f / axes |
 | **Locate the sample and compute the new position** (Quick sample rotation) | as *Fine tunings by ZPS/CPS*: the plate point at the optic focus (x, y, H from the optic position), then `relocate` about it | stand-alone; uses nothing from the other tabs and changes nothing |
 
 ## RealSampleCalibration (beamline staff)

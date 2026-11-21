@@ -833,7 +833,7 @@ class AlignmentSession:
 
     def bring_to_beam(self, target: str, motors: dict | None = None, correct_sn: bool = False) -> dict:
         """ST / SZ putting a target on the beam with SN kept (how the stage is run), at the given (or current)
-        SRn, SRz, piezo; with correct_sn also SN, so that it is on the analyzer focus. A target whose sample height
+        SRn, SRz, with the piezo centred (PIX = PIY = 150 µm: it may still hold a scan position); with correct_sn also SN, so that it is on the analyzer focus. A target whose sample height
         was checked (check_height) keeps the SN of that check unless `motors` gives SN."""
         self._need_start()
         label, uvw = self._target(target)
@@ -841,11 +841,12 @@ class AlignmentSession:
         checked = checked_sn(self.layout, label)
         sn_given = isinstance(motors, dict) and any(k.lower() == "sn" and v is not None for k, v in motors.items())
         use_checked = checked is not None and not correct_sn and not sn_given
+        pi = self.model.config.pi_center
         if correct_sn:
-            new = self.model.motors_for_target(*uvw, srn=m.srn, srz=m.srz, pix=m.pix, piy=m.piy)
+            new = self.model.motors_for_target(*uvw, srn=m.srn, srz=m.srz, pix=pi, piy=pi)
         else:
             sn = checked if use_checked else m.sn
-            new = self.model.motors_on_beam(*uvw, srn=m.srn, srz=m.srz, sn=sn, pix=m.pix, piy=m.piy)
+            new = self.model.motors_on_beam(*uvw, srn=m.srn, srz=m.srz, sn=sn, pix=pi, piy=pi)
         out = self._move_report(label, uvw, new)
         if use_checked:
             out["sn_from_height_check"] = rounded(checked)

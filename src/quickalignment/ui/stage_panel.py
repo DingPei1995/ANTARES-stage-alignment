@@ -126,9 +126,16 @@ class StagePanel(QtWidgets.QWidget):
         self.target_combo = QtWidgets.QComboBox()
         goto_btn = QtWidgets.QPushButton("Bring target onto the beam")
         goto_btn.setToolTip("Compute ST / SZ that put the target on the beam with SN kept as entered (how the stage\n"
-                            "is run), keeping SRn, SRz, PIX, PIY; tells how far the target then is from the analyzer\n"
-                            "focus. The optic refocuses on it.")
+                            "is run), keeping SRn, SRz, with the piezo centred (PIX = PIY = 150 µm); tells how far the\n"
+                            "target then is from the analyzer focus. The optic refocuses on it.")
         goto_btn.clicked.connect(self.bring_target_on_beam)
+        centre_btn = QtWidgets.QPushButton("Centre the piezo")
+        centre_btn.setToolTip(
+            "The sample was seen in a PIX / PIY scan away from the piezo centre: enter that PIX, PIY (and the optic\n"
+            "position in focus there) in the fields. Computes the ST / SZ that show it with the piezo centred\n"
+            "(PIX = PIY = 150 µm) at the same SRn, SRz, SN kept, and the optic refocused (as the last step of\n"
+            "Rotate sample).")
+        centre_btn.clicked.connect(self.centre_piezo)
         self.correct_sn_btn = QtWidgets.QPushButton("Correct SN")
         self.correct_sn_btn.setToolTip("Only if the target is too far from the analyzer focus: compute SN, ST, SZ that put it\n"
                                        "on the analyzer focus (absolute: relies on the configuration's SN_f).")
@@ -137,28 +144,30 @@ class StagePanel(QtWidgets.QWidget):
         self.goto_label.setWordWrap(True)
         self.goto_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.goto_label.hide()
-        self.limits_label = QtWidgets.QLabel()
-        self.limits_label.setWordWrap(True)
-        self.limits_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.limits_label.setToolTip(
-            "Anti-collision check: the plate with its samples against the analyzer nose (MBS A1, front 35 mm from\n"
-            "the focus) and the focusing optic (OSA / zone plate, or capillary) at the entered optic position.\n"
-            "Each range moves one motor with the others kept. Working distances: under the optic position.")
-        self.limits_label.hide()
-        for box in self.motors.boxes.values():  # the readouts only hold for the positions they were computed for
+        for box in self.motors.boxes.values():  # the readout only holds for the positions it was computed for
             box.valueChanged.connect(self.goto_label.hide)
-            box.valueChanged.connect(self.limits_label.hide)
         motor_box = QtWidgets.QGroupBox("Sample stage (current / planned positions)")
         mb = QtWidgets.QVBoxLayout(motor_box)
         mb.addWidget(self.motors)
         row = QtWidgets.QHBoxLayout()
         row.addWidget(QtWidgets.QLabel("Target"))
-        row.addWidget(self.target_combo, 1)
+        self.target_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToContents)
+        self.target_combo.setMinimumContentsLength(12)  # names are short (S1, Sample1/Device2)
+        row.addWidget(self.target_combo)
+        row.addStretch(1)
         mb.addLayout(row)
         self.target_combo.currentTextChanged.connect(lambda _: self._show_target_height())
-        mb.addLayout(equal_row(goto_btn, self.correct_sn_btn))
+        mb.addLayout(equal_row(goto_btn, centre_btn))
         mb.addWidget(self.goto_label)
-        mb.addWidget(self.limits_label)
+        # Correct SN: a step of its own, only when the target is too far from the analyzer focus
+        sn_box = QtWidgets.QGroupBox("Analyzer focus (SN)")
+        sb_ = QtWidgets.QVBoxLayout(sn_box)
+        sn_note = QtWidgets.QLabel("Only if the target is too far from the analyzer focus with SN kept (the line above "
+                                   "says so): SN, ST, SZ that put it on the analyzer focus.")
+        sn_note.setWordWrap(True)
+        sn_note.setStyleSheet("color: #555;")
+        sb_.addWidget(sn_note)
+        sb_.addLayout(equal_row(self.correct_sn_btn))
 
         # focusing optic: absolute position along the beam
         self.optic_type = QtWidgets.QComboBox()
@@ -227,10 +236,8 @@ class StagePanel(QtWidgets.QWidget):
         of.addRow(equal_row(focus_btn, self.undo_fine_btn))
         of.addRow(fine_note)
         of.addRow(self.optic_ref_label)
-        # working distances of the optic solids (anti-collision); filled from the configuration
-        self.distance_form = QtWidgets.QFormLayout()
-        self.distance_boxes = []
-        of.addRow(self.distance_form)
+        # the working distances of the optic solids (anti-collision) come from the configuration only (beamline staff,
+        # RealSampleCalibration): no fields here
         align_labels(self.motors, of)
 
         update_btn = QtWidgets.QPushButton("Update schematic && optics")
@@ -259,7 +266,7 @@ class StagePanel(QtWidgets.QWidget):
         left = QtWidgets.QWidget()
         lv = QtWidgets.QVBoxLayout(left)
         # result_label / cal_status are kept up to date but not shown (too long for the panel)
-        for w in (self.start_box, motor_box, optic_box, update_btn):
+        for w in (self.start_box, motor_box, sn_box, optic_box, update_btn):
             lv.addWidget(w)
         lv.addStretch(1)
         scroll = QtWidgets.QScrollArea()
@@ -306,7 +313,6 @@ class StagePanel(QtWidgets.QWidget):
         self.optic_type.setCurrentText(record.optics.optic_type)
         self.optic_type.blockSignals(False)
         self.optic_pos.setValue(record.optics.current_position)
-        self._fill_distances()
         self._show_record()
         if not self.start_box.isHidden():
             self.show_start_positions()
@@ -343,36 +349,6 @@ class StagePanel(QtWidgets.QWidget):
     def _on_optic_type(self, text: str) -> None:
         # the collision solids of the configuration belong to its optic: another optic takes its defaults
         self.record = replace(self.record, optics=replace(self.record.optics, optic_type=text), collision=None)
-        self._fill_distances()
-
-    def _fill_distances(self) -> None:
-        """One field per optic assembly (the capillary is one, whatever its parts): the distance of its front
-        from the focus (working distance)."""
-        while self.distance_form.rowCount():
-            self.distance_form.removeRow(0)
-        self.distance_boxes = []
-        optics = self.record.collision_geometry().optics
-        for name in dict.fromkeys(b.assembly for b in optics):  # in order, once each
-            parts = [b for b in optics if b.assembly == name]
-            box = spin(min(b.distance for b in parts), 0, 500, 2, 0.5)
-            box.setToolTip(f"Distance of the {name} front from the focus along the beam, used by the anti-collision\n"
-                           "check (for this session; beamline staff keep it in the configuration). "
-                           + ("It moves with the optic motor." if parts[0].moves else
-                              "It stays put when the optic refocuses (placed for the configuration's optics reference)."))
-            box.valueChanged.connect(lambda value, name=name: self._set_distance(name, value))
-            self.distance_form.addRow(f"{name} working distance", box)
-            self.distance_boxes.append(box)
-
-    def _set_distance(self, name: str, value: float) -> None:
-        """Move the whole assembly `name` so that its front is `value` from the focus."""
-        geo = self.record.collision_geometry()
-        optics = list(geo.optics)
-        shift = value - min(b.distance for b in optics if b.assembly == name)
-        for i, body in enumerate(optics):
-            if body.assembly == name:
-                optics[i] = replace(body, distance=body.distance + shift)
-        self.record = replace(self.record, collision=replace(geo, optics=tuple(optics)))
-        self.limits_label.hide()  # computed for the old distances
 
     def bring_found_to_focal_plane(self) -> tuple[MotorPositions, float] | None:
         """"Fine tunings by ZPS/CPS". A sample was found on the beam and in focus at the entered stage positions with
@@ -847,7 +823,8 @@ class StagePanel(QtWidgets.QWidget):
         m = self.motors.value()
         checked = checked_sn(self._layout_getter(), label)
         sn = m.sn if checked is None else checked
-        new = self.model().motors_on_beam(*t, srn=m.srn, srz=m.srz, sn=sn, pix=m.pix, piy=m.piy)
+        pi = self.config().pi_center  # another target: the piezo back to its centre (it may still hold a scan position)
+        new = self.model().motors_on_beam(*t, srn=m.srn, srz=m.srz, sn=sn, pix=pi, piy=pi)
         if not self._go_to(new, "The target cannot be brought onto the beam with SN kept",
                            "\n\nCorrect SN may reach it (it also moves SN)."):
             return None
@@ -861,11 +838,37 @@ class StagePanel(QtWidgets.QWidget):
         if t is None:
             return None
         m = self.motors.value()
-        new = self.model().motors_for_target(*t, srn=m.srn, srz=m.srz, pix=m.pix, piy=m.piy)
+        pi = self.config().pi_center
+        new = self.model().motors_for_target(*t, srn=m.srn, srz=m.srz, pix=pi, piy=pi)
         if not self._go_to(new, "The target cannot be brought to the analyzer focus"):
             return None
         self._show_goto(label, t, new, m.sn)
         return new
+
+    def centre_piezo(self):
+        """The sample was seen at the entered PIX / PIY (a piezo scan), away from the centre, with the optic in focus at
+        the entered position: ST / SZ that show it with the piezo centred at the same SRn / SRz, SN kept, and the optic
+        refocused (rotation.recentre_piezo, as the last step of Rotate sample). Returns the PiezoRecentre or None."""
+        from ..alignment.rotation import recentre_piezo
+        m, optic = self.motors.value(), self.optic_pos.value()
+        pi = self.config().pi_center
+        if abs(m.pix - pi) < 1e-9 and abs(m.piy - pi) < 1e-9:
+            QtWidgets.QMessageBox.information(
+                self, "Centre the piezo", f"PIX and PIY are already at the centre ({pi:g} µm): enter the PIX, PIY "
+                "where the sample is seen in the scan first.")
+            return None
+        p = recentre_piezo(self.model(), m, optic, self.calibration())
+        if not self._go_to(p.new, "The piezo-centred position cannot be reached", optic=p.optic_new):
+            return None
+        self.goto_label.setStyleSheet("color: #207020;")
+        self.goto_label.setText(
+            f"Seen at PIX = {m.pix:.2f}, PIY = {m.piy:.2f} µm → with the piezo centred ({pi:g} / {pi:g} µm), SRn, SRz "
+            f"and SN kept: ST = <b>{p.new.st:.4f}</b> (Δ {unsigned_zero(p.new.st - m.st, 4):+.4f}), SZ = "
+            f"<b>{p.new.sz:.4f}</b> (Δ {unsigned_zero(p.new.sz - m.sz, 4):+.4f}) mm, optic <b>{p.optic_new:.4f}</b> "
+            f"(Δ {unsigned_zero(p.optic_new - optic, 4):+.4f}; the point moves {p.beam_shift * 1000:.1f} µm along the "
+            "beam).")
+        self.goto_label.show()
+        return p
 
     def _go_to(self, new: MotorPositions, what: str, hint: str = "", optic: float | None = None) -> bool:
         """Move to `new` (and the optic to `optic`, if given) unless out of range or colliding."""
@@ -973,10 +976,7 @@ class StagePanel(QtWidgets.QWidget):
         model = self.model()
         m = self.motors.value()
         res = focus_correction(model, m, layout, self.calibration(), self.optic_pos.value())
-        text, hits = self.describe_limits(m)
-        self.limits_label.setText(text)
-        self.limits_label.setStyleSheet("color: #b00;" if hits else "color: #555;")
-        self.limits_label.show()
+        _, hits = self.describe_limits(m)  # drawn in red in the schematic; moves into a collision are refused
         _, ax_plane = draw_schematic(self.figure, model, m, layout, res, self.optic_type.currentText(),
                                      self.record.collision_geometry(), tuple(hits),
                                      self.calibration().reference_y(model))

@@ -89,9 +89,11 @@ Positions here are **absolute motor values** (ST, SZ, SN, …, optic).
 
 - enter the stage positions and press **Update schematic & optics** (the schematic is only redrawn on this button)
 - *Bring target onto the beam*: computes ST/SZ that put a sample/device on the beam with **SN kept** as entered
-  (how the stage is run), keeping SRn, SRz, PIX, PIY, and says how far it then is from the analyzer focus along
-  the beam (red above 50 µm) and the ΔSN that would remove it. Only if that is too far, *Correct SN* computes
-  SN/ST/SZ that put it on the analyzer focus.
+  (how the stage is run), keeping SRn, SRz, with the piezo centred (PIX = PIY = 150 µm), and says how far it then is
+  from the analyzer focus along the beam (red above 50 µm) and the ΔSN that would remove it. Only if that is too
+  far, *Correct SN* (own box under the stage) computes SN/ST/SZ that put it on the analyzer focus. *Centre the piezo*:
+  a sample seen in a PIX / PIY scan off 150 / 150 µm gives the ST / SZ (SN kept, same angles) and optic with the
+  piezo centred (`rotation.recentre_piezo`, as step 4 of the rotation tabs).
 - **focusing optic** (zone plate + OSA or capillary, only along the beam): its absolute position is read
   from the configuration and can be typed in. The result gives the **absolute optic position** for focus
   on the illuminated surface. *Fine tunings by ZPS/CPS* (the optic's focal distance is fixed, so its position in
@@ -213,12 +215,12 @@ The optic solids must also stay out of the **analyzer acceptance cone** (±15° 
 of the beam axis seen from the focus): it is drawn in the top view, and the Stage & Optics tab warns when a solid
 reaches into it (it would shadow the electrons).
 
-The working distance of every optic solid can be typed in the Stage & Optics tab (*… working distance*, under the
-optic position; for the session), and kept by beamline staff in the configuration.
+The working distance of every optic solid is kept by beamline staff in the configuration (RealSampleCalibration);
+QuickAlignment only reads it.
 
-Each solid is grown by a margin (0.1 mm) and the sampling allowance (0.18 mm). The Stage & Optics tab shows, after
-*Update*, the collision-free range of ST, SN and SZ (one motor moved, the others and the optic kept), with what sets
-each limit, and draws the solids in the top view at scale (red when touched). *Bring target onto the beam*, *Correct SN* and *Send to Stage & Optics tab* refuse a position
+Each solid is grown by a margin (0.1 mm) and the sampling allowance (0.18 mm). The Stage & Optics tab draws the
+solids in the top view at scale (red when touched); `StagePanel.describe_limits` (collision-free range of ST, SN and
+SZ, one motor moved) is no longer shown under the motors. *Bring target onto the beam*, *Correct SN* and *Send to Stage & Optics tab* refuse a position
 where the plate would touch something, with the optic where it is now or refocused.
 
 Geometry: at 45° incidence a front face of (half) width a at distance d before the focus clears a flat surface in

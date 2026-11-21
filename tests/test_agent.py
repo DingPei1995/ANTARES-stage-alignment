@@ -506,3 +506,10 @@ def test_manual_annotation_keeps_user_corners(api, tmp_path, monkeypatch, qapp):
     assert np.allclose(a.photos[pid].corners, moved, atol=1e-6)
     # unchanged corners: nothing re-registered
     assert not a.load_annotation(str(out))["registration"]["changed"]
+
+
+def test_bring_to_beam_centres_the_piezo(api):
+    a = started(api)
+    a.add_sample(1.0, 2.0, 2.0, 2.0, 0.5, name="S1")
+    out = a.bring_to_beam("S1", {"st": 0, "sz": 40, "sn": 0.5, "srn": 120, "srz": -10, "pix": 138, "piy": 162})
+    assert out["stage"]["pix"] == 150 and out["stage"]["piy"] == 150

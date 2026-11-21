@@ -75,7 +75,9 @@ y up, front view (sample side) with the tab up), not motor positions; the plate 
   Target and press the button. The optic's fixed focal distance tells where the surface is: its sample (with all its
   devices) is moved on the plate to where it really is (Δx, ΔH; Δy as the plate offset in the holder: an error of the
   drawing); the other samples and the configuration stay. The list is recomputed and the sample keeps the corrected
-  position from then on (saved with the session).
+  position from then on (saved with the session). *Target's sample H* sets its height; *H is exact* (off by default,
+  for a wafer of known thickness) keeps H and corrects x / y only (where the beam meets the surface at that height,
+  `core.stage.beam_at_height`). *Undo fine tuning* takes back the last one (step by step, down to the SN set by eye).
 
 ![Samples tab](docs/images/guide/samples_tab.png)
 

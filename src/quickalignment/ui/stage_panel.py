@@ -22,8 +22,8 @@ from ..core.collision import ACCEPTANCE_HALF_ANGLE, collisions, in_acceptance, m
 from ..core.schematic import draw_schematic
 from ..core.stage import (
     HEIGHT_CHECK_OPTIC, HEIGHT_CHECK_SRZ, HEIGHT_EXPLAIN_TOL, OPTIC_TYPES, MotorPositions, OpticsCalibration,
-    StageConfig, StageModel, apply_found_offset, checked_sn, fit_height, focus_correction, focus_point, found_offset,
-    slide_to_sn, sn_to_focus,
+    Y_HAT, StageConfig, StageModel, apply_found_offset, beam_at_height, checked_sn, fit_height, focus_correction,
+    found_offset, slide_to_sn, sn_to_focus,
 )
 from ..realsample.fit import measurement_sigmas
 
@@ -153,6 +153,7 @@ class StagePanel(QtWidgets.QWidget):
         row.addWidget(QtWidgets.QLabel("Target"))
         row.addWidget(self.target_combo, 1)
         mb.addLayout(row)
+        self.target_combo.currentTextChanged.connect(lambda _: self._show_target_height())
         mb.addLayout(equal_row(goto_btn, self.correct_sn_btn))
         mb.addWidget(self.goto_label)
         mb.addWidget(self.limits_label)
@@ -176,6 +177,28 @@ class StagePanel(QtWidgets.QWidget):
             "   analyzer focal plane, and the optic goes back to the configuration's position for the analyzer\n"
             "   focus.")
         focus_btn.clicked.connect(self.bring_found_to_focal_plane)
+        self.undo_fine_btn = QtWidgets.QPushButton("Undo fine tuning")
+        self.undo_fine_btn.setToolTip(
+            "Take back the last “Fine tunings by ZPS/CPS”: the sample position and height, the plate offset, the\n"
+            "SN set by eye and the stage / optic fields return to what they were before it. Pressed again, it takes\n"
+            "back the one before, down to the state before the first fine tuning (e.g. the SN set by eye).")
+        self.undo_fine_btn.clicked.connect(self.undo_fine_tuning)
+        self.undo_fine_btn.setEnabled(False)
+        self._fine_history: list[dict] = []  # states before each fine tuning (undo_fine_tuning)
+        # height of the Target's sample, and whether it is exact (then the fine tuning corrects x / y only)
+        self.height_box = spin(0.0, 0.0, 100.0, 3, 0.005)
+        self.height_box.setToolTip("Height H of the Target's sample (its top surface above the plate surface), the\n"
+                                   "same as H in the Samples tab. Type the known height here (e.g. a wafer of known\n"
+                                   "thickness) before the fine tuning.")
+        self.height_box.valueChanged.connect(self._on_height_typed)
+        self.height_exact = QtWidgets.QCheckBox("H is exact: do not correct it")
+        self.height_exact.setToolTip(
+            "Tick when the sample height is known precisely (e.g. a Si wafer of known thickness, mounted to within\n"
+            "0.02 mm). The fine tuning then keeps H: the Target is where the beam meets its surface at that height,\n"
+            "only its position on the plate (photo error, plate offset) is corrected, and SN brings that surface onto\n"
+            "the analyzer focus. The optic focus reading is only reported (it would otherwise correct H).\n"
+            "Off (default): the optic focus corrects H as well.")
+        self.height_exact.setChecked(False)
         fine_note = QtWidgets.QLabel(
             "Works because the focal distance of the optic is fixed: the ZPS / CPS of the found focus corrects "
             "the sample position and height and brings the sample back onto the analyzer focus.")
@@ -188,7 +211,9 @@ class StagePanel(QtWidgets.QWidget):
         of = QtWidgets.QFormLayout(optic_box)
         of.addRow("Type", self.optic_type)
         of.addRow("Optic position", self.optic_pos)
-        of.addRow(equal_row(focus_btn))
+        of.addRow("Target's sample H", self.height_box)
+        of.addRow(self.height_exact)
+        of.addRow(equal_row(focus_btn, self.undo_fine_btn))
         of.addRow(fine_note)
         of.addRow(self.optic_ref_label)
         # working distances of the optic solids (anti-collision); filled from the configuration
@@ -258,6 +283,7 @@ class StagePanel(QtWidgets.QWidget):
         self._target_labels = None
         self.set_record(self.record)
         self.refresh_targets()
+        self._show_target_height()
 
     # -- state ----------------------------------------------------------------
     def set_record(self, record: CalibrationRecord) -> None:
@@ -343,16 +369,30 @@ class StagePanel(QtWidgets.QWidget):
         optics reference turns that optic position into where the focus, i.e. the sample surface, is along the beam.
         First the height H of the Target's sample is checked against it (check_found_height); then SN (ST
         compensating, the point slides along the beam, SZ stays) brings the surface onto the analyzer focal plane and
-        the optic goes back to the configuration's position for the analyzer focus. Returns (motors, optic)."""
+        the optic goes back to the configuration's position for the analyzer focus. Returns (motors, optic).
+
+        With "H is exact" ticked the height is kept: the Target is where the beam meets its surface at that height
+        (core.stage.beam_at_height), only its plate position is corrected, and SN brings that surface onto the analyzer
+        focus; the optic reading is only compared. The state before is kept for undo_fine_tuning."""
         m, optic_now = self.motors.value(), self.optic_pos.value()
-        height_text = self.check_found_height(m, optic_now)  # may correct H of the target's sample
+        state = self._fine_state()
+        height_text = self.check_found_height(m, optic_now)  # may correct H (or only x / y) of the target's sample
         model, cal = self.model(), self.calibration()
-        y = cal.focus_for_position(model, optic_now)
-        u, v, w = (float(x) for x in focus_point(model, m, cal, optic_now))
+        y_optic = cal.focus_for_position(model, optic_now)
+        y = y_optic
+        sample = self._target_sample()
+        if self.height_exact.isChecked() and sample is not None:
+            t = self.target_point(self.target_combo.currentText())
+            y = beam_at_height(model, m, t[2])
+        u, v, w = (float(x) for x in model.lab_to_plate(m, y * Y_HAT))
         new = slide_to_sn(m, m.sn - y / 2 ** 0.5)
         optic_new = cal.position_for_focus(model, 0.0)
         if not self._go_to(new, "The found sample cannot be brought onto the analyzer focal plane", optic=optic_new):
+            self._restore_fine_state(state)  # nothing done: take back a correction already applied
             return None
+        self._fine_history.append(state)
+        self.undo_fine_btn.setEnabled(True)
+        self._show_target_height()
         height = w - model.plate.total_thickness
         side = "downstream" if y > 0 else "upstream"
         where = ("It was already on the analyzer focus." if abs(y) < TOLERANCE else
@@ -367,6 +407,73 @@ class StagePanel(QtWidgets.QWidget):
             + (f"<br>{height_text}" if height_text else ""))
         self.goto_label.show()
         return new, optic_new
+
+    # -- fine tuning: height of the target, undo --------------------------------------
+    def _target_sample(self):
+        label = self.target_combo.currentText()
+        return self._layout_getter().sample_of(label) if label else None
+
+    def _show_target_height(self) -> None:
+        """The H field follows the Target's sample (disabled for the plate centre)."""
+        sample = self._target_sample()
+        self.height_box.blockSignals(True)
+        self.height_box.setValue(sample.height if sample is not None else 0.0)
+        self.height_box.blockSignals(False)
+        self.height_box.setEnabled(sample is not None)
+
+    def _on_height_typed(self, value: float) -> None:
+        sample = self._target_sample()
+        if sample is None or abs(value - sample.height) < 5e-7:
+            return
+        sample.height = value
+        sample.sn_checked = None  # typed by hand: no longer from the SN set by eye (as in the Samples tab)
+        self.goto_label.hide()
+        self.layoutCorrected.emit(sample.name)
+        self.refresh_targets()
+
+    def _fine_state(self) -> dict:
+        layout = self._layout_getter()
+        return {"layout": layout, "plate_offset_v": layout.plate_offset_v,
+                "samples": [(s, s.u, s.v, s.height, s.sn_checked) for s in layout.samples],
+                "motors": self.motors.value(), "optic": self.optic_pos.value()}
+
+    def _restore_fine_state(self, state: dict) -> list[str]:
+        """Put the plate, the samples and the stage / optic fields back as in `state`; returns the samples changed."""
+        layout = state["layout"]
+        layout.plate_offset_v = state["plate_offset_v"]
+        changed = []
+        for s, u, v, h, sn in state["samples"]:
+            if s in layout.samples and (s.u, s.v, s.height, s.sn_checked) != (u, v, h, sn):
+                s.u, s.v, s.height, s.sn_checked = u, v, h, sn
+                changed.append(s.name)
+        self.motors.set_value(state["motors"])
+        self.optic_pos.setValue(state["optic"])
+        return changed
+
+    def undo_fine_tuning(self) -> bool:
+        """Take back the last "Fine tunings by ZPS/CPS" (sample position and height, plate offset, SN set by eye,
+        stage and optic fields). False if there is nothing to take back (or the plate was changed since)."""
+        while self._fine_history:
+            state = self._fine_history.pop()
+            if state["layout"] is self._layout_getter():
+                break
+        else:
+            self.undo_fine_btn.setEnabled(False)
+            return False
+        changed = self._restore_fine_state(state)
+        self.undo_fine_btn.setEnabled(bool(self._fine_history))
+        for name in changed or [""]:
+            self.layoutCorrected.emit(name or "the plate")
+        self.refresh_targets()
+        self._show_target_height()
+        left = len(self._fine_history)
+        self.goto_label.setStyleSheet("color: #555;")
+        self.goto_label.setText(
+            "Fine tuning taken back: samples, plate offset and stage / optic fields as before it"
+            + (f" ({left} more fine tuning(s) can be taken back)." if left else
+               " (the state before the first fine tuning, e.g. the SN set by eye)."))
+        self.goto_label.show()
+        return True
 
     def check_found_height(self, m: MotorPositions, optic: float) -> str:
         """Correction part of "Fine tunings by ZPS/CPS": the Target was found on the beam and in focus at m with the
@@ -387,6 +494,9 @@ class StagePanel(QtWidgets.QWidget):
         name = "CPS" if capillary else "ZPS"
         if abs(m.srz) < HEIGHT_CHECK_SRZ:
             return self.correct_found_at_srz0(m, optic, label, sample, t, name, optic_type)
+        if self.height_exact.isChecked():
+            return (f"<span style='color:#555'>H of {sample.name} marked exact ({sample.height:.3f} mm): no height "
+                    "check after the SRz turn.</span>")
         fit = fit_height(self.model(), m, self.calibration(), optic, *t, sigmas=measurement_sigmas(optic_type))
         st, sz, op = fit.before
         if abs(op) <= HEIGHT_CHECK_OPTIC:
@@ -431,8 +541,10 @@ class StagePanel(QtWidgets.QWidget):
         model, cal = self.model(), self.calibration()
         layout = self._layout_getter()
         y = cal.focus_for_position(model, optic)
-        du, dv, dw = found_offset(model, m, *t, y=y)
         sigma = measurement_sigmas(optic_type)[1] / 2 ** 0.5  # optic reading along the beam -> along the normal
+        if self.height_exact.isChecked():
+            return self._correct_found_exact_height(m, optic, label, sample, t, name, y, sigma)
+        du, dv, dw = found_offset(model, m, *t, y=y)
         su, sv, sw = (unsigned_zero(x, 3) for x in (du, dv, dw))
         if abs(du) < FOUND_POSITION_MIN and abs(dv) < FOUND_POSITION_MIN and abs(dw) < HEIGHT_FOCUS_MIN:
             return (f"<span style='color:#555'>{label} found where expected (Δx {su:+.3f}, Δy {sv:+.3f}, "
@@ -475,6 +587,52 @@ class StagePanel(QtWidgets.QWidget):
                 f"H {before:.3f} → {sample.height:.3f} mm (± {sigma:.3f}); plate offset "
                 f"{layout.plate_offset_v:+.3f} mm.</span>")
 
+    def _correct_found_exact_height(self, m: MotorPositions, optic: float, label: str, sample, t, name: str,
+                                    y_optic: float, sigma: float) -> str:
+        """SRz 0 fine tuning with "H is exact": the Target is where the beam meets its surface at the known height,
+        so only Δx (this sample) and Δy (plate offset) are corrected, from the photo error; the optic focus reading is
+        compared with that surface (its difference is not taken as a height error)."""
+        model = self.model()
+        layout = self._layout_getter()
+        y = beam_at_height(model, m, t[2])
+        du, dv, _ = found_offset(model, m, *t, y=y)
+        _, _, dw_optic = found_offset(model, m, *t, y=y_optic)
+        su, sv, so = (unsigned_zero(x, 3) for x in (du, dv, dw_optic))
+        optic_note = (f"the {name} focus puts the surface {so:+.3f} ± {sigma:.3f} mm from H = {sample.height:.3f} mm"
+                      + (" (more than 3 σ: check the optic position typed, H or SN_f of the configuration)"
+                         if abs(dw_optic) > 3 * sigma else ""))
+        if abs(du) < FOUND_POSITION_MIN and abs(dv) < FOUND_POSITION_MIN:
+            return (f"<span style='color:#555'>{label} found where expected (Δx {su:+.3f}, Δy {sv:+.3f} mm; H exact, "
+                    f"kept); {optic_note}: nothing corrected.</span>")
+        large = ""
+        if abs(du) > LARGE_FOUND_OFFSET:
+            large = (f"\n\nΔx (ST) is more than {LARGE_FOUND_OFFSET:g} mm: more likely the beam spot has moved (optic "
+                     "realigned?) than the sample, or the Target is not the one on the beam.")
+        if abs(layout.plate_offset_v + dv) > PLATE_OFFSET_WARNING:
+            large += (f"\n\nThe plate would then sit {layout.plate_offset_v + dv:+.2f} mm off its usual height in the "
+                      f"holder (more than {PLATE_OFFSET_WARNING:g} mm): check that the right sample was found.")
+        answer = QtWidgets.QMessageBox.question(
+            self, "Correct the plate / sample position?",
+            f"{label} was found on the beam at SRz = 0° (ST = {m.st:.4f}, SZ = {m.sz:.4f}, SN = {m.sn:.4f}). The height "
+            f"of {sample.name} is marked exact (H = {sample.height:.3f} mm, kept), so the Target is where the beam "
+            f"meets its surface: Δx = {su:+.3f}, Δy = {sv:+.3f} mm on the plate from where it was drawn (photo "
+            f"error).\n\n"
+            f"• Δy: the whole plate moves by {sv:+.3f} mm in the holder (plate offset {layout.plate_offset_v:+.3f} → "
+            f"{layout.plate_offset_v + dv:+.3f} mm), every sample's SZ changes by {unsigned_zero(-dv, 3):+.3f} mm.\n"
+            f"• Δx: {sample.name} (with its devices) is moved by Δx; the other samples stay.\n\n"
+            f"For information: {optic_note}." + large,
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes,
+        )
+        if answer != QtWidgets.QMessageBox.Yes:
+            return (f"<span style='color:#555'>{label}: Δx {su:+.3f}, Δy {sv:+.3f} mm (H exact); nothing "
+                    "corrected.</span>")
+        apply_found_offset(self.config(), layout, sample, du, dv, 0.0)
+        self.layoutCorrected.emit(sample.name)
+        self.refresh_targets()
+        return (f"<span style='color:#207020'>Corrected (H exact, {sample.height:.3f} mm kept): {sample.name} moved by "
+                f"Δx {su:+.3f} mm; plate offset {layout.plate_offset_v:+.3f} mm. {optic_note[0].upper()}"
+                f"{optic_note[1:]}.</span>")
+
     def model(self) -> StageModel:
         return StageModel(self.config(), self._layout_getter().plate)
 
@@ -492,6 +650,8 @@ class StagePanel(QtWidgets.QWidget):
             self.target_combo.blockSignals(False)
         if not self.start_box.isHidden():
             self.show_start_positions()
+        if hasattr(self, "height_box"):
+            self._show_target_height()
 
     def show_start_positions(self) -> None:
         """List the ST / SZ / SN putting each sample / device on the analyzer focus at SRn = ref, SRz = 0."""

@@ -243,8 +243,20 @@ ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back
    - **Back onto the analyzer focus.** SN (ST compensating, so the point stays on the beam; SZ kept) brings the
      surface onto the analyzer focal plane, and the optic goes back to the configuration's exact position for the
      analyzer focus. The line under the motors gives the new ST, SZ, SN, ΔSN, ΔST and optic position, and where the
-     point is on the plate. Not moved if a motor would leave its range or the plate would touch something (a height
-     correction already made is kept).
+     point is on the plate. Not moved if a motor would leave its range or the plate would touch something (then
+     nothing is corrected either).
+   - **Target's sample H** (above the button) shows and sets the height of the *Target*'s sample (the same H as in
+     the Samples tab; typing it drops an SN set by eye). **H is exact: do not correct it** (off by default): tick it
+     when the height is known precisely, e.g. a Si wafer of known thickness mounted to within 0.02 mm. The fine
+     tuning then keeps H and corrects only the photo error: the *Target* is taken where the beam meets its surface at
+     that height (Δx of its sample, Δy of the plate), and SN brings that surface onto the analyzer focus. The optic
+     focus is only compared with H (shown in the window, flagged above 3 σ); after an SRz turn there is no height
+     check.
+   - **Undo fine tuning** takes back the last fine tuning: the sample position and height, the plate offset, the SN
+     set by eye and the stage and optic fields return to what they were before it. Pressed again it takes back the
+     one before, down to the state before the first fine tuning (e.g. the result of *Set SN by eye*).
+
+   ![Fine tunings by ZPS/CPS: the H of the Target's sample, H is exact, Undo fine tuning](images/guide/fine_tuning_controls.png)
 
 **The schematic** (redrawn only with *Update schematic & optics*):
 
@@ -269,7 +281,9 @@ back onto the analyzer focus, see step 4 above):
   same height): the whole plate moves, so the SZ of **every** sample changes by the same amount. The start positions
   show the *plate offset*; above 2.5 mm you are warned to check that the right sample was found. Choosing another
   plate resets it.
-- **Δx and ΔH** correct only this sample (with all its devices); the other samples stay.
+- **Δx and ΔH** correct only this sample (with all its devices); the other samples stay. With *H is exact* ticked,
+  ΔH is not applied (the window says *H … kept*): only Δx and Δy, from where the beam meets the surface at the known
+  height.
 
 All predictions then use the corrected positions (saved with the session); the list of start positions is updated.
 
@@ -493,7 +507,7 @@ first use of a new kind of measurement, check that the point appears where the a
 | *Collision: the plate would touch …* | at that position the plate (or a sample, a screw) would hit the optic or the analyzer; nothing is changed: choose another position, or move the optic back |
 | *… in the analyzer acceptance cone: it would shadow the electrons* | the optic stands in the path of the electrons to the analyzer; move it out |
 | *… µm from the analyzer focus* (red) | after an SRz turn the point left the focal plane: tick *Correct SN* |
-| *Correct the plate / sample position and height?* | *Fine tunings by ZPS/CPS*: check the positions and the device; *Yes* moves the plate by Δy (all samples) and the sample by Δx, ΔH |
+| *Correct the plate / sample position and height?* (*… position?* with *H is exact*) | *Fine tunings by ZPS/CPS*: check the positions and the device; *Yes* moves the plate by Δy (all samples) and the sample by Δx, ΔH |
 | *Fine tunings by ZPS/CPS* moves a sample by > 0.3 mm | the drawing was off, or the configuration is outdated (motors re-homed): ask the staff |
 | *The beam misses the plate* | ST / SZ do not put the beam on the plate |
 | *Check the input: Γ–K on the map is …* | lattice constant, point or photon energy does not match the map |

@@ -61,7 +61,9 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
      SZ can be 0-2 mm off because the plate does not always go into the holder at the same height (not the beam):
      the SZ shift moves the whole plate (plate offset, every sample's SZ), the ST shift and H correct that sample.
      Positions are recomputed. A large ST shift (> 0.3 mm) points rather to the beam spot (optic realigned): if
-     several samples show it, suggest an optics recalibration instead of moving samples.
+     several samples show it, suggest an optics recalibration instead of moving samples. Ask whether the sample
+     height is known precisely (e.g. a Si wafer of known thickness, mounted within 0.02 mm; default: no): then
+     height_exact=true keeps H and corrects only x / y (the photo error and the plate offset).
    - The user says a sample is elsewhere / bigger / has another height: align_update_sample.
    - Rotation: align_rotate(srn, srz, motors=position with the point on the beam) gives ST, SZ, SN and the optic
      position (two answers: SN kept, and SN corrected; follow "recommended"). To turn an edge seen on the photo

@@ -173,3 +173,72 @@ def test_fine_tuning_at_srz_0_refused_changes_nothing(stage, monkeypatch):
     answer(monkeypatch, QtWidgets.QMessageBox.No)
     st.bring_found_to_focal_plane()
     assert sample.height == 0.75 and "nothing corrected" in st.goto_label.text()
+
+
+# -- H exact, the H field and Undo fine tuning ------------------------------------------------------------------------
+def test_height_field_follows_the_target_and_sets_h(stage):
+    st, sample = stage
+    assert st.height_box.isEnabled() and st.height_box.value() == pytest.approx(0.75)
+    assert not st.height_exact.isChecked()  # off by default
+    sample.sn_checked = 1.234
+    st.height_box.setValue(0.525)
+    assert sample.height == pytest.approx(0.525) and sample.sn_checked is None  # typed: no longer the SN set by eye
+    st.target_combo.setCurrentText("plate centre")
+    assert not st.height_box.isEnabled()
+
+
+def test_exact_height_corrects_only_the_photo_error(stage, monkeypatch):
+    """H exact (0.75 mm): found 0.1 mm off in x and 0.05 mm low in y on the plate, the optic read 0.04 mm off along the
+    beam: x and the plate offset are corrected, H is kept, and the surface at H ends on the analyzer focus."""
+    st, sample = stage
+    st.height_exact.setChecked(True)
+    model, cal = st.model(), st.calibration()
+    w = PLATE.total_thickness + 0.75
+    m = model.motors_on_beam(2.1, 3.95, w, srn=120, srz=0.0, sn=0.3, pix=150, piy=150)
+    st.motors.set_value(M(st=m.st, sz=m.sz, sn=m.sn, srn=120, srz=0.0, pix=150, piy=150))
+    st.optic_pos.setValue(cal.position_for_focus(model, model.beam_position(m, 2.1, 3.95, w) + 0.04))
+    asked = answer(monkeypatch, QtWidgets.QMessageBox.Yes)
+    st.bring_found_to_focal_plane()
+    assert len(asked) == 1 and "marked exact" in asked[0] and "Δx = +0.100" in asked[0]
+    assert sample.height == 0.75 and sample.u == pytest.approx(2.1, abs=2e-4)
+    assert st._layout_getter().plate_offset_v == pytest.approx(-0.05, abs=2e-4)
+    assert "H exact" in st.goto_label.text()
+    model = st.model()
+    assert model.beam_position(st.motors.value(), 2.1, 4.0, w) == pytest.approx(0, abs=2e-4)
+
+
+def test_exact_height_no_height_check_after_an_srz_turn(stage, monkeypatch):
+    st, sample = stage
+    st.height_exact.setChecked(True)
+    set_found(st, 0.65, -20.0)  # the optic says 0.1 mm lower: not taken as a height error
+    asked = answer(monkeypatch, QtWidgets.QMessageBox.Yes)
+    st.bring_found_to_focal_plane()
+    assert not asked and sample.height == 0.75 and "marked exact" in st.goto_label.text()
+
+
+def test_undo_fine_tuning_back_to_the_sn_set_by_eye(stage, monkeypatch):
+    st, sample = stage
+    assert not st.undo_fine_btn.isEnabled() and not st.undo_fine_tuning()
+    sample.sn_checked = 0.4  # SN set by eye
+    layout = st._layout_getter()
+    answer(monkeypatch, QtWidgets.QMessageBox.Yes)
+    set_found(st, 0.65, 0.0)
+    m0, optic0 = st.motors.value(), st.optic_pos.value()
+    st.bring_found_to_focal_plane()  # H corrected, SN set by eye follows
+    assert sample.height == pytest.approx(0.65, abs=2e-4) and sample.sn_checked != 0.4
+    model, cal = st.model(), st.calibration()  # a second fine tuning, found 0.1 mm off in x
+    w = PLATE.total_thickness + 0.65
+    m = model.motors_on_beam(2.1, 4.0, w, srn=120, srz=0.0, sn=0.3, pix=150, piy=150)
+    st.motors.set_value(m)
+    st.optic_pos.setValue(cal.position_for_focus(model, model.beam_position(m, 2.1, 4.0, w)))
+    m1, optic1 = st.motors.value(), st.optic_pos.value()
+    st.bring_found_to_focal_plane()
+    assert sample.u == pytest.approx(2.1, abs=2e-4) and st.undo_fine_btn.isEnabled()
+    assert st.undo_fine_tuning()  # the second one
+    assert sample.u == pytest.approx(2.0, abs=2e-4) and sample.height == pytest.approx(0.65, abs=2e-4)
+    assert st.motors.value() == m1 and st.optic_pos.value() == pytest.approx(optic1)
+    assert st.undo_fine_tuning()  # the first one: back to the SN set by eye
+    assert (sample.u, sample.v, sample.height, sample.sn_checked) == (2.0, 4.0, 0.75, 0.4)
+    assert layout.plate_offset_v == 0.0 and st.height_box.value() == pytest.approx(0.75)
+    assert st.motors.value() == m0 and st.optic_pos.value() == pytest.approx(optic0)
+    assert not st.undo_fine_btn.isEnabled() and "before the first fine tuning" in st.goto_label.text()

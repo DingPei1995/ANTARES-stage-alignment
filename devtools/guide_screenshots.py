@@ -228,6 +228,8 @@ def quickalignment_shots(app, store: CalibrationStore) -> None:
     st.bring_found_to_focal_plane()
     QtWidgets.QMessageBox.question = question
     st.update_view()
+    # the focusing-optic box after it: H of the Target's sample, "H is exact" (off), Undo fine tuning enabled
+    save(st.undo_fine_btn.parentWidget(), "fine_tuning_controls", app)
 
     # Rotate sample tab: to SRn 92, SRz -24 (the second rotation of the beamtime)
     win.resize(1450, 1000)

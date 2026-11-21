@@ -190,6 +190,12 @@ def test_found_here_not_in_focus_and_old_configuration(api):
     assert out["sample"]["height"] == pytest.approx(0.748)
     hit = a.beam_on(m)["plate_mm"]
     assert hit == pytest.approx([out["sample"]["x"], out["sample"]["y"]], abs=2e-3)
+    # height_exact: H known precisely, kept; x / y from where the beam crosses the surface (plate offset moves y)
+    m = {"srn": 120, "srz": 0, "st": -3.0, "sz": 36.0, "sn": 0.8}
+    hit = a.beam_on(m)["plate_mm"]
+    out = a.found_here("Cav", m, height_exact=True)
+    assert out["sample"]["height"] == pytest.approx(0.748) and out["shift_mm"]["dH"] == 0
+    assert "marked exact" in out["height_kept"] and out["sample"]["x"] == pytest.approx(hit[0], abs=2e-3)
 
 
 def test_device_photo_from_point_pairs(api):

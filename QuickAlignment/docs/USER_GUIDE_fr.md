@@ -259,7 +259,19 @@ pour repère).
      surface dans le plan focal de l'analyseur, et l'optique revient à la position exacte de la configuration pour le
      foyer de l'analyseur. La ligne sous les moteurs donne les nouveaux ST, SZ, SN, ΔSN, ΔST et la position de
      l'optique, et où est le point sur la plaquette. Pas de déplacement si un moteur sortait de sa course ou si la
-     plaquette touchait quelque chose (une correction de H déjà faite est gardée).
+     plaquette touchait quelque chose (rien n'est alors corrigé non plus).
+   - **Target's sample H** (au-dessus du bouton) affiche et règle la hauteur de l'échantillon de la *Target* (le même
+     H que dans l'onglet Samples ; la taper annule un SN réglé à l'œil). **H is exact: do not correct it** (décoché
+     par défaut) : à cocher quand la hauteur est connue précisément, par ex. une plaquette de Si d'épaisseur connue
+     montée à 0,02 mm près. Le réglage fin garde alors H et ne corrige que l'erreur de la photo : la *Target* est prise
+     là où le faisceau rencontre sa surface à cette hauteur (Δx de son échantillon, Δy de la plaquette), et SN amène
+     cette surface au foyer de l'analyseur. Le foyer de l'optique est seulement comparé à H (affiché dans la fenêtre,
+     signalé au-delà de 3 σ) ; après une rotation SRz, pas de contrôle de hauteur.
+   - **Undo fine tuning** annule le dernier réglage fin : position et hauteur de l'échantillon, plate offset, SN
+     réglé à l'œil et champs de la platine et de l'optique reviennent à leur état d'avant. Appuyé à nouveau, il annule
+     le précédent, jusqu'à l'état d'avant le premier réglage fin (par ex. le résultat de *Set SN by eye*).
+
+   ![Fine tunings by ZPS/CPS : H de l'échantillon de la Target, H is exact, Undo fine tuning](images/guide/fine_tuning_controls.png)
 
 **Le schéma** (redessiné seulement avec *Update schematic & optics*) :
 
@@ -285,7 +297,9 @@ parties (puis la platine revient au foyer de l'analyseur, voir l'étape 4 ci-des
   toujours à la même hauteur) : toute la plaquette se déplace, le SZ de **tous** les échantillons change d'autant. Les
   positions de départ affichent le *plate offset* ; au-delà de 2,5 mm, un avertissement demande de vérifier que c'est
   le bon échantillon. Choisir une autre plaquette le remet à zéro.
-- **Δx et ΔH** ne corrigent que cet échantillon (avec tous ses dispositifs) ; les autres restent.
+- **Δx et ΔH** ne corrigent que cet échantillon (avec tous ses dispositifs) ; les autres restent. Avec *H is
+  exact* coché, ΔH n'est pas appliqué (la fenêtre indique *H … kept*) : seulement Δx et Δy, d'après le point où le
+  faisceau rencontre la surface à la hauteur connue.
 
 Toutes les prédictions utilisent ensuite les positions corrigées (enregistrées avec la session) ; la liste des
 positions de départ est mise à jour.

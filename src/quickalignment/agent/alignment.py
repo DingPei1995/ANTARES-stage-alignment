@@ -874,7 +874,7 @@ class AlignmentSession:
         return out
 
     def found_here(self, target: str, motors: dict, apply: bool = True, at_focus: bool = True,
-                   configuration: str | None = None) -> dict:
+                   configuration: str | None = None, height_exact: bool = False) -> dict:
         """The target was found on the beam at these stage positions. ST is usually right; SZ is off (0-2 mm) because
         the plate does not always go into the holder at the same height, not because of the beam: the y shift moves
         the whole plate in the holder (plate offset: SZ of every sample changes, the configuration and the drawing
@@ -882,6 +882,9 @@ class AlignmentSession:
 
         at_focus: SN was set so that the target is in the analyzer focus (then its height H follows from SN too).
         false: SN was not corrected (only on the beam): x, y follow and H is kept.
+        height_exact: the sample height is known precisely (e.g. a wafer of known thickness, mounted within 0.02 mm):
+        H is kept, x, y follow from where the beam crosses the surface at that height (only the photo error and the
+        plate offset are corrected), as "H is exact" in the program's Fine tunings by ZPS/CPS.
         configuration: the motor values were read with another (older) configuration, e.g. a position noted months
         ago (another mounting of the plate); x, y follow from that configuration and move the sample, H is kept
         (heights do not carry over between configurations)."""
@@ -893,7 +896,7 @@ class AlignmentSession:
         m = motors_from(motors, self._base_motors())
         model = self.model if configuration is None else StageModel(
             self._find_record(configuration).config_for(self.layout.plate.key), self.layout.plate)
-        if at_focus and configuration is None:
+        if at_focus and configuration is None and not height_exact:
             du, dv, dw = found_offset(model, m, *uvw)
         else:
             hit = model.beam_hit(m, uvw[2])
@@ -908,8 +911,10 @@ class AlignmentSession:
                                               "after": self.layout.plate_offset_v + dv}, 4)
             out["how"] = ("dy: the plate sits at another height in the holder (not the beam): all samples move with it "
                           f"(their SZ by {-dv:+.4f} mm); dx and dH: {sample.name} only.")
-        if configuration is not None or not at_focus:
-            out["height_kept"] = (f"H kept at {sample.height:.3f} mm; x, y from where the beam crosses the surface"
+        if configuration is not None or not at_focus or height_exact:
+            out["height_kept"] = (f"H kept at {sample.height:.3f} mm"
+                                  + (" (marked exact)" if height_exact else "")
+                                  + "; x, y from where the beam crosses the surface"
                                   + (f" with configuration {configuration!r}." if configuration else "."))
         if abs(du) > LARGE_FOUND_OFFSET:
             out["warning"] = (f"x (ST) off by more than {LARGE_FOUND_OFFSET:g} mm: more likely the beam spot has moved "

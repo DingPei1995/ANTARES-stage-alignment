@@ -168,10 +168,13 @@ TOOLS = [
     tool("align_found_here", "alignment", "found_here",
          "A target was found on the beam at these positions: the y (SZ) shift moves the whole plate in the holder "
          "(plate offset, all samples), x and H correct its sample (at_focus false: SN not corrected, H kept; "
+         "height_exact: H known precisely, kept, only x / y corrected; "
          "configuration: positions read with an older configuration: the sample moves, H kept).",
          {"target": STR, "motors": MOTORS_ARG, "apply": d("false: only report the shift", **BOOL),
           "at_focus": d("true (default): SN put the target in the analyzer focus", **BOOL),
-          "configuration": d("configuration the motor values were read with (default: the one in use)", **STR)},
+          "configuration": d("configuration the motor values were read with (default: the one in use)", **STR),
+          "height_exact": d("true: the sample height is known precisely (wafer of known thickness): keep H, correct "
+                            "x / y only", **BOOL)},
          ["target", "motors"]),
     tool("align_rotate", "alignment", "rotate",
          "New ST / SZ / SN and optic position after turning SRn / SRz, keeping the point now on the beam.",

@@ -428,6 +428,17 @@ def beam_on_layout(model: StageModel, m: MotorPositions, layout: SampleLayout) -
     return None, None, None, "misses the plate"
 
 
+def beam_at_height(model: StageModel, m: MotorPositions, w: float) -> float:
+    """Position along the beam (from the analyzer focus, + downstream) where the beam crosses the plane at height w
+    above the back face, at m. Used when the sample height is known exactly ("H exact" in Fine tunings by ZPS/CPS):
+    the point on the beam is then where the beam meets the sample surface, whatever the optic focus reading says."""
+    p0 = float(model.lab_to_plate(m, np.zeros(3))[2])
+    k = float(model.lab_to_plate(m, Y_HAT)[2]) - p0  # lab_to_plate is affine along the beam
+    if abs(k) < 1e-9:
+        raise ValueError("The beam runs parallel to the sample surface.")
+    return (w - p0) / k
+
+
 def focus_point(model: StageModel, m: MotorPositions, cal: OpticsCalibration, optic_position: float) -> np.ndarray:
     """Plate point (u, v, w) at the optic focus: where the sample point is when it was found on the beam and in
     focus at the stage positions m with the optic at `optic_position`. The working distance of the optic stays, so

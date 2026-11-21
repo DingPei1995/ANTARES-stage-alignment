@@ -77,7 +77,9 @@ y up, front view (sample side) with the tab up), not motor positions; the plate 
   drawing); the other samples and the configuration stay. The list is recomputed and the sample keeps the corrected
   position from then on (saved with the session). *Target's sample H* sets its height; *H is exact* (off by default,
   for a wafer of known thickness) keeps H and corrects x / y only (where the beam meets the surface at that height,
-  `core.stage.beam_at_height`). *Undo fine tuning* takes back the last one (step by step, down to the SN set by eye).
+  `core.stage.beam_at_height`). Trust: known exact H > ZPS / CPS focus > SN set by eye: an H from the SN set by eye
+  or left at the default is confirmed (or the known one entered) before it is taken as exact; the SN set by eye is
+  then kept as a check of SN_f / the mounting. *Undo fine tuning* takes back the last one (step by step, down to the SN set by eye).
 
 ![Samples tab](docs/images/guide/samples_tab.png)
 

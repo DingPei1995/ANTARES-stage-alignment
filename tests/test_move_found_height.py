@@ -187,11 +187,19 @@ def test_height_field_follows_the_target_and_sets_h(stage):
     assert not st.height_box.isEnabled()
 
 
+def exact(st, monkeypatch, height="same"):
+    """Tick "H is exact"; the question answered: "same" (H is exact as it is), a value (entered) or None (cancel)."""
+    asked = []
+    monkeypatch.setattr(st, "_known_height", lambda s: asked.append(s.name) or (s.height if height == "same" else height))
+    st.height_exact.setChecked(True)
+    return asked
+
+
 def test_exact_height_corrects_only_the_photo_error(stage, monkeypatch):
     """H exact (0.75 mm): found 0.1 mm off in x and 0.05 mm low in y on the plate, the optic read 0.04 mm off along the
     beam: x and the plate offset are corrected, H is kept, and the surface at H ends on the analyzer focus."""
     st, sample = stage
-    st.height_exact.setChecked(True)
+    assert exact(st, monkeypatch) == ["Cav"] and st.is_exact(sample)
     model, cal = st.model(), st.calibration()
     w = PLATE.total_thickness + 0.75
     m = model.motors_on_beam(2.1, 3.95, w, srn=120, srz=0.0, sn=0.3, pix=150, piy=150)
@@ -209,7 +217,7 @@ def test_exact_height_corrects_only_the_photo_error(stage, monkeypatch):
 
 def test_exact_height_no_height_check_after_an_srz_turn(stage, monkeypatch):
     st, sample = stage
-    st.height_exact.setChecked(True)
+    exact(st, monkeypatch)
     set_found(st, 0.65, -20.0)  # the optic says 0.1 mm lower: not taken as a height error
     asked = answer(monkeypatch, QtWidgets.QMessageBox.Yes)
     st.bring_found_to_focal_plane()
@@ -242,3 +250,70 @@ def test_undo_fine_tuning_back_to_the_sn_set_by_eye(stage, monkeypatch):
     assert layout.plate_offset_v == 0.0 and st.height_box.value() == pytest.approx(0.75)
     assert st.motors.value() == m0 and st.optic_pos.value() == pytest.approx(optic0)
     assert not st.undo_fine_btn.isEnabled() and "before the first fine tuning" in st.goto_label.text()
+
+
+def test_sn_by_eye_is_not_taken_as_exact_without_asking(stage, monkeypatch):
+    """Trust: known exact H > ZPS / CPS focus > SN set by eye. Ticking "H is exact" on an H from the SN set by eye
+    asks; cancelled, nothing changes; the known H entered replaces the SN set by eye, which stays as a check."""
+    st, sample = stage
+    sample.sn_checked = 0.4
+    st.refresh_targets()
+    assert "SN set by eye" in st.height_source.text()
+    assert exact(st, monkeypatch, None) == ["Cav"]
+    assert not st.height_exact.isChecked() and sample.sn_checked == 0.4 and not st.is_exact(sample)
+    assert exact(st, monkeypatch, 0.70) == ["Cav"]
+    assert st.height_exact.isChecked() and sample.height == 0.70 and sample.sn_checked is None
+    assert "exact" in st.height_source.text() and st.height_box.value() == pytest.approx(0.70)
+    assert "SN set by eye 0.400" in st.eye_check(sample)
+    # Undo fine tuning goes back to the SN set by eye
+    assert st.undo_fine_btn.isEnabled() and st.undo_fine_tuning()
+    assert (sample.height, sample.sn_checked) == (0.75, 0.4) and not st.is_exact(sample)
+
+
+def test_exact_height_forgotten_until_the_fine_tuning(stage, monkeypatch):
+    """H never entered (default) and "H is exact" ticked for another target: the fine tuning asks for it first; the
+    height typed there with the box ticked is taken as exact."""
+    st, sample = stage
+    st.default_height_getter = lambda: 0.75
+    st.refresh_targets()
+    assert "default height" in st.height_source.text()
+    st.target_combo.setCurrentText("plate centre")
+    exact(st, monkeypatch)  # no sample: nothing asked yet
+    st.target_combo.setCurrentText("Cav")
+    asked = []
+    monkeypatch.setattr(st, "_known_height", lambda s: asked.append(s.name) or None)
+    set_found(st, 0.75, 0.0)
+    assert st.bring_found_to_focal_plane() is None and asked == ["Cav"]  # cancelled: nothing done
+    assert not st.undo_fine_btn.isEnabled()
+    st.height_box.setValue(0.6)  # typed with the box ticked: the known height
+    assert st.is_exact(sample) and sample.height == pytest.approx(0.6)
+    q = answer(monkeypatch, QtWidgets.QMessageBox.Yes)
+    asked.clear()
+    st.bring_found_to_focal_plane()
+    assert not asked and len(q) == 1 and "marked exact" in q[0] and sample.height == pytest.approx(0.6)
+
+
+def test_fine_tuning_reminds_of_a_default_height(stage, monkeypatch):
+    st, sample = stage
+    st.default_height_getter = lambda: 0.75
+    set_found(st, 0.65, 0.0)
+    q = answer(monkeypatch, QtWidgets.QMessageBox.No)
+    st.bring_found_to_focal_plane()
+    assert "default height of new samples" in q[0] and "H is exact" in q[0]
+
+
+@pytest.mark.parametrize("button, expected", [("Yes", 0.75), ("Enter", 0.71), (None, None)])
+def test_known_height_dialog(stage, monkeypatch, button, expected):
+    st, sample = stage
+    sample.sn_checked = 0.4
+    texts = []
+
+    def clicked(box):
+        texts.append(box.text())
+        return next((b for b in box.buttons() if button and b.text().startswith(button)),
+                    box.button(QtWidgets.QMessageBox.Cancel))
+    monkeypatch.setattr(QtWidgets.QMessageBox, "exec", lambda box: 0)
+    monkeypatch.setattr(QtWidgets.QMessageBox, "clickedButton", clicked)
+    monkeypatch.setattr(QtWidgets.QInputDialog, "getDouble", lambda *a, **k: (0.71, True))
+    assert st._known_height(sample) == expected
+    assert "SN set by eye" in texts[0] and "Trust" in texts[0]

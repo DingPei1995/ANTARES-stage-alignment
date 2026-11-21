@@ -63,7 +63,9 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
      Positions are recomputed. A large ST shift (> 0.3 mm) points rather to the beam spot (optic realigned): if
      several samples show it, suggest an optics recalibration instead of moving samples. Ask whether the sample
      height is known precisely (e.g. a Si wafer of known thickness, mounted within 0.02 mm; default: no): then
-     height_exact=true keeps H and corrects only x / y (the photo error and the plate offset).
+     height_exact=true keeps H and corrects only x / y (the photo error and the plate offset). Users often forget
+     to give H until now: ask for the value and pass it as height=... . Trust: a known exact H > the ZPS / CPS focus
+     > the SN set by eye: never call an H from the SN set by eye exact (refused) unless the user gives the known one.
    - The user says a sample is elsewhere / bigger / has another height: align_update_sample.
    - Rotation: align_rotate(srn, srz, motors=position with the point on the beam) gives ST, SZ, SN and the optic
      position (two answers: SN kept, and SN corrected; follow "recommended"). To turn an edge seen on the photo

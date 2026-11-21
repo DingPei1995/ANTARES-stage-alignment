@@ -42,7 +42,7 @@ from ..core.motors import (
 from ..core.session import Session
 from ..core.stage import (
     MotorPositions, StageModel, apply_found_offset, check_height, checked_sn, focus_correction, found_offset,
-    height_from_sn, sn_to_focus,
+    height_from_sn, sn_from_height, sn_to_focus,
 )
 from .common import APIError, motors_dict, motors_from, number, optic_short, optic_type, rounded
 from .photos import grid_png, overlay_png, plate_png, read_image
@@ -874,7 +874,7 @@ class AlignmentSession:
         return out
 
     def found_here(self, target: str, motors: dict, apply: bool = True, at_focus: bool = True,
-                   configuration: str | None = None, height_exact: bool = False) -> dict:
+                   configuration: str | None = None, height_exact: bool = False, height: float | None = None) -> dict:
         """The target was found on the beam at these stage positions. ST is usually right; SZ is off (0-2 mm) because
         the plate does not always go into the holder at the same height, not because of the beam: the y shift moves
         the whole plate in the holder (plate offset: SZ of every sample changes, the configuration and the drawing
@@ -884,7 +884,11 @@ class AlignmentSession:
         false: SN was not corrected (only on the beam): x, y follow and H is kept.
         height_exact: the sample height is known precisely (e.g. a wafer of known thickness, mounted within 0.02 mm):
         H is kept, x, y follow from where the beam crosses the surface at that height (only the photo error and the
-        plate offset are corrected), as "H is exact" in the program's Fine tunings by ZPS/CPS.
+        plate offset are corrected), as "H is exact" in the program's Fine tunings by ZPS/CPS. Trust: a known exact H >
+        the ZPS / CPS focus > the SN set by eye: an H from the SN set by eye is not taken as exact (error) unless the
+        known one is given in `height`.
+        height: the known height H of its sample (mm), set first (users often remember it only now); it replaces an
+        SN set by eye, which is then reported as a check (SN_f / mounting).
         configuration: the motor values were read with another (older) configuration, e.g. a position noted months
         ago (another mounting of the plate); x, y follow from that configuration and move the sample, H is kept
         (heights do not carry over between configurations)."""
@@ -893,6 +897,20 @@ class AlignmentSession:
         if label == "plate centre":
             raise APIError("Choose a sample or device, not the plate centre.")
         sample = self.layout.sample_of(label)
+        eye_sn = None
+        if height is not None:
+            h = number(height, "height")
+            if h < 0:
+                raise APIError("height: H is >= 0 mm (top surface above the plate surface).")
+            eye_sn = sample.sn_checked
+            if apply:
+                sample.height, sample.sn_checked = h, None
+            uvw = (uvw[0], uvw[1], self.layout.plate.total_thickness + h)  # the target on its sample's top surface
+        if height_exact and sample.sn_checked is not None and height is None:
+            raise APIError(f"H of {sample.name} ({sample.height:.3f} mm) comes from the SN set by eye (about ±0.05 mm), "
+                           "not from a known thickness. Trust: a known exact H > the ZPS / CPS focus > the SN set by "
+                           "eye. Ask the user for the known thickness and give it as height=..., or call without "
+                           "height_exact so that the focus corrects H.")
         m = motors_from(motors, self._base_motors())
         model = self.model if configuration is None else StageModel(
             self._find_record(configuration).config_for(self.layout.plate.key), self.layout.plate)
@@ -905,6 +923,15 @@ class AlignmentSession:
             u, v, _ = model.lab_to_plate(m, hit)
             du, dv, dw = u - uvw[0], v - uvw[1], 0.0
         out = {"target": label, "stage": motors_dict(m), "shift_mm": rounded({"dx": du, "dy": dv, "dH": dw})}
+        if eye_sn is not None:
+            sn = sn_from_height(self.model.config, number(height, "height"), self.layout.plate)
+            out["sn_by_eye_check"] = (f"SN set by eye {eye_sn:.3f} mm, SN for the known H on the analyzer focus "
+                                      f"{sn:.3f} mm (difference {eye_sn - sn:+.3f} mm"
+                                      + ("; more than 0.1 mm: check SN_f of the configuration or the mounting)."
+                                         if abs(eye_sn - sn) > 0.1 else ")."))
+        elif height_exact and height is None and abs(sample.height - DEFAULT_HEIGHT) < 5e-7:
+            out["height_warning"] = (f"H of {sample.name} is the default {DEFAULT_HEIGHT} mm: make sure it is the known "
+                                     "thickness (users often forget to enter it), else give height=... .")
         plate_move = configuration is None  # an older configuration: another mounting, the sample moves as before
         if plate_move:
             out["plate_offset_mm"] = rounded({"before": self.layout.plate_offset_v,

@@ -23,12 +23,13 @@ from ..core.schematic import draw_schematic
 from ..core.stage import (
     HEIGHT_CHECK_OPTIC, HEIGHT_CHECK_SRZ, HEIGHT_EXPLAIN_TOL, OPTIC_TYPES, MotorPositions, OpticsCalibration,
     Y_HAT, StageConfig, StageModel, apply_found_offset, beam_at_height, checked_sn, fit_height, focus_correction,
-    found_offset, slide_to_sn, sn_to_focus,
+    found_offset, slide_to_sn, sn_from_height, sn_to_focus,
 )
 from ..realsample.fit import measurement_sigmas
 
 Qt = QtCore.Qt
 FINE_TUNE_BUTTON = "Fine tunings by ZPS/CPS"
+EYE_SN_WARN = 0.1  # mm: SN set by eye this far from the SN of the exact H: check SN_f or the mounting
 HEIGHT_FOCUS_MIN = 0.002  # mm: a height change from the focus below this is not offered (H confirmed)
 FOUND_POSITION_MIN = 0.001  # mm: x / y changes from the focus below this (with H below HEIGHT_FOCUS_MIN) are not offered
 
@@ -191,14 +192,22 @@ class StagePanel(QtWidgets.QWidget):
                                    "same as H in the Samples tab. Type the known height here (e.g. a wafer of known\n"
                                    "thickness) before the fine tuning.")
         self.height_box.valueChanged.connect(self._on_height_typed)
+        self.height_source = QtWidgets.QLabel()  # where H comes from: SN by eye, default, exact ...
+        self.height_source.setWordWrap(True)
         self.height_exact = QtWidgets.QCheckBox("H is exact: do not correct it")
         self.height_exact.setToolTip(
             "Tick when the sample height is known precisely (e.g. a Si wafer of known thickness, mounted to within\n"
             "0.02 mm). The fine tuning then keeps H: the Target is where the beam meets its surface at that height,\n"
             "only its position on the plate (photo error, plate offset) is corrected, and SN brings that surface onto\n"
             "the analyzer focus. The optic focus reading is only reported (it would otherwise correct H).\n"
-            "Off (default): the optic focus corrects H as well.")
+            "Off (default): the optic focus corrects H as well.\n"
+            "Trust: a known exact H > the ZPS / CPS focus > the SN set by eye. An H from the SN set by eye (or left at\n"
+            "the default) is asked for once before it is taken as exact.")
         self.height_exact.setChecked(False)
+        self.height_exact.toggled.connect(self._on_exact_toggled)
+        self._exact: dict[int, float] = {}  # id(sample) -> H confirmed as exact (known thickness)
+        self._eye_sn: dict[int, float] = {}  # id(sample) -> SN set by eye, replaced by an exact H (kept as a check)
+        self.default_height_getter = None  # height of new samples (Samples tab), to tell an H never entered
         fine_note = QtWidgets.QLabel(
             "Works because the focal distance of the optic is fixed: the ZPS / CPS of the found focus corrects "
             "the sample position and height and brings the sample back onto the analyzer focus.")
@@ -212,6 +221,7 @@ class StagePanel(QtWidgets.QWidget):
         of.addRow("Type", self.optic_type)
         of.addRow("Optic position", self.optic_pos)
         of.addRow("Target's sample H", self.height_box)
+        of.addRow(self.height_source)
         of.addRow(self.height_exact)
         of.addRow(equal_row(focus_btn, self.undo_fine_btn))
         of.addRow(fine_note)
@@ -376,6 +386,10 @@ class StagePanel(QtWidgets.QWidget):
         focus; the optic reading is only compared. The state before is kept for undo_fine_tuning."""
         m, optic_now = self.motors.value(), self.optic_pos.value()
         state = self._fine_state()
+        target_sample = self._target_sample()
+        if (self.height_exact.isChecked() and target_sample is not None
+                and not self._confirm_exact(target_sample, record=False)):
+            return None  # H not confirmed as exact: nothing done
         height_text = self.check_found_height(m, optic_now)  # may correct H (or only x / y) of the target's sample
         model, cal = self.model(), self.calibration()
         y_optic = cal.focus_for_position(model, optic_now)
@@ -414,22 +428,126 @@ class StagePanel(QtWidgets.QWidget):
         return self._layout_getter().sample_of(label) if label else None
 
     def _show_target_height(self) -> None:
-        """The H field follows the Target's sample (disabled for the plate centre)."""
+        """The H field follows the Target's sample (disabled for the plate centre), with where H comes from."""
         sample = self._target_sample()
         self.height_box.blockSignals(True)
         self.height_box.setValue(sample.height if sample is not None else 0.0)
         self.height_box.blockSignals(False)
         self.height_box.setEnabled(sample is not None)
+        kind, text = self.height_origin(sample)
+        color = {"exact": "#207020", "eye": "#b05000", "default": "#c00000"}.get(kind, "#555")
+        self.height_source.setStyleSheet(f"color: {color};")
+        self.height_source.setText(text)
+        self.height_source.setVisible(bool(text))
+
+    def is_exact(self, sample) -> bool:
+        """H of `sample` was confirmed as its known, exact height (and not changed since)."""
+        h = self._exact.get(id(sample))
+        return h is not None and abs(h - sample.height) < 5e-7 and sample.sn_checked is None
+
+    def height_origin(self, sample) -> tuple[str, str]:
+        """Where H of the sample comes from: ("exact" | "eye" | "default" | "entered" | "", text)."""
+        if sample is None:
+            return "", ""
+        if self.is_exact(sample):
+            return "exact", "H exact (known thickness): kept by the fine tuning."
+        if sample.sn_checked is not None:
+            return "eye", f"H from the SN set by eye (SN {sample.sn_checked:.3f} mm, about ±0.05 mm)."
+        default = self.default_height_getter() if self.default_height_getter else None
+        if default is not None and abs(sample.height - default) < 5e-7:
+            return "default", (f"H is the default height of new samples ({default:.3f} mm): enter the known height "
+                               "if it was never entered.")
+        return "entered", ""
+
+    def _known_height(self, sample) -> float | None:
+        """Ask whether H of `sample` is its known, exact height (or for that height). None: cancelled."""
+        kind, _ = self.height_origin(sample)
+        h = sample.height
+        why = {
+            "eye": (f"H = {h:.3f} mm of {sample.name} comes from the SN set by eye (SN = {sample.sn_checked:.3f} mm, "
+                    "about ±0.05 mm), not from a known thickness."),
+            "default": (f"H = {h:.3f} mm of {sample.name} is the default height of new samples: it may never have "
+                        "been entered."),
+        }.get(kind, f"H of {sample.name} is {h:.3f} mm.")
+        box = QtWidgets.QMessageBox(self)
+        box.setIcon(QtWidgets.QMessageBox.Question)
+        box.setWindowTitle("Is the sample height exact?")
+        box.setText(
+            f"{why}\n\nTrust: a known exact H (e.g. a wafer of known thickness) > the ZPS / CPS focus > the SN set by "
+            "eye. If you do not know the thickness, leave “H is exact” off: the fine tuning then corrects H from the "
+            "focus.\n\nIs it the known, exact height?")
+        yes = box.addButton(f"Yes, H = {h:.3f} mm is exact", QtWidgets.QMessageBox.AcceptRole)
+        enter = box.addButton("Enter the known H…", QtWidgets.QMessageBox.ActionRole)
+        box.addButton(QtWidgets.QMessageBox.Cancel)
+        box.exec()
+        if box.clickedButton() is yes:
+            return h
+        if box.clickedButton() is enter:
+            value, ok = QtWidgets.QInputDialog.getDouble(
+                self, "Known sample height", f"Exact height H of {sample.name} (mm, above the plate surface):",
+                h, 0.0, 100.0, 3)
+            return float(value) if ok else None
+        return None
+
+    def _confirm_exact(self, sample, record: bool = True) -> bool:
+        """Make sure H of `sample` is a known exact height before it is kept: asks when it comes from the SN set by
+        eye, is the default or was not confirmed yet. The exact H replaces the SN set by eye (kept as a check).
+        record: the state before can be taken back with Undo fine tuning (back to the SN set by eye)."""
+        if self.is_exact(sample):
+            return True
+        h = self._known_height(sample)
+        if h is None:
+            return False
+        if record and (sample.sn_checked is not None or abs(sample.height - h) > 5e-7):
+            self._fine_history.append(self._fine_state())
+            self.undo_fine_btn.setEnabled(True)
+        self._set_exact(sample, h)
+        return True
+
+    def _set_exact(self, sample, h: float) -> None:
+        if sample.sn_checked is not None:
+            self._eye_sn[id(sample)] = sample.sn_checked
+        changed = abs(sample.height - h) > 5e-7 or sample.sn_checked is not None
+        sample.height, sample.sn_checked = h, None
+        self._exact[id(sample)] = h
+        if changed:
+            self.layoutCorrected.emit(sample.name)
+            self.refresh_targets()
+        self._show_target_height()
+
+    def eye_check(self, sample) -> str:
+        """The SN set by eye compared with the SN of the exact H (a check of SN_f / the mounting); "" if none."""
+        eye = self._eye_sn.get(id(sample))
+        if eye is None or not self.is_exact(sample):
+            return ""
+        sn = sn_from_height(self.config(), sample.height, self._layout_getter().plate)
+        text = (f"SN set by eye {eye:.3f} mm, SN for the exact H on the analyzer focus {sn:.3f} mm "
+                f"(Δ {unsigned_zero(eye - sn, 3):+.3f} mm")
+        return text + (f", more than {EYE_SN_WARN:g} mm: check SN_f of the configuration or the mounting)"
+                       if abs(eye - sn) > EYE_SN_WARN else ")")
+
+    def _on_exact_toggled(self, on: bool) -> None:
+        sample = self._target_sample()
+        if on and sample is not None and not self._confirm_exact(sample):
+            self.height_exact.blockSignals(True)
+            self.height_exact.setChecked(False)
+            self.height_exact.blockSignals(False)
+        self._show_target_height()
 
     def _on_height_typed(self, value: float) -> None:
         sample = self._target_sample()
         if sample is None or abs(value - sample.height) < 5e-7:
             return
-        sample.height = value
-        sample.sn_checked = None  # typed by hand: no longer from the SN set by eye (as in the Samples tab)
+        if self.height_exact.isChecked():  # a height typed with "H is exact" ticked is the known one
+            self._set_exact(sample, value)
+        else:
+            if sample.sn_checked is not None:
+                self._eye_sn[id(sample)] = sample.sn_checked
+            sample.height = value
+            sample.sn_checked = None  # typed by hand: no longer from the SN set by eye (as in the Samples tab)
+            self.layoutCorrected.emit(sample.name)
+            self.refresh_targets()
         self.goto_label.hide()
-        self.layoutCorrected.emit(sample.name)
-        self.refresh_targets()
 
     def _fine_state(self) -> dict:
         layout = self._layout_getter()
@@ -495,8 +613,9 @@ class StagePanel(QtWidgets.QWidget):
         if abs(m.srz) < HEIGHT_CHECK_SRZ:
             return self.correct_found_at_srz0(m, optic, label, sample, t, name, optic_type)
         if self.height_exact.isChecked():
+            eye = self.eye_check(sample)
             return (f"<span style='color:#555'>H of {sample.name} marked exact ({sample.height:.3f} mm): no height "
-                    "check after the SRz turn.</span>")
+                    "check after the SRz turn." + (f" {eye}." if eye else "") + "</span>")
         fit = fit_height(self.model(), m, self.calibration(), optic, *t, sigmas=measurement_sigmas(optic_type))
         st, sz, op = fit.before
         if abs(op) <= HEIGHT_CHECK_OPTIC:
@@ -573,7 +692,8 @@ class StagePanel(QtWidgets.QWidget):
             f"{layout.plate_offset_v:+.3f} → {layout.plate_offset_v + dv:+.3f} mm), so every sample's SZ changes by "
             f"{unsigned_zero(-dv, 3):+.3f} mm.\n"
             f"• Δx and ΔH: {sample.name} (with its devices) is moved by Δx and its height corrected "
-            f"(H {sample.height:.3f} → {max(sample.height + dw, 0.0):.3f} mm); the other samples stay." + large,
+            f"(H {sample.height:.3f} → {max(sample.height + dw, 0.0):.3f} mm); the other samples stay." + large
+            + self._height_hint(sample),
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes,
         )
         if answer != QtWidgets.QMessageBox.Yes:
@@ -586,6 +706,20 @@ class StagePanel(QtWidgets.QWidget):
         return (f"<span style='color:#207020'>Corrected by the {name} focus: {sample.name} moved by Δx {su:+.3f} mm, "
                 f"H {before:.3f} → {sample.height:.3f} mm (± {sigma:.3f}); plate offset "
                 f"{layout.plate_offset_v:+.3f} mm.</span>")
+
+    def _height_hint(self, sample) -> str:
+        """Reminder in the fine-tuning window when H was never entered (default) or set by eye: a known thickness
+        would be better (Target's sample H, H is exact)."""
+        kind, _ = self.height_origin(sample)
+        if kind == "default":
+            return (f"\n\nH of {sample.name} is still the default height of new samples ({sample.height:.3f} mm). "
+                    "If you know its thickness, answer No, enter it in “Target's sample H”, tick “H is exact” and "
+                    "press Fine tunings again.")
+        if kind == "eye":
+            return (f"\n\nH of {sample.name} comes from the SN set by eye; the focus is more precise and corrects it. "
+                    "If you know its exact thickness, answer No, enter it in “Target's sample H” and tick “H is "
+                    "exact”.")
+        return ""
 
     def _correct_found_exact_height(self, m: MotorPositions, optic: float, label: str, sample, t, name: str,
                                     y_optic: float, sigma: float) -> str:
@@ -601,6 +735,9 @@ class StagePanel(QtWidgets.QWidget):
         optic_note = (f"the {name} focus puts the surface {so:+.3f} ± {sigma:.3f} mm from H = {sample.height:.3f} mm"
                       + (" (more than 3 σ: check the optic position typed, H or SN_f of the configuration)"
                          if abs(dw_optic) > 3 * sigma else ""))
+        eye = self.eye_check(sample)
+        if eye:
+            optic_note += f"; {eye}"
         if abs(du) < FOUND_POSITION_MIN and abs(dv) < FOUND_POSITION_MIN:
             return (f"<span style='color:#555'>{label} found where expected (Δx {su:+.3f}, Δy {sv:+.3f} mm; H exact, "
                     f"kept); {optic_note}: nothing corrected.</span>")

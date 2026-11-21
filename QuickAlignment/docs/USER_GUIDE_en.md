@@ -246,14 +246,25 @@ ST = −2.662, SZ = 37.540, SN = 0.000 (*plate centre* is the centre of the back
      point is on the plate. Not moved if a motor would leave its range or the plate would touch something (then
      nothing is corrected either).
    - **Target's sample H** (above the button) shows and sets the height of the *Target*'s sample (the same H as in
-     the Samples tab; typing it drops an SN set by eye). **H is exact: do not correct it** (off by default): tick it
-     when the height is known precisely, e.g. a Si wafer of known thickness mounted to within 0.02 mm. The fine
-     tuning then keeps H and corrects only the photo error: the *Target* is taken where the beam meets its surface at
-     that height (Δx of its sample, Δy of the plate), and SN brings that surface onto the analyzer focus. The optic
-     focus is only compared with H (shown in the window, flagged above 3 σ); after an SRz turn there is no height
-     check.
-   - **Undo fine tuning** takes back the last fine tuning: the sample position and height, the plate offset, the SN
-     set by eye and the stage and optic fields return to what they were before it. Pressed again it takes back the
+     the Samples tab; typing it drops an SN set by eye). The line under it says where H comes from: *from the SN set
+     by eye* (orange), *the default height of new samples* (red: probably never entered, a common case noticed only
+     at the fine tuning) or *exact* (green). **H is exact: do not correct it** (off by default): tick it when the
+     height is known precisely, e.g. a Si wafer of known thickness mounted to within 0.02 mm. The fine tuning then
+     keeps H and corrects only the photo error: the *Target* is taken where the beam meets its surface at that height
+     (Δx of its sample, Δy of the plate), and SN brings that surface onto the analyzer focus. The optic focus is only
+     compared with H (shown in the window, flagged above 3 σ); after an SRz turn there is no height check.
+   - **Which height wins.** Trust: a known exact H > the ZPS / CPS focus > the SN set by eye. An H is taken as exact
+     only once you have confirmed it: ticking *H is exact* (or pressing the button with it ticked) for an H that
+     comes from the SN set by eye, is the default or was not confirmed yet asks *Is the sample height exact?* —
+     *Yes, H = … is exact*, *Enter the known H…*, or *Cancel* (the box is then unticked and nothing changes). A
+     height typed in the H field while *H is exact* is ticked is the known one. The exact H replaces the SN set by
+     eye; that SN is then only a check: the result line compares it with the SN that the exact H puts on the
+     analyzer focus (more than 0.1 mm apart: check SN_f of the configuration or the mounting). Without *H is exact*
+     the focus corrects H as before; if H is still the default or from the SN set by eye, the confirmation window
+     reminds you that you can answer *No*, enter the known H, tick *H is exact* and press the button again.
+   - **Undo fine tuning** takes back the last fine tuning (or the switch from the SN set by eye to an exact H): the
+     sample position and height, the plate offset, the SN set by eye and the stage and optic fields return to what
+     they were before it. Pressed again it takes back the
      one before, down to the state before the first fine tuning (e.g. the result of *Set SN by eye*).
 
    ![Fine tunings by ZPS/CPS: the H of the Target's sample, H is exact, Undo fine tuning](images/guide/fine_tuning_controls.png)
@@ -290,7 +301,8 @@ All predictions then use the corrected positions (saved with the session); the l
 ![The confirmation window of Fine tunings by ZPS/CPS for D1](images/guide/fine_tuning.png)
 
 In the example D1 is found at ST = −2.4601, SZ = 37.8095, SN = 0 (SRn = 120°, SRz = 0°): it was drawn 0.20 mm too
-far right, and the plate is 0.27 mm off in y (it was drawn 0.27 mm too high). A Δx or ΔH above 0.3 mm, or the same ST shift for every sample, suggests that the
+far right, and the plate is 0.27 mm off in y (it was drawn 0.27 mm too high). H of SampleA is still the default
+0.525 mm, so the window ends with the reminder to enter the known thickness if there is one. A Δx or ΔH above 0.3 mm, or the same ST shift for every sample, suggests that the
 configuration is outdated: tell the beamline staff. Do it at SRz = 0°: there the focus gives x, y and H without the
 rotation axes; after an SRz turn the button corrects H only (when one ΔH explains the errors), because x, y errors
 cannot be told apart from rotation-axis errors there. (This replaces the former *Found here* button, which assumed the

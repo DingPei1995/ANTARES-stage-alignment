@@ -174,7 +174,9 @@ TOOLS = [
           "at_focus": d("true (default): SN put the target in the analyzer focus", **BOOL),
           "configuration": d("configuration the motor values were read with (default: the one in use)", **STR),
           "height_exact": d("true: the sample height is known precisely (wafer of known thickness): keep H, correct "
-                            "x / y only", **BOOL)},
+                            "x / y only; refused for an H from the SN set by eye unless height is given", **BOOL),
+          "height": d("the known height H of the target's sample (mm), set first; replaces an SN set by eye",
+                      **NUM)},
          ["target", "motors"]),
     tool("align_rotate", "alignment", "rotate",
          "New ST / SZ / SN and optic position after turning SRn / SRz, keeping the point now on the beam.",

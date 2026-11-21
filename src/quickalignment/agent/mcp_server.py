@@ -159,10 +159,16 @@ TOOLS = [
          "The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits.",
          {"motors": MOTORS_ARG, "optic_position": NUM}, ["motors"]),
     tool("align_bring_to_beam", "alignment", "bring_to_beam",
-         "ST / SZ putting a target on the beam with SN kept (height-checked sample: the SN of its check; "
-         "correct_sn: also SN, onto the analyzer focus).",
+         "ST / SZ putting a target on the beam with SN kept and the piezo centred (height-checked sample: the SN of "
+         "its check; correct_sn: also SN, onto the analyzer focus).",
          {"target": d("'sample', 'sample/device' or 'plate centre'", **STR), "motors": MOTORS_ARG, "correct_sn": BOOL},
          ["target"]),
+    tool("align_centre_piezo", "alignment", "centre_piezo",
+         "The sample was seen in a PIX / PIY scan off the piezo centre: ST / SZ (same SRn / SRz, SN kept) and the "
+         "optic that show it with the piezo centred (150 / 150 µm). Only computes.",
+         {"motors": dict(MOTORS_ARG, description="positions where the sample is seen, with that PIX, PIY (missing "
+                                                 "motors keep the current value)"),
+          "optic_position": d("optic position in focus there (default: current)", **NUM)}),
     tool("align_beam_on", "alignment", "beam_on", "What the beam hits at these positions and the optic focus position.",
          {"motors": MOTORS_ARG, "optic_position": NUM}),
     tool("align_found_here", "alignment", "found_here",

@@ -81,6 +81,9 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
      height_exact=true keeps H and corrects only x / y (the photo error and the plate offset). Users often forget
      to give H until now: ask for the value and pass it as height=... . Trust: a known exact H > the ZPS / CPS focus
      > the SN set by eye: never call an H from the SN set by eye exact (refused) unless the user gives the known one.
+   - The sample is seen in a PIX / PIY scan away from 150 / 150: align_centre_piezo(motors with that PIX, PIY,
+     optic_position in focus there) gives ST / SZ (SN kept, same angles) and the optic with the piezo centred.
+     align_bring_to_beam always puts the piezo back to 150 / 150 for a new target.
    - The user says a sample is elsewhere / bigger / has another height: align_update_sample.
    - Rotation: align_rotate(srn, srz, motors=position with the point on the beam) gives ST, SZ, SN and the optic
      position (two answers: SN kept, and SN corrected; follow "recommended"). To turn an edge seen on the photo
@@ -126,7 +129,7 @@ RULES
 
 Prompts: `start`, `find_samples`, `calibrate`
 
-## 2. MCP tools (52)
+## 2. MCP tools (53)
 
 `*` = required. **acts**: changes the session, a file or a window; the others only read.
 
@@ -163,7 +166,8 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `align_samples` | reads | - | The samples and devices with their warnings. |
 | `align_sample_positions` | reads | - | ST / SZ / SN of every sample and device at the start rotation (SRn ref, SRz 0, piezo centred). |
 | `align_set_position` | **acts** | `motors*` (object), `optic_position` (number) | The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits. |
-| `align_bring_to_beam` | reads | `target*` (string), `motors` (object), `correct_sn` (boolean) | ST / SZ putting a target on the beam with SN kept (height-checked sample: the SN of its check; correct_sn: also SN, onto the analyzer focus). |
+| `align_bring_to_beam` | reads | `target*` (string), `motors` (object), `correct_sn` (boolean) | ST / SZ putting a target on the beam with SN kept and the piezo centred (height-checked sample: the SN of its check; correct_sn: also SN, onto the analyzer focus). |
+| `align_centre_piezo` | reads | `motors` (object), `optic_position` (number) | The sample was seen in a PIX / PIY scan off the piezo centre: ST / SZ (same SRn / SRz, SN kept) and the optic that show it with the piezo centred (150 / 150 µm). Only computes. |
 | `align_beam_on` | reads | `motors` (object), `optic_position` (number) | What the beam hits at these positions and the optic focus position. |
 | `align_found_here` | **acts** | `target*` (string), `motors*` (object), `apply` (boolean), `at_focus` (boolean), `configuration` (string), `height_exact` (boolean), `height` (number) | A target was found on the beam at these positions: the y (SZ) shift moves the whole plate in the holder (plate offset, all samples), x and H correct its sample (at_focus false: SN not corrected, H kept; height_exact: H known precisely, kept, only x / y corrected; configuration: positions read with an older configuration: the sample moves, H kept). |
 | `align_rotate` | reads | `srn*` (number), `srz` (number), `motors` (object), `measured_optic` (number), `target` (string) | New ST / SZ / SN and optic position after turning SRn / SRz, keeping the point now on the beam. |
@@ -199,6 +203,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `bring_to_beam(target: 'str', motors: 'dict \| None' = None, correct_sn: 'bool' = False) -> 'dict'` | ST / SZ putting a target on the beam with SN kept (how the stage is run), at the given (or current) SRn, SRz, with the piezo centred (PIX = PIY = 150 µm: it may still hold a scan position); with correct_sn also SN, so that it is on the analyzer focus. A target whose sample height was checked (check_height) keeps the SN of that check unless `motors` gives SN. |
 | `bz_angles(lattice_a: 'float', hv_map: 'float', gamma: 'list', ref_point: 'list', ref_label: 'str' = 'K', feature: 'str' = 'K', line: 'int' = 0, hv: 'float \| None' = None, map_srn: 'float \| None' = None, map_srz: 'float \| None' = None, binding: 'float' = 0.0) -> 'dict'` | SRn / SRz putting a 2-D hexagonal Brillouin-zone point (Γ, K, K', M) at the slit centre with the slit along a high-symmetry line, from a measured map (ARPES viewer angles θ = deflector, φ = along the slit). |
 | `bz_point_to(lattice_a: 'float', hv_map: 'float', ref_point: 'list', map_srn: 'float', map_srz: 'float', ref_label: 'str' = 'K', hv: 'float \| None' = None, target_angles: 'list \| None' = None, gamma: 'list \| None' = None, keep_srn: 'bool' = False, binding: 'float' = 0.0, sample: 'str \| None' = None) -> 'dict'` | SRn / SRz putting a K or M point read on a map (θ = deflector, φ = slit, ARPES viewer) at chosen analyzer angles at another photon energy. Γ is optional: without it the surface tilt is estimated from \|Γ–point\|. keep_srn: keep the in-plane orientation (slit already along Γ–K / Γ–M) and turn SRz only. With `sample`, also the ST / SZ / SN putting it at the analyzer focus there. |
+| `centre_piezo(motors: 'dict \| None' = None, optic_position: 'float \| None' = None) -> 'dict'` | The sample was seen in a PIX / PIY scan away from the piezo centre, at these (or the current) positions with the optic in focus at `optic_position` (default: the current one): the ST / SZ that show it with the piezo centred (PIX = PIY = 150 µm) at the same SRn / SRz, SN kept, and the refocused optic (as "Centre the piezo" in the program and the last step of Rotate sample). Only computes: give the result to set_position once the user has moved there. |
 | `check_height(sample: 'str', sn: 'float') -> 'dict'` | Set SN by eye: the top surface of `sample` was driven onto the camera reference line (the analyzer focal plane) at SRn ref, SRz 0, at SN = sn (read by eye, about ±0.05 mm). Its height H follows roughly; bring_to_beam then keeps this SN for its targets (right at SRn ref, SRz 0, as the height was set with it). A zone-plate / capillary focus ('Fine tunings by ZPS/CPS' in the program) gives H more precisely. |
 | `clear_samples() -> 'dict'` | - |
 | `collision_check(motors: 'dict \| None' = None, optic_position: 'float \| None' = None) -> 'dict'` | Does the plate touch the analyzer / optic at these positions, and how far can each motor go. |

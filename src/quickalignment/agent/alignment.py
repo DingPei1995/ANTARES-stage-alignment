@@ -32,7 +32,7 @@ from ..alignment.photo import (
     apply_homography, camera_matrix, check_corners, check_mirror_3d, corner_points, detect_samples, homography,
     line_transform, pair_transform, plane_homography, plate_view_bounds, rectify, reference_points_3d, rgb_to_lab,
 )
-from ..alignment.rotation import relocate, wrap180
+from ..alignment.rotation import recentre_piezo, relocate, wrap180
 from ..core.calibration import CalibrationRecord, CalibrationStore
 from ..core.collision import ACCEPTANCE_HALF_ANGLE, collisions, in_acceptance, motor_limits
 from ..core.geometry import PLATES, STANDARD_PLATE, X_EDGES, Y_EDGES, Device, Sample, SampleLayout, custom_plate
@@ -830,6 +830,30 @@ class AlignmentSession:
             out["delta_sn_to_focus"] = rounded(sn_to_focus(model, new, *uvw))
         out["focus_ok"] = abs(y) <= FOCUS_WARNING
         return out
+
+    def centre_piezo(self, motors: dict | None = None, optic_position: float | None = None) -> dict:
+        """The sample was seen in a PIX / PIY scan away from the piezo centre, at these (or the current) positions with
+        the optic in focus at `optic_position` (default: the current one): the ST / SZ that show it with the piezo
+        centred (PIX = PIY = 150 µm) at the same SRn / SRz, SN kept, and the refocused optic (as "Centre the piezo" in
+        the program and the last step of Rotate sample). Only computes: give the result to set_position once the
+        user has moved there."""
+        self._need_start()
+        m = motors_from(motors, self._base_motors())
+        optic = self.current_optic() if optic_position is None else number(optic_position, "optic position")
+        pi = self.model.config.pi_center
+        if abs(m.pix - pi) < 1e-9 and abs(m.piy - pi) < 1e-9:
+            raise APIError(f"PIX and PIY are already at the centre ({pi:g} µm): give the PIX, PIY where the sample is "
+                           "seen in the scan.")
+        p = recentre_piezo(self.model, m, optic, self.record.optics)
+        return {"seen_at": motors_dict(m), "optic_position_seen": rounded(optic),
+                "stage": motors_dict(p.new), "optic_position": rounded(p.optic_new),
+                "delta_mm": rounded({"ST": p.new.st - m.st, "SZ": p.new.sz - m.sz, "SN": p.new.sn - m.sn,
+                                     "optic": p.optic_new - optic}),
+                "moves_along_beam_um": rounded(p.beam_shift * 1000, 1),
+                "same_point_optic_unchanged": motors_dict(p.same_point),
+                "out_of_range": out_of_range(p.new), "collisions": self._collision_text(p.new, p.optic_new),
+                "next": "Tell the user these ST, SZ (PIX = PIY = 150, SN kept) and the optic position; once there, "
+                        "set_position with them."}
 
     def bring_to_beam(self, target: str, motors: dict | None = None, correct_sn: bool = False) -> dict:
         """ST / SZ putting a target on the beam with SN kept (how the stage is run), at the given (or current)

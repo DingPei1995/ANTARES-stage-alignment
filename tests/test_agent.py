@@ -513,3 +513,17 @@ def test_bring_to_beam_centres_the_piezo(api):
     a.add_sample(1.0, 2.0, 2.0, 2.0, 0.5, name="S1")
     out = a.bring_to_beam("S1", {"st": 0, "sz": 40, "sn": 0.5, "srn": 120, "srz": -10, "pix": 138, "piy": 162})
     assert out["stage"]["pix"] == 150 and out["stage"]["piy"] == 150
+
+
+def test_centre_piezo(api):
+    a = started(api)
+    a.add_sample(1.0, 2.0, 2.0, 2.0, 0.5, name="S1")
+    on = a.bring_to_beam("S1", {"st": 0, "sz": 40, "sn": 0.5, "srn": 120, "srz": -10})["stage"]
+    seen = dict(on, pix=140.0, piy=155.0)
+    out = a.centre_piezo(seen, optic_position=60.0)
+    assert out["stage"]["pix"] == 150 and out["stage"]["piy"] == 150
+    assert out["stage"]["sn"] == pytest.approx(seen["sn"]) and out["stage"]["srz"] == pytest.approx(-10)
+    hit_seen, hit_new = a.beam_on(seen)["plate_mm"], a.beam_on(out["stage"])["plate_mm"]
+    assert hit_new == pytest.approx(hit_seen, abs=1e-3)  # the same plate point on the beam
+    with pytest.raises(APIError):
+        a.centre_piezo(on)  # already centred

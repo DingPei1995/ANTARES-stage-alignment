@@ -133,7 +133,8 @@ The same list, with the arguments, is in [`src/quickalignment/agent/API.md`](../
 | `align_samples` | The samples and devices with their warnings. |
 | `align_sample_positions` | ST / SZ / SN of every sample and device at the start rotation (SRn ref, SRz 0, piezo centred). |
 | `align_set_position` | The stage as it is now (motor values read by the user) and the optic position; returns what the beam hits. |
-| `align_bring_to_beam` | ST / SZ putting a target on the beam with SN kept (height-checked sample: the SN of its check; correct_sn: also SN, onto the analyzer focus). |
+| `align_bring_to_beam` | ST / SZ putting a target on the beam with SN kept and the piezo centred (height-checked sample: the SN of its check; correct_sn: also SN, onto the analyzer focus). |
+| `align_centre_piezo` | The sample was seen in a PIX / PIY scan off the piezo centre: ST / SZ (same SRn / SRz, SN kept) and the optic that show it with the piezo centred (150 / 150 µm). Only computes. |
 | `align_beam_on` | What the beam hits at these positions and the optic focus position. |
 | `align_found_here` | A target was found on the beam at these positions: the y (SZ) shift moves the whole plate in the holder (plate offset, all samples), x and H correct its sample (at_focus false: SN not corrected, H kept; configuration: positions read with an older configuration: the sample moves, H kept). |
 | `align_rotate` | New ST / SZ / SN and optic position after turning SRn / SRz, keeping the point now on the beam. |

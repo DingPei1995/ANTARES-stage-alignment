@@ -68,6 +68,9 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
      height_exact=true keeps H and corrects only x / y (the photo error and the plate offset). Users often forget
      to give H until now: ask for the value and pass it as height=... . Trust: a known exact H > the ZPS / CPS focus
      > the SN set by eye: never call an H from the SN set by eye exact (refused) unless the user gives the known one.
+   - The sample is seen in a PIX / PIY scan away from 150 / 150: align_centre_piezo(motors with that PIX, PIY,
+     optic_position in focus there) gives ST / SZ (SN kept, same angles) and the optic with the piezo centred.
+     align_bring_to_beam always puts the piezo back to 150 / 150 for a new target.
    - The user says a sample is elsewhere / bigger / has another height: align_update_sample.
    - Rotation: align_rotate(srn, srz, motors=position with the point on the beam) gives ST, SZ, SN and the optic
      position (two answers: SN kept, and SN corrected; follow "recommended"). To turn an edge seen on the photo

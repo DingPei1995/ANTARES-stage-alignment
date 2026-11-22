@@ -142,6 +142,9 @@ The same list, with the arguments, is in [`src/quickalignment/agent/API.md`](../
 | `align_bz_angles` | SRn / SRz putting a hexagonal Brillouin-zone point at the slit centre (from a measured map's angles). |
 | `align_bz_point_to` | SRn / SRz putting a K / M point read on a map at chosen analyzer angles at another hv (Γ optional; keep_srn: turn SRz only). |
 | `align_collision_check` | Does the plate touch the analyzer / optic at these positions; collision-free motor ranges. |
+| `align_photon_energy` | The photon energy in use: optic positions are then for that hv (zone plate focal length ∝ hv; `configs/optics_vs_hv.json`). |
+| `align_optics_vs_hv` | The optic against photon energy: model, measured points, the shift now. |
+| `align_add_optic_hv_point` | A focus measured at another hv: the optic shift; `save=true` adds it to `optics_vs_hv.json` (only when the user asks). |
 | `align_save_session` | Save the plate (samples, devices, stage) as a session file. |
 | `align_load_session` | Load a QuickAlignment session file. |
 

@@ -345,6 +345,9 @@ class OpticsCalibration:
     where the beam met a surface at plate height `surface_w` with the stage at
     `motors` (a measured reference). `optic_sign` is +1 if increasing the optic
     motor moves the optic downstream (towards the sample), -1 otherwise.
+    `photon_energy` (eV) is the photon energy the optic position was measured at: the working distance of a zone
+    plate grows with it, so at another energy the optic position is shifted (photon_energy.py). Configurations
+    written before it was recorded were all made at 95 eV.
     """
 
     enabled: bool = False
@@ -354,6 +357,7 @@ class OpticsCalibration:
     optic_sign: int = 1
     optic_type: str = OPTIC_TYPES[0]
     last_position: float | None = None  # optic position when the configuration was saved
+    photon_energy: float = 95.0  # eV, the photon energy of the optic reference (photon_energy.REFERENCE_HV)
 
     @property
     def current_position(self) -> float:

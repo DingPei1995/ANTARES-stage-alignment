@@ -70,6 +70,11 @@ SPEM maps (300 × 300 µm, 10 µm steps) before and after the turn
   the optic position instead: ZPS 54.30 predicted, 54.33 found (zone plate, SRn 140 / SRz −15,
   [2026-11-15 report](RealSampleCalibration/docs/reports/2026-11-15_zone_plate_calibration_srz_axis.pdf)).
 
+**Photon energy.** The configurations were measured at 95 eV, and "the working distance of the optic is fixed" holds
+at that energy. At another photon energy the optic positions are shifted (zone plate: focal length ∝ hv; capillary:
+achromatic), from `configs/optics_vs_hv.json`, where foci measured at other energies are added as they are tested
+(*Photon energy* field of the Stage & Optics tab; agent tools `align_photon_energy`, `align_add_optic_hv_point`).
+
 The positions are as good as the stage calibration in `configs/`, made by the beamline staff with
 RealSampleCalibration ([staff guide](RealSampleCalibration/docs/pdf/RealSampleCalibration_staff_guide_en.pdf)).
 If *Fine tunings by ZPS/CPS* moves a sample by more than 0.3 mm, or all samples the same way, ask the staff to recalibrate.

@@ -81,6 +81,11 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    - Not in focus, or old positions: align_found_here(at_focus=false) when SN was not put at the analyzer focus
      (H kept); configuration=<older file> for positions noted with an older configuration (x, y converted, H kept).
    - Before sending the user to a new position, mention any out_of_range or collisions in the result.
+   - Photon energy: the configurations and the fixed working distance hold at 95 eV. When the user works at
+     another hv, call align_photon_energy(hv) first: optic positions are then for that hv (zone plate: the focal
+     length grows with hv; capillary: achromatic). If the result says the shift is NOT KNOWN, say so and offer to
+     measure the focus there: align_add_optic_hv_point(target, hv, motors, optic_position) on a target already
+     fine-tuned at 95 eV; save=true only when the user asks (it changes optics_vs_hv.json for everyone).
 8. align_save_session(path) so the user can open the plate in the QuickAlignment program.
 
 (b) CALIBRATION (RealSampleCalibration, with one feature of a real sample):

@@ -94,6 +94,11 @@ START OF A CONVERSATION (also when the user just sends photos of a sample plate)
    - Not in focus, or old positions: align_found_here(at_focus=false) when SN was not put at the analyzer focus
      (H kept); configuration=<older file> for positions noted with an older configuration (x, y converted, H kept).
    - Before sending the user to a new position, mention any out_of_range or collisions in the result.
+   - Photon energy: the configurations and the fixed working distance hold at 95 eV. When the user works at
+     another hv, call align_photon_energy(hv) first: optic positions are then for that hv (zone plate: the focal
+     length grows with hv; capillary: achromatic). If the result says the shift is NOT KNOWN, say so and offer to
+     measure the focus there: align_add_optic_hv_point(target, hv, motors, optic_position) on a target already
+     fine-tuned at 95 eV; save=true only when the user asks (it changes optics_vs_hv.json for everyone).
 8. align_save_session(path) so the user can open the plate in the QuickAlignment program.
 
 (b) CALIBRATION (RealSampleCalibration, with one feature of a real sample):
@@ -129,7 +134,7 @@ RULES
 
 Prompts: `start`, `find_samples`, `calibrate`
 
-## 2. MCP tools (53)
+## 2. MCP tools (56)
 
 `*` = required. **acts**: changes the session, a file or a window; the others only read.
 
@@ -175,10 +180,13 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `align_bz_angles` | reads | `lattice_a*` (number), `hv_map*` (number), `gamma*` (array), `ref_point*` (array), `ref_label` (string), `feature` (string), `line` (integer), `hv` (number), `map_srn` (number), `map_srz` (number), `binding` (number) | SRn / SRz putting a hexagonal Brillouin-zone point at the slit centre (from a measured map's angles). |
 | `align_bz_point_to` | reads | `lattice_a*` (number), `hv_map*` (number), `ref_point*` (array), `map_srn*` (number), `map_srz*` (number), `ref_label` (string), `hv` (number), `target_angles` (array), `gamma` (array), `keep_srn` (boolean), `binding` (number), `sample` (string) | SRn / SRz putting a K / M point read on a map at chosen analyzer angles at another hv (Γ optional; keep_srn: turn SRz only). |
 | `align_collision_check` | reads | `motors` (object), `optic_position` (number) | Does the plate touch the analyzer / optic at these positions; collision-free motor ranges. |
+| `align_photon_energy` | **acts** | `hv` (number) | The photon energy in use (eV; empty: the configuration's, 95 eV): every optic position computed or given afterwards is for this energy (the zone plate's working distance grows with hv). |
+| `align_optics_vs_hv` | reads | - | The focusing optic against photon energy: model and measured points (configs/optics_vs_hv.json), and the optic shift at the photon energy in use. |
+| `align_add_optic_hv_point` | **acts** | `target*` (string), `hv*` (number), `motors*` (object), `optic_position*` (number), `comment` (string), `save` (boolean) | A focus measured at another photon energy (target on the beam and in focus at these motors and optic position): the optic shift against the reference energy; save=true writes it to optics_vs_hv.json (only when the user asks). |
 | `align_save_session` | **acts** | `path*` (string) | Save the plate (samples, devices, stage) as a session file. |
 | `align_load_session` | **acts** | `path*` (string), `optic` (string) | Load a QuickAlignment session file. |
 | `rsc_guide` | reads | - | Real-sample calibration: where it stands and what to do next. |
-| `rsc_start` | **acts** | `mode*` (string), `optic*` (string), `plate*` (string), `feature_x*` (number), `feature_y*` (number), `feature_height*` (number), `sn_kept` (boolean), `configuration` (string) | Start a real-sample calibration with one reference feature. |
+| `rsc_start` | **acts** | `mode*` (string), `optic*` (string), `plate*` (string), `feature_x*` (number), `feature_y*` (number), `feature_height*` (number), `sn_kept` (boolean), `configuration` (string), `photon_energy` (number) | Start a real-sample calibration with one reference feature. |
 | `rsc_status` | reads | - | The sets, what is measured, where the feature is expected. |
 | `rsc_read_spem` | reads | `path*` (string) | Motor and optic positions (ST, SZ, SN, SRn, SRz, ZPS, CPS, hv, scanned axes) recorded in a SPEM map file. |
 | `rsc_add_set` | **acts** | `name*` (string), `srn*` (number), `srz*` (number), `sn_kept` (boolean) | Another measurement set at other angles. |
@@ -196,6 +204,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | Method | What it does |
 |---|---|
 | `add_device(sample: 'str', name: 'str \| None' = None, x: 'float \| None' = None, y: 'float \| None' = None, photo_px=None, photo_id: 'str \| None' = None, x_edge: 'str' = 'left', y_edge: 'str' = 'bottom', size_mm: 'float' = 0.2) -> 'dict'` | A device on a substrate: at plate (x, y) mm, or at a pixel of a registered photo (plate or microscope). It is stored relative to the substrate edges (x_edge left/right, y_edge bottom/top), so it moves with it. |
+| `add_optic_energy_point(target: 'str', hv: 'float', motors: 'dict', optic_position: 'float', comment: 'str' = '', save: 'bool' = False) -> 'dict'` | A focus measured at another photon energy: `target` on the beam and in focus at `motors` with the optic at `optic_position` (read at photon energy hv). The shift is that position minus the position the configuration predicts for the same surface at its reference energy. Measure it on a target whose height was corrected at the reference energy (Fine tunings by ZPS/CPS), else the height error enters the shift. `save`: write it to optics_vs_hv.json (only on the user's explicit request: it changes the predictions for everyone). |
 | `add_sample(x: 'float', y: 'float', length: 'float', width: 'float', height: 'float \| None' = None, name: 'str \| None' = None) -> 'dict'` | A rectangular sample: centre (x, y), length along x, width along y (plate mm), height H (mm). |
 | `add_sample_from_photo(points_px, height: 'float \| None' = None, name: 'str \| None' = None, photo_id: 'str \| None' = None) -> 'dict'` | A sample from points read on the plate photo: its 4 corners (any order), or 2 opposite corners of its box. The sample is the plate rectangle around them; its in-plane angle is reported. |
 | `align_edge(p1, p2, along: 'str' = 'slit', photo_id: 'str \| None' = None, plate_mm: 'bool' = False, current_srn: 'float \| None' = None) -> 'dict'` | SRn turning a straight edge (two points on it: photo pixels of a registered photo, or plate mm with plate_mm=true) along the analyzer slit (horizontal at ANTARES) or across it ('vertical'). |
@@ -214,6 +223,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `load_annotation(path: 'str \| None' = None, wait: 'bool' = False) -> 'dict'` | Read the result of the manual-annotation window into the plate (replacing the samples if the user chose so in the window, else adding them). |
 | `load_session(path: 'str', optic: 'str \| None' = None) -> 'dict'` | - |
 | `manual_annotation(photo_id: 'str \| None' = None) -> 'dict'` | Open the "Samples from a photo" window on the user's screen with this photo and its registration, so the user marks / corrects the samples and devices by hand (when they are not satisfied with what was found). Returns at once; call load_annotation when the user has pressed OK. |
+| `optics_vs_hv() -> 'dict'` | The optic against photon energy: the model of each optic and the measured points (optics_vs_hv.json), and the shift at the photon energy in use. |
 | `photo_corners() -> 'dict'` | The four points to read on a plate photo, in this order (plate mm). |
 | `photo_grid(path: 'str \| None' = None, photo_id: 'str \| None' = None, region=None, step: 'float \| None' = None, marks=None) -> 'dict'` | The photo (or a zoomed region [x0, y0, x1, y1]) with a pixel grid, to read coordinates precisely. |
 | `photo_info(path: 'str') -> 'dict'` | - |
@@ -232,6 +242,7 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `sample_positions() -> 'dict'` | ST / SZ / SN putting each sample / device centre on the beam at the analyzer focus at the start rotation (SRn ref, SRz 0, piezo centred). |
 | `samples() -> 'dict'` | - |
 | `save_session(path: 'str') -> 'dict'` | - |
+| `set_photon_energy(hv: 'float \| None' = None) -> 'dict'` | The photon energy in use (eV; None: back to the configuration's, 95 eV). Every optic position computed afterwards (bring_to_beam, rotate, centre_piezo, beam_on, collisions) is for this photon energy, and every optic position given is read as one at this photon energy: the zone plate's focal length grows with hv (optics_vs_hv.json: model and measured points). |
 | `set_position(motors: 'dict', optic_position: 'float \| None' = None) -> 'dict'` | The stage as it is now (absolute motor values read at the beamline); missing motors keep their value. |
 | `start(plate: 'str' = 'standard', optic: 'str \| None' = 'capillary', custom_plate_mm: 'dict \| None' = None, configuration: 'str \| None' = None) -> 'dict'` | Begin with an empty plate: plate type, optic and configuration (default: the newest for the optic). |
 | `status() -> 'dict'` | - |
@@ -251,6 +262,6 @@ Prompts: `start`, `find_samples`, `calibrate`
 | `read_spem(path: 'str') -> 'dict'` | Motor values of a SPEM map file (.nxs): what to enter in measure_set / answer_test, with the PIX / PIY of the tracked point read on the map by the user (the file's PIX / PIY are where the scan ended). |
 | `save(comment: 'str' = '') -> 'dict'` | Save the fitted configuration in configs/ (only after the user agreed). |
 | `sets_table() -> 'list[dict]'` | The sets with where the feature is expected (a start for the search): from the newest configuration, from set 1 once it is measured, from the fit once there is one. |
-| `start(mode: 'str' = 'optics', optic: 'str \| None' = None, plate: 'str' = 'standard', feature_x: 'float' = 0.0, feature_y: 'float' = 0.0, feature_height: 'float' = 0.0, sn_kept: 'bool' = True, configuration: 'str \| None' = None) -> 'dict'` | Begin a calibration: mode "optics" (optic realigned: ST0, SZ0, optic reference; the mechanics are kept from the newest configuration) or "full" (optics + motors: all constants), the optic, the plate and the reference feature (plate x, y in mm and its height H above the plate surface). `sn_kept` (full mode): the rotated sets keep the SN of set 1 and refocus the optic (usual); false: every set is moved to the analyzer focus with SN. `configuration` (label or file name): keep the mechanics from this configuration instead of the newest of the optic; it may be one of the other optic (e.g. the zone plate calibrated with the axes of a recent capillary calibration). The optic reference is still compared with the newest of the chosen optic. |
+| `start(mode: 'str' = 'optics', optic: 'str \| None' = None, plate: 'str' = 'standard', feature_x: 'float' = 0.0, feature_y: 'float' = 0.0, feature_height: 'float' = 0.0, sn_kept: 'bool' = True, configuration: 'str \| None' = None, photon_energy: 'float \| None' = None) -> 'dict'` | Begin a calibration: mode "optics" (optic realigned: ST0, SZ0, optic reference; the mechanics are kept from the newest configuration) or "full" (optics + motors: all constants), the optic, the plate and the reference feature (plate x, y in mm and its height H above the plate surface). `sn_kept` (full mode): the rotated sets keep the SN of set 1 and refocus the optic (usual); false: every set is moved to the analyzer focus with SN. `configuration` (label or file name): keep the mechanics from this configuration instead of the newest of the optic; it may be one of the other optic (e.g. the zone plate calibrated with the axes of a recent capillary calibration). The optic reference is still compared with the newest of the chosen optic. `photon_energy` (eV, default 95): the photon energy of the measurements; it is written with the optic reference (the zone plate's working distance depends on it). |
 | `status() -> 'dict'` | - |
 | `test_points() -> 'dict'` | The test points of the open round: where to go (SRn, SRz, ST, SZ, SN, optic). |

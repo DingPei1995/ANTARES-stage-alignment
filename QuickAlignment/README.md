@@ -94,6 +94,13 @@ Positions here are **absolute motor values** (ST, SZ, SN, …, optic).
   far, *Correct SN* (own box under the stage) computes SN/ST/SZ that put it on the analyzer focus. *Centre the piezo*:
   a sample seen in a PIX / PIY scan off 150 / 150 µm gives the ST / SZ (SN kept, same angles) and optic with the
   piezo centred (`rotation.recentre_piezo`, as step 4 of the rotation tabs).
+- **photon energy** (field under the optic position, default 95 eV): the configurations, and the fixed focal
+  distance of the optic, hold at the photon energy they were measured at (95 eV for every file written before it
+  was recorded: `OpticsCalibration.photon_energy`). At another energy every optic position shown is shifted
+  (`core/photon_energy.py`, `configs/optics_vs_hv.json`): zone plate focal length ∝ hv (needs the focal length at
+  95 eV, `focal_length_mm`, until then only measured points), capillary achromatic; measured points (optic in focus at
+  hv minus the prediction at 95 eV, on a target already fine-tuned at 95 eV) take precedence, interpolated between
+  them, extrapolated with the model's slope. The OSA has to follow the zone plate; it is not computed.
 - **focusing optic** (zone plate + OSA or capillary, only along the beam): its absolute position is read
   from the configuration and can be typed in. The result gives the **absolute optic position** for focus
   on the illuminated surface. *Fine tunings by ZPS/CPS* (the optic's focal distance is fixed, so its position in

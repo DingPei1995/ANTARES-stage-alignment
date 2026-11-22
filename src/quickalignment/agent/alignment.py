@@ -36,6 +36,7 @@ from ..alignment.rotation import recentre_piezo, relocate, wrap180
 from ..core.calibration import CalibrationRecord, CalibrationStore
 from ..core.collision import ACCEPTANCE_HALF_ANGLE, collisions, in_acceptance, motor_limits
 from ..core.geometry import PLATES, STANDARD_PLATE, X_EDGES, Y_EDGES, Device, Sample, SampleLayout, custom_plate
+from ..core.photon_energy import OpticsEnergyTable, optics_at_energy
 from ..core.motors import (
     FOCUS_WARNING, LARGE_FOUND_OFFSET, PLATE_OFFSET_WARNING, TOLERANCE, TRAVEL, out_of_range, set_motor_limits,
 )
@@ -101,6 +102,8 @@ class AlignmentSession:
         self.motors: MotorPositions | None = None  # the stage as last reported by the user
         self.optic_position: float | None = None
         self.started = False
+        self.photon_energy: float | None = None  # eV; None: the photon energy of the configuration (95 eV)
+        self.energy_table = OpticsEnergyTable.load(self.store.folder)
 
     # ------------------------------------------------------------------------------------------------- setup
     def plates(self) -> dict:
@@ -192,12 +195,23 @@ class AlignmentSession:
     def model(self) -> StageModel:
         return StageModel(self.record.config_for(self.layout.plate.key, self.layout.plate_offset_v), self.layout.plate)
 
+    @property
+    def optics(self):
+        """The configuration's optic reference at the photon energy in use (photon_energy.py)."""
+        return optics_at_energy(self.record.optics, self.energy_table, self.photon_energy)[0]
+
+    def _energy_info(self) -> dict:
+        cal = self.record.optics
+        moved, shift = optics_at_energy(cal, self.energy_table, self.photon_energy)
+        return {"photon_energy_eV": rounded(moved.photon_energy), "configuration_photon_energy_eV": cal.photon_energy,
+                "optic_shift_mm": rounded(shift.shift), "optic_shift_source": shift.source}
+
     def status(self) -> dict:
         self._need_start()
         return {"plate": self.layout.plate.name, "optic": self.optic, "configuration": self._record_info(),
                 "samples": self.samples()["samples"], "photos": [p.info() for p in self.photos.values()],
                 "stage": None if self.motors is None else motors_dict(self.motors),
-                "optic_position": rounded(self.current_optic())}
+                "optic_position": rounded(self.current_optic()), "photon_energy": self._energy_info()}
 
     # ------------------------------------------------------------------------------------------------ photos
     def photo_corners(self) -> dict:
@@ -754,7 +768,7 @@ class AlignmentSession:
         raise APIError(f"No target {label!r}; targets: {['plate centre'] + [t[0] for t in self.layout.targets()]}.")
 
     def current_optic(self) -> float:
-        return self.record.optics.current_position if self.optic_position is None else self.optic_position
+        return self.optics.current_position if self.optic_position is None else self.optic_position
 
     def _base_motors(self) -> MotorPositions:
         if self.motors is not None:
@@ -801,7 +815,7 @@ class AlignmentSession:
 
     def _collision_text(self, new: MotorPositions, optic_new: float | None) -> list[str]:
         model = self.model
-        cal = self.record.optics
+        cal = self.optics
         geo = self.record.collision_geometry()
         fixed_y = cal.reference_y(model)
         out = []
@@ -817,7 +831,7 @@ class AlignmentSession:
 
     def _move_report(self, label: str, uvw, new: MotorPositions) -> dict:
         model = self.model
-        res = focus_correction(model, new, self.layout, self.record.optics, self.current_optic())
+        res = focus_correction(model, new, self.layout, self.optics, self.current_optic())
         y = model.beam_position(new, *uvw)
         out = {"target": label, "stage": motors_dict(new),
                "distance_from_analyzer_focus_um": rounded(abs(y) * 1000, 0),
@@ -844,7 +858,7 @@ class AlignmentSession:
         if abs(m.pix - pi) < 1e-9 and abs(m.piy - pi) < 1e-9:
             raise APIError(f"PIX and PIY are already at the centre ({pi:g} µm): give the PIX, PIY where the sample is "
                            "seen in the scan.")
-        p = recentre_piezo(self.model, m, optic, self.record.optics)
+        p = recentre_piezo(self.model, m, optic, self.optics)
         return {"seen_at": motors_dict(m), "optic_position_seen": rounded(optic),
                 "stage": motors_dict(p.new), "optic_position": rounded(p.optic_new),
                 "delta_mm": rounded({"ST": p.new.st - m.st, "SZ": p.new.sz - m.sz, "SN": p.new.sn - m.sn,
@@ -892,7 +906,7 @@ class AlignmentSession:
         self._need_start()
         m = motors_from(motors, self._base_motors())
         optic = self.current_optic() if optic_position is None else number(optic_position, "optic position")
-        res = focus_correction(self.model, m, self.layout, self.record.optics, optic)
+        res = focus_correction(self.model, m, self.layout, self.optics, optic)
         out = {"beam_lands_on": res.target, "stage": motors_dict(m),
                "plate_mm": None if res.plate_uv is None else rounded(list(res.plate_uv), 3),
                "surface_in_focal_plane_H_mm": rounded(self.model.focal_plane_height(m) - self.layout.plate.total_thickness),
@@ -1017,9 +1031,9 @@ class AlignmentSession:
         optic = self.current_optic() if measured_optic is None else number(measured_optic, "optic position")
         default_h = DEFAULT_HEIGHT
         try:
-            kept = relocate(self.model, self.layout, measured, srn, srz, self.record.optics, optic,
+            kept = relocate(self.model, self.layout, measured, srn, srz, self.optics, optic,
                             recentre_piezo=True, keep_sn=True, default_height=default_h)
-            focus = relocate(self.model, self.layout, measured, srn, srz, self.record.optics, optic,
+            focus = relocate(self.model, self.layout, measured, srn, srz, self.optics, optic,
                              recentre_piezo=True, to_analyzer_focus=True, limits=TRAVEL, default_height=default_h)
         except ValueError as exc:
             raise APIError(str(exc)) from None
@@ -1189,7 +1203,7 @@ class AlignmentSession:
         """Does the plate touch the analyzer / optic at these positions, and how far can each motor go."""
         self._need_start()
         m = motors_from(motors, self._base_motors())
-        model, geo, cal = self.model, self.record.collision_geometry(), self.record.optics
+        model, geo, cal = self.model, self.record.collision_geometry(), self.optics
         optic = self.current_optic() if optic_position is None else number(optic_position, "optic position")
         y = cal.focus_for_position(model, optic)
         fixed = cal.reference_y(model)
@@ -1203,6 +1217,54 @@ class AlignmentSession:
         shadow = in_acceptance(geo, [y], fixed)
         if shadow:
             out["shadow"] = f"{', '.join(shadow)} inside the analyzer acceptance cone (±{ACCEPTANCE_HALF_ANGLE:g}°)"
+        return out
+
+    # ------------------------------------------------------------------------------------- photon energy
+    def set_photon_energy(self, hv: float | None = None) -> dict:
+        """The photon energy in use (eV; None: back to the configuration's, 95 eV). Every optic position computed
+        afterwards (bring_to_beam, rotate, centre_piezo, beam_on, collisions) is for this photon energy, and every
+        optic position given is read as one at this photon energy: the zone plate's focal length grows with hv
+        (optics_vs_hv.json: model and measured points)."""
+        self.photon_energy = None if hv is None else number(hv, "photon energy")
+        if self.photon_energy is not None and not 10.0 <= self.photon_energy <= 2000.0:
+            raise APIError("photon energy: eV between 10 and 2000.")
+        out = self._energy_info()
+        if "NOT KNOWN" in out["optic_shift_source"]:
+            out["warning"] = ("The optic shift at this photon energy is not known: measure the focus here and add the "
+                              "point (add_optic_energy_point), or set the zone plate focal length in optics_vs_hv.json.")
+        return out
+
+    def optics_vs_hv(self) -> dict:
+        """The optic against photon energy: the model of each optic and the measured points (optics_vs_hv.json),
+        and the shift at the photon energy in use."""
+        return {"table": self.energy_table.describe(), "now": self._energy_info()}
+
+    def add_optic_energy_point(self, target: str, hv: float, motors: dict, optic_position: float,
+                               comment: str = "", save: bool = False) -> dict:
+        """A focus measured at another photon energy: `target` on the beam and in focus at `motors` with the optic at
+        `optic_position` (read at photon energy hv). The shift is that position minus the position the configuration
+        predicts for the same surface at its reference energy. Measure it on a target whose height was corrected at
+        the reference energy (Fine tunings by ZPS/CPS), else the height error enters the shift. `save`: write it to
+        optics_vs_hv.json (only on the user's explicit request: it changes the predictions for everyone)."""
+        self._need_start()
+        hv = number(hv, "photon energy")
+        optic = number(optic_position, "optic position")
+        label, uvw = self._target(target)
+        m = motors_from(motors, self._base_motors())
+        ref = optics_at_energy(self.record.optics, self.energy_table, self.energy_table.reference_hv)[0]
+        hit = self.model.beam_hit(m, uvw[2])
+        if hit is None:
+            raise APIError("The beam runs along the sample surface at these angles.")
+        predicted = ref.position_for_focus(self.model, float(hit[1]))
+        shift = optic - predicted
+        out = {"target": label, "hv": hv, "optic_position": rounded(optic),
+               "predicted_at_reference_energy": rounded(predicted), "shift_mm": rounded(shift),
+               "model_shift_mm": rounded(self.energy_table.shift(ref.optic_type, hv, ref.optic_sign).shift)}
+        if save:
+            self.energy_table.add_point(ref.optic_type, hv, shift, comment)
+            out["saved"] = str(self.energy_table.save(self.store.folder))
+        else:
+            out["note"] = "Not saved: call again with save=true when the user asks to add it to optics_vs_hv.json."
         return out
 
     # ---------------------------------------------------------------------------------------------- files

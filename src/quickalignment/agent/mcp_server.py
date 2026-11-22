@@ -218,6 +218,20 @@ TOOLS = [
     tool("align_collision_check", "alignment", "collision_check",
          "Does the plate touch the analyzer / optic at these positions; collision-free motor ranges.",
          {"motors": MOTORS_ARG, "optic_position": NUM}),
+    tool("align_photon_energy", "alignment", "set_photon_energy",
+         "The photon energy in use (eV; empty: the configuration's, 95 eV): every optic position computed or given "
+         "afterwards is for this energy (the zone plate's working distance grows with hv).",
+         {"hv": d("photon energy (eV)", **NUM)}),
+    tool("align_optics_vs_hv", "alignment", "optics_vs_hv",
+         "The focusing optic against photon energy: model and measured points (configs/optics_vs_hv.json), and the "
+         "optic shift at the photon energy in use."),
+    tool("align_add_optic_hv_point", "alignment", "add_optic_energy_point",
+         "A focus measured at another photon energy (target on the beam and in focus at these motors and optic "
+         "position): the optic shift against the reference energy; save=true writes it to optics_vs_hv.json "
+         "(only when the user asks).",
+         {"target": STR, "hv": d("photon energy of the measurement (eV)", **NUM), "motors": MOTORS_ARG,
+          "optic_position": d("optic position in focus at hv", **NUM), "comment": STR, "save": BOOL},
+         ["target", "hv", "motors", "optic_position"]),
     tool("align_save_session", "alignment", "save_session", "Save the plate (samples, devices, stage) as a session file.",
          {"path": STR}, ["path"]),
     tool("align_load_session", "alignment", "load_session", "Load a QuickAlignment session file.",
@@ -232,7 +246,8 @@ TOOLS = [
           "sn_kept": d("full mode: rotated sets keep the SN of set 1 and refocus the optic (default true); "
                        "false: every set moved to the analyzer focus with SN", **BOOL),
           "configuration": d("keep the mechanics (SN_f, SRn / SRz axes) from this configuration, label or file name, "
-                             "may be of the other optic (default: newest of the optic)", **STR)},
+                             "may be of the other optic (default: newest of the optic)", **STR),
+          "photon_energy": d("photon energy of the measurements, eV (default 95)", **NUM)},
          ["mode", "optic", "plate", "feature_x", "feature_y", "feature_height"]),
     tool("rsc_status", "real_sample", "status", "The sets, what is measured, where the feature is expected."),
     tool("rsc_read_spem", "real_sample", "read_spem",
@@ -267,7 +282,7 @@ ACTING = {
     "align_check_height",
     "align_remove_sample", "align_clear_samples", "align_add_device", "align_remove_device",
     "align_register_device_photo", "align_set_position", "align_found_here", "align_save_session",
-    "align_load_session",
+    "align_load_session", "align_photon_energy", "align_add_optic_hv_point",
     "rsc_start", "rsc_add_set", "rsc_measure_set", "rsc_fit", "rsc_answer_test", "rsc_change_test_angles", "rsc_save",
 }
 

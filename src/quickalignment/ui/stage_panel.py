@@ -13,7 +13,8 @@ from matplotlib.figure import Figure
 from dataclasses import replace
 
 from ._qt import QtCore, QtWidgets, Signal
-from ..core.calibration import CalibrationRecord
+from ..core.calibration import DEFAULT_FOLDER, CalibrationRecord
+from ..core.photon_energy import REFERENCE_HV, OpticsEnergyTable, optics_at_energy
 from ..core.motors import (  # noqa: F401  (re-exported for the other windows)
     CONFIG_SPECS, DEFAULT_LIMITS, FOCUS_WARNING, LARGE_FOUND_OFFSET, LIMIT_MOTORS, MOTOR_SPECS, PLATE_OFFSET_WARNING,
     TOLERANCE, TRAVEL, current_limits, out_of_range, set_motor_limits,
@@ -175,6 +176,13 @@ class StagePanel(QtWidgets.QWidget):
         self.optic_type.currentTextChanged.connect(self._on_optic_type)
         self.optic_pos = spin(0.0, -10000, 10000, 4, 0.01)
         self.optic_pos.setToolTip("Absolute optic motor position along the beam (from the configuration, or typed in).")
+        self.hv_box = spin(REFERENCE_HV, 10.0, 2000.0, 1, 1.0, " eV")
+        self.hv_box.setToolTip(
+            "Photon energy of the measurement. The configurations (and the fixed working distance of the optic) hold\n"
+            "at 95 eV; at another energy the optic positions shown are shifted (zone plate: focal length ∝ hv;\n"
+            "capillary: achromatic), from configs/optics_vs_hv.json (model and measured points).")
+        self.hv_box.valueChanged.connect(self._on_hv)
+        self._energy_table: OpticsEnergyTable | None = None
         focus_btn = QtWidgets.QPushButton(FINE_TUNE_BUTTON)
         focus_btn.setToolTip(
             "The Target was found on the beam and in focus at the entered stage positions with the optic\n"
@@ -230,6 +238,7 @@ class StagePanel(QtWidgets.QWidget):
         of = QtWidgets.QFormLayout(optic_box)
         of.addRow("Type", self.optic_type)
         of.addRow("Optic position", self.optic_pos)
+        of.addRow("Photon energy", self.hv_box)
         of.addRow("Target's sample H", self.height_box)
         of.addRow(self.height_source)
         of.addRow(self.height_exact)
@@ -307,6 +316,7 @@ class StagePanel(QtWidgets.QWidget):
     def set_record(self, record: CalibrationRecord) -> None:
         """Use a configuration; the optic fields are loaded from it."""
         self.record = record
+        self._energy_table = None  # optics_vs_hv.json of its folder, read again
         self.optic_type.blockSignals(True)
         if self.optic_type.findText(record.optics.optic_type) < 0:
             self.optic_type.addItem(record.optics.optic_type)
@@ -331,6 +341,11 @@ class StagePanel(QtWidgets.QWidget):
                    f"SRn {m.srn:.3f}, SRz {m.srz:.3f}")
         else:
             ref = f"in focus on the analyzer focus at optic {optics.optic_position:.4f}"
+        ref += f" ({optics.photon_energy:g} eV)"
+        _, shift = optics_at_energy(optics, self.energy_table(), self.hv_box.value())
+        if abs(self.hv_box.value() - optics.photon_energy) > 1e-9:
+            ref += (f"; at {self.hv_box.value():g} eV the optic positions are shifted by {shift.shift:+.4f} mm "
+                    f"({shift.source})")
         self.optic_ref_label.setText(f"Optics reference: {ref}")
         note = record.plate_note(self._layout_getter().plate.key)
         self.cal_status.setText(f"Configuration in use: <b>{record.label}</b>"
@@ -343,8 +358,21 @@ class StagePanel(QtWidgets.QWidget):
         layout = self._layout_getter()
         return self.record.config_for(layout.plate.key, layout.plate_offset_v)
 
+    def energy_table(self) -> OpticsEnergyTable:
+        """configs/optics_vs_hv.json of the configuration folder (read once)."""
+        if self._energy_table is None:
+            folder = self.record.path.parent if self.record.path is not None else DEFAULT_FOLDER
+            self._energy_table = OpticsEnergyTable.load(folder)
+        return self._energy_table
+
     def calibration(self) -> OpticsCalibration:
-        return self.record.optics
+        """The configuration's optic reference at the photon energy entered (photon_energy.py)."""
+        return optics_at_energy(self.record.optics, self.energy_table(), self.hv_box.value())[0]
+
+    def _on_hv(self, _value: float) -> None:
+        self._show_record()
+        if not self.start_box.isHidden():
+            self.show_start_positions()
 
     def _on_optic_type(self, text: str) -> None:
         # the collision solids of the configuration belong to its optic: another optic takes its defaults

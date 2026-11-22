@@ -23,6 +23,7 @@ import numpy as np
 
 from ..core.calibration import CalibrationStore
 from ..core.geometry import PLATES, SN_REFERENCE_W
+from ..core.photon_energy import REFERENCE_HV
 from ..core.motors import out_of_range
 from ..core.schematic import feature_warnings
 from ..core.stage import MotorPositions, StageModel
@@ -66,14 +67,16 @@ class RealSampleCalibrationSession:
     # --------------------------------------------------------------------------------------------- setup
     def start(self, mode: str = "optics", optic: str | None = None, plate: str = "standard",
               feature_x: float = 0.0, feature_y: float = 0.0, feature_height: float = 0.0,
-              sn_kept: bool = True, configuration: str | None = None) -> dict:
+              sn_kept: bool = True, configuration: str | None = None, photon_energy: float | None = None) -> dict:
         """Begin a calibration: mode "optics" (optic realigned: ST0, SZ0, optic reference; the mechanics are kept
         from the newest configuration) or "full" (optics + motors: all constants), the optic, the plate and the
         reference feature (plate x, y in mm and its height H above the plate surface). `sn_kept` (full mode): the
         rotated sets keep the SN of set 1 and refocus the optic (usual); false: every set is moved to the analyzer
         focus with SN. `configuration` (label or file name): keep the mechanics from this configuration instead of
         the newest of the optic; it may be one of the other optic (e.g. the zone plate calibrated with the axes of a
-        recent capillary calibration). The optic reference is still compared with the newest of the chosen optic."""
+        recent capillary calibration). The optic reference is still compared with the newest of the chosen optic.
+        `photon_energy` (eV, default 95): the photon energy of the measurements; it is written with the optic
+        reference (the zone plate's working distance depends on it)."""
         mode = str(mode).strip().lower()
         mode = "optics" if mode.startswith("opt") else "full" if mode in ("full", "all", "motors", "optics + motors") \
             else mode
@@ -90,6 +93,7 @@ class RealSampleCalibrationSession:
                                                         and prev.optic_name != optic_short(self.optic))):
             raise APIError(f"There is no {optic_short(self.optic)} configuration to keep the mechanics from: use "
                            "mode 'full' (optics + motors), or name one with configuration=...")
+        self.photon_energy = REFERENCE_HV if photon_energy is None else number(photon_energy, "photon energy")
         self.mode, self.plate = mode, PLATES[key]
         x, y, h = number(feature_x, "x"), number(feature_y, "y"), number(feature_height, "H")
         self.uvw = (x, y, self.plate.total_thickness + h)
@@ -97,6 +101,7 @@ class RealSampleCalibrationSession:
         self.sets = protocol_sets(prev.config.srn_ref, mode, sn_kept=self.sn_kept)
         self.tests, self.result, self.saved, self.measured, self.last_fit = [], None, None, set(), None
         out = {"mode": mode, "optic": self.optic, "plate": self.plate.name, "feature": {"x": x, "y": y, "H": h},
+               "photon_energy_eV": self.photon_energy,
                "sn_kept": self.sn_kept,
                "feature_warnings": feature_warnings(self.plate, x, y),
                "previous_configuration": prev.label,
@@ -420,6 +425,8 @@ class RealSampleCalibrationSession:
                                     tests=[t for t in self.tests if t.answered], previous=label)
         if optic_rec.optic_name == record.optic_name:
             record = replace(record, collision=optic_rec.collision)
+        record = replace(record, optics=replace(record.optics, photon_energy=getattr(self, "photon_energy",
+                                                                                     REFERENCE_HV)))
         try:
             saved = self.store.save(record)
         except OSError as exc:

@@ -189,13 +189,14 @@ def test_keep_sn_slides_along_the_beam_with_srz():
 
 
 def test_starting_configuration_zone_plate_reference():
-    """configs/calibration_2026-10-24_170000_zone_plate.json: ZP_ZS 53.21985 focuses on the first SampleC Map (+ = towards the sample)."""
+    """tests/data/old_configs/calibration_2026-10-24_170000_zone_plate.json (retired from configs/): ZP_ZS 53.21985 focuses on the first SampleC Map (+ = towards the sample)."""
     from pathlib import Path
 
     from quickalignment.core.calibration import CalibrationStore
 
     root = Path(__file__).resolve().parent.parent
-    record = next(r for r in CalibrationStore(root / "configs").records() if r.created == "2026-10-24 17:00:00")
+    record = next(r for r in CalibrationStore(root / "tests" / "data" / "old_configs").records()
+                  if r.created == "2026-10-24 17:00:00")
     assert record.optics.enabled and record.optics.optic_sign == 1
     model = StageModel(record.config)
     first, second = SampleC_ZONE_PLATE

@@ -20,6 +20,8 @@ from quickalignment.realsample.fit import on_beam, protocol_sets
 ROOT = Path(__file__).resolve().parent.parent
 PHOTO = ROOT / "tests" / "data" / "gating_plate_photo.jpg"
 CORNERS = [(207.5, 212.0), (543.5, 298.0), (466.5, 624.0), (128.0, 542.0)]
+# configurations retired from configs/ that tests still reproduce
+OLD_CONFIGS = ROOT / "tests" / "data" / "old_configs"
 
 
 @pytest.fixture
@@ -178,6 +180,7 @@ def test_found_here_not_in_focus_and_old_configuration(api):
     a.start("gating", "capillary", configuration="calibration_2026-11-14_173743_capillary.json")
     a.add_sample(-2.0, 2.0, 11.0, 10.0, 0.748, name="Cav")
     old = {"srn": 120, "srz": -24, "st": -6, "sz": 35.2, "sn": 0}
+    shutil.copy(OLD_CONFIGS / "calibration_2026-10-24_235500_capillary.json", a.store.folder)  # retired, kept here
     out = a.found_here("Cav", old, configuration="calibration_2026-10-24_235500_capillary.json")
     s = out["sample"]
     assert s["height"] == pytest.approx(0.748) and out["shift_mm"]["dH"] == 0

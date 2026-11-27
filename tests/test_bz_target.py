@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 import pytest
 
 from quickalignment.alignment import bz_target as bt
@@ -149,3 +149,29 @@ def test_preview_draws():
 def test_emission_in_plate_matches_target_inputs():
     t = make_target(3.282, 95, m=MotorPositions(srn=120, srz=0))
     assert np.allclose(emission_in_plate(MODEL, GEO, t.measured, *t.gamma), [0, 0, 1])
+
+def test_plate_tilt_is_the_starting_normal_without_gamma():
+    """A plate tilted in the holder (StageConfig.plate_tilt_u / _v): a flat sample on it has the tilted plate normal,
+    so a K point read without Gamma gives that normal back (tilt 0 from the plate normal), and a measured Gamma
+    along it is reported as 0 deg from the plate normal too."""
+    from dataclasses import replace
+    from quickalignment.core.stage import plate_normal
+
+    model = StageModel(replace(MODEL.config, plate_tilt_u=-0.26, plate_tilt_v=1.6))
+    z = plate_normal(model.config)
+    assert np.degrees(np.arccos(z[2])) == pytest.approx(np.hypot(0.26, 1.6), abs=0.01)
+    assert plate_normal(MODEL.config) == pytest.approx([0, 0, 1])
+    m, hv, a = MotorPositions(srn=130.0, srz=-5.0), 95.0, 3.282
+    s = bt.gamma_k(a) / bt.k0(hv)
+    e1 = np.cross(z, [0.3, 1.0, 0.0])
+    e1 /= np.linalg.norm(e1)
+    lab = plate_to_lab_dir(model, m.srn, m.srz)
+    ref = analyzer_angles(GEO, lab @ (np.sqrt(1 - s * s) * z + s * e1))
+    frame = bt.point_frame(model, GEO, m, ref, bt.gamma_k(a), hv)
+    assert frame.n == pytest.approx(z, abs=1e-9)
+    assert frame.tilt == pytest.approx(0.0, abs=1e-4)
+    flat = bt.point_frame(MODEL, GEO, m, ref, bt.gamma_k(a), hv)  # same map read without the plate tilt
+    # without it only the tilt component towards the point is seen: the normal comes out wrong
+    assert flat.tilt < np.hypot(0.26, 1.6) and np.degrees(np.arccos(flat.n @ z)) > 0.5
+    gamma = analyzer_angles(GEO, lab @ z)
+    assert bt.SampleFrame(model, GEO, bt.HexTarget(a, hv, gamma, "K", ref, m)).tilt == pytest.approx(0.0, abs=1e-4)

@@ -1,0 +1,69 @@
+{
+  "created": "2026-11-19 12:39:01",
+  "comment": "Standard plate + zone plate, 2026-11-19, from the configuration 2026-11-17 15:39:57 zone plate (gating plate, itself the 2026-11-15 one with the photo update), with the zone-plate working distance kept (focus vs ZPS as there). Device S1/D1 (20261119/Sample.json, plate x 1.396 / y 5.549) found on the beam at SRn 120 / SRz 0: ST -2.146, SZ 35.568, SN -0.05, PIX 84, PIY 138, ZPS 53.82 in focus. ZPS 53.82 puts the focus +70 um along the beam from the analyzer focus, so the device top is on the analyzer focus at SN -0.0994: H 0.6989 with SN_f kept (by-eye height check: SN -0.05, H 0.748). ST0 -0.6773 -> -0.7666, SZ0 41.143 -> 41.129. SRn / SRz axes (holder / stage) kept in the lab, re-expressed in the standard plate frame (plate moved +0.0893 / +0.0140 mm in u / v against the gating plate of the 11-17 configuration; against the 11-15 one -0.0461 / +0.0769). SN_f, SRz offset_n, ZPS direction unchanged. Found: the gating plate does NOT sit 1.0 mm higher than the standard plate (PLATE_SEAT_V) here: -0.014 mm (11-17) / -0.077 mm (11-15), within the photo registration and plate seating scatter. Only one device, one rotation: rotation axes not checked with this plate.",
+  "stage_config": {
+    "st0": -0.7666,
+    "sz0": 41.129,
+    "sn_f": -0.798260207455943,
+    "srn_ref": 120.0,
+    "pi_center": 150.0,
+    "srn_axis_u": 0.014,
+    "srn_axis_v": -0.1335,
+    "srz_offset_t": -0.0989,
+    "srz_offset_n": 2.775
+  },
+  "optics": {
+    "enabled": true,
+    "motors": {
+      "st": -2.146,
+      "sn": -0.05,
+      "sz": 35.568,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 84.0,
+      "piy": 138.0
+    },
+    "surface_w": 5.698879453222792,
+    "optic_position": 53.82,
+    "optic_sign": 1,
+    "optic_type": "zone plate + OSA",
+    "last_position": null
+  },
+  "check": {
+    "type": "one device found with the zone plate, working distance kept",
+    "plate": "standard",
+    "point_plate_uvw": [
+      1.396,
+      5.549,
+      5.698879453222792
+    ],
+    "device": "S1/D1, 20261119/Sample.json",
+    "found": {
+      "st": -2.146,
+      "sz": 35.568,
+      "sn": -0.05,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 84,
+      "piy": 138,
+      "zps": 53.82
+    },
+    "sn_by_eye": -0.05,
+    "gating_minus_standard": {
+      "from_2026-11-17": {
+        "st0": 0.0893,
+        "sz0": 0.014
+      },
+      "from_2026-11-15": {
+        "st0": -0.0461,
+        "sz0": 0.0769
+      }
+    },
+    "previous": [
+      "2026-11-17 15:39:57 zone plate",
+      "2026-11-15 15:13:56 zone plate",
+      "2026-11-14 17:37:43 capillary",
+      "2026-10-24 17:00:00 zone plate"
+    ]
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "created": "2026-11-27 18:55:29",
+  "comment": "Gating plate + zone plate, 2026-11-27 (afternoon), sample config 20261127.json (H 1.0 exact). From 12:20:44 (tilt, SN_f, SRz axis, optics reference D2 ZPS 53.83 kept). NEW: SRn axis u -0.2807 v +0.0668 +- 0.0066 mm (was 0.0375 / -0.1332 from 11-20) and ST0 -0.9465 SZ0 41.1558 (+- 0.0035), fitted on device S2/D2 (plate -2.310 / 1.212) at SRn 75 / 120 / 165 (SN -0.052, SRz 0, ZPS 53.84 at all three) plus the morning SRn 120 (anchor) and SRn 150 points: residuals du/dv um SRn 120 -1.9/+2.4, SRn 165 +6.2/+7.4, SRn 75 +2.4/+0.4, SRn 120 am -2.3/+3.4, SRn 150 am -4.4/-13.7; rms 5.8 um. The afternoon SRn 120 point agrees with the morning anchor within 1 um (plate not moved). D2 ZPS constant over SRn 75..165 (53.84; S-series-only prediction 53.829 +- 0.008): no sign of an SRn-axis tilt; the morning SRn 150 ZPS 53.90 is the outlier. Open: SRz axis (from 11-20) and SN_f not checked with this mounting.",
+  "stage_config": {
+    "st0": -0.9465,
+    "sz0": 41.1558,
+    "sn_f": -1.0517,
+    "srn_ref": 120.0,
+    "pi_center": 150.0,
+    "srn_axis_u": -0.2807,
+    "srn_axis_v": 0.0668,
+    "srz_offset_t": -0.2828,
+    "srz_offset_n": 2.361,
+    "plate_tilt_u": -0.2634,
+    "plate_tilt_v": 1.5952
+  },
+  "optics": {
+    "enabled": true,
+    "motors": {
+      "st": 1.5495,
+      "sn": -0.052,
+      "sz": 39.929,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 6.0,
+      "piy": 110.0
+    },
+    "surface_w": 6.0,
+    "optic_position": 53.83,
+    "optic_sign": 1,
+    "optic_type": "zone plate + OSA",
+    "last_position": null,
+    "photon_energy": 95.0
+  },
+  "check": {
+    "type": "SRn axis from one device at four SRn (+ anchor, tilt from 12:20:44)",
+    "plate": "gating",
+    "sample_config": "20261127.json",
+    "point_plate_uvw": [
+      -2.31,
+      1.212,
+      6.0
+    ],
+    "found": {
+      "st": 1.5495,
+      "sz": 39.929,
+      "sn": -0.052,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 6,
+      "piy": 110,
+      "zps": 53.83
+    },
+    "tilt_points": {
+      "D1": [
+        -3.5802,
+        36.537,
+        234,
+        134,
+        53.74
+      ],
+      "S7": [
+        3.996,
+        39.941,
+        134,
+        140,
+        53.82
+      ],
+      "S5": [
+        1.0992,
+        42.499,
+        150,
+        145,
+        53.93
+      ],
+      "S3": [
+        -3.6556,
+        34.004,
+        150,
+        120,
+        53.61
+      ],
+      "S6": [
+        -1.4791,
+        36.649,
+        282,
+        150,
+        53.74
+      ]
+    },
+    "tilt_points_columns": [
+      "st",
+      "sz",
+      "pix",
+      "piy",
+      "zps"
+    ],
+    "tilt_points_sn": -0.052,
+    "plate_tilt_deg": {
+      "u": [
+        -0.2634,
+        0.14
+      ],
+      "v": [
+        1.5952,
+        0.14
+      ]
+    },
+    "previous": [
+      "2026-11-27 12:20:44 zone plate",
+      "2026-11-20 14:29:37 zone plate"
+    ],
+    "srn_points": {
+      "120": [
+        1.4071,
+        39.986,
+        148,
+        166,
+        53.84
+      ],
+      "165": [
+        1.5908,
+        41.771,
+        122,
+        192,
+        53.84
+      ],
+      "75": [
+        0.0143,
+        38.814,
+        114,
+        108,
+        53.84
+      ],
+      "150 am": [
+        1.6968,
+        41.1311,
+        150,
+        130,
+        53.9
+      ]
+    },
+    "srn_points_columns": [
+      "st",
+      "sz",
+      "pix",
+      "piy",
+      "zps"
+    ],
+    "srn_points_sn": -0.052,
+    "srn_axis_fit": {
+      "x": [
+        -0.9465111291084534,
+        41.15580768483794,
+        -0.28067520576162464,
+        0.06678932709496149
+      ],
+      "err": [
+        0.0035351789947060397,
+        0.003516617080303159,
+        0.006562853260344433,
+        0.0065737201400448125
+      ],
+      "rms_um": 5.767584725878317,
+      "resid_um": {
+        "120": [
+          -1.9000795372630108,
+          2.4117979789179955
+        ],
+        "165": [
+          6.207081385287694,
+          7.422844376471005
+        ],
+        "75": [
+          2.3887616086080143,
+          0.4394763326205364
+        ],
+        "120 am": [
+          -2.270531070600157,
+          3.4122331057040434
+        ],
+        "150 am": [
+          -4.425233724051125,
+          -13.686348121742409
+        ]
+      }
+    }
+  }
+}

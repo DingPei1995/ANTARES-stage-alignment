@@ -1,0 +1,8 @@
+{
+  "_comment": "Focusing optic against photon energy (quickalignment/core/photon_energy.py). shift: optic position in focus at hv minus the position predicted at reference_hv, in mm of optic motor. focal_length_mm: zone plate focal length at reference_hv (f = D x dr / lambda); null until known: then only measured points are used for the zone plate.",
+  "reference_hv": 95.0,
+  "optics": {
+    "zone plate": {"model": "zone_plate", "focal_length_mm": null, "points": []},
+    "capillary": {"model": "achromatic", "focal_length_mm": null, "points": []}
+  }
+}

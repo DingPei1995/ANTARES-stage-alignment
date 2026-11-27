@@ -1,0 +1,282 @@
+{
+  "created": "2026-11-27 21:20:30",
+  "comment": "Gating plate + zone plate, 2026-11-27 (evening), sample config 20261127.json (H 1.0 exact). From 20:55:42 (SRn axis from D2 at 4 SRn, tilt, SN_f, optics reference D2 ZPS 53.83 kept). NEW: SRz axis offset_t -0.3032 +- 0.035, offset_n 2.2228 +- 0.034 mm (11-20: -0.2828 / 2.361; 20:55:42 from S7 SN kept only: -0.3388 / 2.2085), fitted on the vertical gold line S7 (plate u -4.879, v 1.260) at SRn 120, SZ 39.925 and PIY 150 fixed (line centred with PIX, ZPS best focus). SN -0.052 kept: SRz 0 / -5 / -10 / -15, ST 3.9975 / 4.0697 / 4.0798 / 4.0317, PIX 140 / 144 / 154 / 166, ZPS 53.79 / 53.26 / 52.76 / 52.29. SN moved to the analyzer focus: SRz -15 SN 1.073 ST 2.9366 PIX 144 ZPS 53.86; SRz -10 SN 0.744 ST 3.3033 PIX 145 ZPS 53.86 (ZPS constant, as predicted). Free ZPS zero of the S7 series -0.015; residuals u / ZPS: SRz 0 -2.7 um / -0.007, SRz -5 +3.9 um / +0.009, SRz -10 +4.5 um / +0.013, SRz -15 +0.0 um / +0.002, SRz -15 SN moved -2.4 um / -0.010, SRz -10 SN moved -3.3 um / -0.008; chi2 7.1 / 8. An extra ZPS offset of the SN-moved points is -0.017 +- 0.010 (not significant). Device D2 (focus judged unreliable by the user) agrees at SRz -10 (+4 um) but not at -5 (-75 um), and its ZPS reads 0.07 low at both. Open: SN_f (analyzer focal plane, camera line) not measured with this mounting.",
+  "stage_config": {
+    "st0": -0.9465,
+    "sz0": 41.1558,
+    "sn_f": -1.0517,
+    "srn_ref": 120.0,
+    "pi_center": 150.0,
+    "srn_axis_u": -0.2807,
+    "srn_axis_v": 0.0668,
+    "srz_offset_t": -0.3032,
+    "srz_offset_n": 2.2228,
+    "plate_tilt_u": -0.2634,
+    "plate_tilt_v": 1.5952
+  },
+  "optics": {
+    "enabled": true,
+    "motors": {
+      "st": 1.5495,
+      "sn": -0.052,
+      "sz": 39.929,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 6.0,
+      "piy": 110.0
+    },
+    "surface_w": 6.0,
+    "optic_position": 53.83,
+    "optic_sign": 1,
+    "optic_type": "zone plate + OSA",
+    "last_position": null,
+    "photon_energy": 95.0
+  },
+  "check": {
+    "type": "SRz axis from a vertical gold line (S7), SN kept and SN moved to the analyzer focus",
+    "plate": "gating",
+    "sample_config": "20261127.json",
+    "point_plate_uvw": [
+      -2.31,
+      1.212,
+      6.0
+    ],
+    "found": {
+      "st": 1.5495,
+      "sz": 39.929,
+      "sn": -0.052,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 6,
+      "piy": 110,
+      "zps": 53.83
+    },
+    "tilt_points": {
+      "D1": [
+        -3.5802,
+        36.537,
+        234,
+        134,
+        53.74
+      ],
+      "S7": [
+        3.996,
+        39.941,
+        134,
+        140,
+        53.82
+      ],
+      "S5": [
+        1.0992,
+        42.499,
+        150,
+        145,
+        53.93
+      ],
+      "S3": [
+        -3.6556,
+        34.004,
+        150,
+        120,
+        53.61
+      ],
+      "S6": [
+        -1.4791,
+        36.649,
+        282,
+        150,
+        53.74
+      ]
+    },
+    "tilt_points_columns": [
+      "st",
+      "sz",
+      "pix",
+      "piy",
+      "zps"
+    ],
+    "tilt_points_sn": -0.052,
+    "plate_tilt_deg": {
+      "u": [
+        -0.2634,
+        0.14
+      ],
+      "v": [
+        1.5952,
+        0.14
+      ]
+    },
+    "previous": [
+      "2026-11-27 20:55:42 zone plate",
+      "2026-11-27 18:55:29 zone plate",
+      "2026-11-27 12:20:44 zone plate",
+      "2026-11-20 14:29:37 zone plate"
+    ],
+    "srn_points": {
+      "120": [
+        1.4071,
+        39.986,
+        148,
+        166,
+        53.84
+      ],
+      "165": [
+        1.5908,
+        41.771,
+        122,
+        192,
+        53.84
+      ],
+      "75": [
+        0.0143,
+        38.814,
+        114,
+        108,
+        53.84
+      ],
+      "150 am": [
+        1.6968,
+        41.1311,
+        150,
+        130,
+        53.9
+      ]
+    },
+    "srn_points_columns": [
+      "st",
+      "sz",
+      "pix",
+      "piy",
+      "zps"
+    ],
+    "srn_points_sn": -0.052,
+    "srn_axis_fit": {
+      "x": [
+        -0.9465111291084534,
+        41.15580768483794,
+        -0.28067520576162464,
+        0.06678932709496149
+      ],
+      "err": [
+        0.0035351789947060397,
+        0.003516617080303159,
+        0.006562853260344433,
+        0.0065737201400448125
+      ],
+      "rms_um": 5.767584725878317,
+      "resid_um": {
+        "120": [
+          -1.9000795372630108,
+          2.4117979789179955
+        ],
+        "165": [
+          6.207081385287694,
+          7.422844376471005
+        ],
+        "75": [
+          2.3887616086080143,
+          0.4394763326205364
+        ],
+        "120 am": [
+          -2.270531070600157,
+          3.4122331057040434
+        ],
+        "150 am": [
+          -4.425233724051125,
+          -13.686348121742409
+        ]
+      }
+    },
+    "srz_points": {
+      "0": [
+        3.9975,
+        -0.052,
+        140,
+        53.79
+      ],
+      "-5": [
+        4.0697,
+        -0.052,
+        144,
+        53.26
+      ],
+      "-10": [
+        4.0798,
+        -0.052,
+        154,
+        52.76
+      ],
+      "-15": [
+        4.0317,
+        -0.052,
+        166,
+        52.29
+      ],
+      "-15 SN moved": [
+        2.9366,
+        1.073,
+        144,
+        53.86
+      ],
+      "-10 SN moved": [
+        3.3033,
+        0.744,
+        145,
+        53.86
+      ]
+    },
+    "srz_points_columns": [
+      "st",
+      "sn",
+      "pix",
+      "zps"
+    ],
+    "srz_points_fixed": {
+      "sz": 39.925,
+      "piy": 150,
+      "srn": 120.0
+    },
+    "srz_axis_fit": {
+      "x": [
+        -0.3032030132833874,
+        2.2227826390106773,
+        -4.8785298832490245,
+        -0.014868895951126136
+      ],
+      "err": [
+        0.035063900417208874,
+        0.03427423045829779,
+        0.004135620118823835,
+        0.008226112432112085
+      ],
+      "chi2": 7.090854119858085,
+      "dof": 8,
+      "resid": {
+        "0": [
+          -2.7169092988108545,
+          -0.006689730902726877
+        ],
+        "-5": [
+          3.8603174435092313,
+          0.00924797308137356
+        ],
+        "-10": [
+          4.487637206747941,
+          0.013158251492514227
+        ],
+        "-15": [
+          0.04794530963092569,
+          0.0023516550002341194
+        ],
+        "-15 SN moved": [
+          -2.358937108977166,
+          -0.009689952227132904
+        ],
+        "-10 SN moved": [
+          -3.320053552247515,
+          -0.008378196444466836
+        ]
+      }
+    }
+  }
+}

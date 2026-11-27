@@ -334,6 +334,9 @@ Both plates share the same back plate (18 × 15.5 × 1.1 mm Ta with tab), which 
   configuration (capillary and zone plate, older ones too) with the tilt of the newest file that records one
   (`core/calibration.py`, `with_stage_tilt`; `CalibrationRecord.tilt_from` names it). Measured 2026-11-27:
   −0.263° / +1.595°.
+  A plate offset (the plate seated higher in the holder, *Fine tunings* / *found here*) moves the plate along the
+  holder's v, which the tilt turns away from the plate's v: `apply_found_offset` splits a found shift accordingly
+  (with H kept, the target stays on the beam at its height: `beam_in_plate`).
 
 Plate frame (x, y), mm: front view (sample side) with the tab up, origin = centre of the 18 × 15.5 mm back
 plate, x right, y up. At the reference orientation (SRn = 120, SRz = 0) a plate point comes onto the beam at

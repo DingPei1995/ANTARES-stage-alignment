@@ -304,17 +304,41 @@ def check_height(config: StageConfig, layout: SampleLayout, sample, sn: float) -
     return dh
 
 
-def apply_found_offset(config: StageConfig, layout: SampleLayout, sample, du: float, dv: float, dw: float) -> None:
+def apply_found_offset(config: StageConfig, layout: SampleLayout, sample, du: float, dv: float, dw: float,
+                       beam=None) -> None:
     """A target found on the beam (found_offset du, dv, dw of a target of `sample`; "Fine tunings by ZPS/CPS" at SRz 0
     in the program, found_here for the agent): ST is usually right and SZ is off because the
     plate does not always go into the holder at the same height (0-2 mm), not because of the beam. So dv moves the
     whole plate in the holder (layout.plate_offset_v; all samples, the plate drawing stays), du moves this sample
-    and dw changes its height (its checked SN, if any, follows). `config`: the configuration in use before."""
+    and dw changes its height (its checked SN, if any, follows). `config`: the configuration in use before.
+
+    With a plate tilt (plate_tilt_u / _v) the plate moves in its holder along the holder's v (config_for_plate),
+    which is not the plate's own v: the plate offset that accounts for dv also moves the target slightly in u and
+    out of the surface, and du / dw take that back, so that the model puts the target where it was found.
+    `beam`: when H is kept (the target taken where the beam crosses its surface at its height, dw = 0), the beam
+    direction in the plate frame at the positions of the find (beam_in_plate): the target then stays on that beam at
+    its height instead (H unchanged). Without a tilt both give the plain split above."""
+    if has_tilt(config):
+        r = tilt_matrix(config)[1]  # the holder's v in the plate frame: how a plate offset moves a plate point
+        b = None if beam is None else np.asarray(beam, float)
+        if b is not None and abs(r[1] * b[2] - r[2] * b[1]) > 1e-9:
+            # dv - delta r_v + t b_v = 0, dw - delta r_w + t b_w = 0: plate offset delta, slide t along the beam
+            delta, t = np.linalg.solve([[r[1], -b[1]], [r[2], -b[2]]], [dv, dw])
+            du, dw = du - delta * r[0] + t * b[0], 0.0
+        else:
+            delta = dv / r[1]
+            du, dw = du - delta * r[0], dw - delta * r[2]
+        dv = float(delta)
     layout.plate_offset_v += dv
     sample.u += du
     sample.height = max(sample.height + dw, 0.0)
     if sample.sn_checked is not None and dw:
         sample.sn_checked = sn_from_height(config, sample.height, layout.plate, sample.u, sample.v)
+
+
+def beam_in_plate(model: StageModel, m: MotorPositions) -> np.ndarray:
+    """Direction of the beam (+y) in the plate frame at m (for apply_found_offset when H is kept)."""
+    return model.lab_to_plate(m, Y_HAT) - model.lab_to_plate(m, np.zeros(3))
 
 
 def checked_sn(layout: SampleLayout, label: str) -> float | None:

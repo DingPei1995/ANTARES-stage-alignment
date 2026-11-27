@@ -230,3 +230,37 @@ def test_plate_tilt_height_and_sn_inverse():
     sn = sn_from_height(TILTED, 1.0, STANDARD_PLATE, 2.8, 4.6)
     assert height_from_sn(TILTED, sn, STANDARD_PLATE, 2.8, 4.6) == pytest.approx(1.0)
     assert sn == pytest.approx(StageModel(TILTED, STANDARD_PLATE).reference_motors(2.8, 4.6, 6.0)[2])
+
+
+@pytest.mark.parametrize("keep_height", [False, True])
+def test_plate_tilt_found_offset_puts_the_target_where_it_was_found(keep_height):
+    """A plate offset moves the plate along the holder's v, which a plate tilt turns away from the plate's v: the
+    correction of a target found on the beam still makes the model put it there (at its height when H is kept)."""
+    from dataclasses import replace as dc_replace
+
+    from quickalignment.core.geometry import STANDARD_PLATE, Sample, SampleLayout
+    from quickalignment.core.stage import apply_found_offset, beam_at_height, beam_in_plate, config_for_plate, found_offset
+
+    layout = SampleLayout(STANDARD_PLATE, [Sample("S", u=-2.6, v=1.6, length=1, width=1, height=0.4)])
+    sample = layout.samples[0]
+    true = StageModel(config_for_plate(TILTED, 0.0, 0.6), STANDARD_PLATE)            # plate 0.6 mm higher
+    m = true.motors_on_beam(-2.48, 1.52, 5.44, 120.0, 0.0, sn=-0.34)                # the target found here
+    found = true.plate_to_lab(m, -2.48, 1.52, 5.44)
+    model = StageModel(TILTED, STANDARD_PLATE)
+    w = STANDARD_PLATE.total_thickness + sample.height
+    if keep_height:
+        du, dv, dw = found_offset(model, m, sample.u, sample.v, w, y=beam_at_height(model, m, w))
+        apply_found_offset(TILTED, layout, sample, du, dv, dw, beam=beam_in_plate(model, m))
+        assert sample.height == pytest.approx(0.4)                                   # H kept
+    else:
+        du, dv, dw = found_offset(model, m, sample.u, sample.v, w, y=float(found[1]))
+        apply_found_offset(TILTED, layout, sample, du, dv, dw)
+    new = StageModel(config_for_plate(TILTED, 0.0, layout.plate_offset_v), STANDARD_PLATE)
+    p = new.plate_to_lab(m, sample.u, sample.v, STANDARD_PLATE.total_thickness + sample.height)
+    assert abs(p[0]) < 1e-9 and abs(p[2]) < 1e-9                                       # on the beam
+    if not keep_height:
+        assert p == pytest.approx(found, abs=1e-9)                                     # exactly where it was found
+    flat_layout = SampleLayout(STANDARD_PLATE, [dc_replace(sample, u=-2.6, height=0.4)])
+    apply_found_offset(dc_replace(TILTED, plate_tilt_u=0.0, plate_tilt_v=0.0), flat_layout, flat_layout.samples[0],
+                       0.1, 0.2, 0.0, beam=[0.0, 0.7, 0.7])                            # flat: the plain split
+    assert flat_layout.plate_offset_v == 0.2 and flat_layout.samples[0].u == pytest.approx(-2.5)

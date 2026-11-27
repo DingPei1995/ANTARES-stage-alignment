@@ -23,8 +23,8 @@ from ..core.collision import ACCEPTANCE_HALF_ANGLE, collisions, in_acceptance, m
 from ..core.schematic import draw_schematic
 from ..core.stage import (
     HEIGHT_CHECK_OPTIC, HEIGHT_CHECK_SRZ, HEIGHT_EXPLAIN_TOL, OPTIC_TYPES, MotorPositions, OpticsCalibration,
-    Y_HAT, StageConfig, StageModel, apply_found_offset, beam_at_height, checked_sn, fit_height, focus_correction,
-    found_offset, slide_to_sn, sn_from_height, sn_to_focus,
+    Y_HAT, StageConfig, StageModel, apply_found_offset, beam_at_height, beam_in_plate, checked_sn, fit_height,
+    focus_correction, found_offset, slide_to_sn, sn_from_height, sn_to_focus,
 )
 from ..realsample.fit import measurement_sigmas
 
@@ -771,7 +771,7 @@ class StagePanel(QtWidgets.QWidget):
         if answer != QtWidgets.QMessageBox.Yes:
             return (f"<span style='color:#555'>{label}: Δx {su:+.3f}, Δy {sv:+.3f} mm (H exact); nothing "
                     "corrected.</span>")
-        apply_found_offset(self.config(), layout, sample, du, dv, 0.0)
+        apply_found_offset(self.config(), layout, sample, du, dv, 0.0, beam=beam_in_plate(model, m))
         self.layoutCorrected.emit(sample.name)
         self.refresh_targets()
         return (f"<span style='color:#207020'>Corrected (H exact, {sample.height:.3f} mm kept): {sample.name} moved by "

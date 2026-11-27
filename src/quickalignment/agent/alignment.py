@@ -42,7 +42,7 @@ from ..core.motors import (
 )
 from ..core.session import Session
 from ..core.stage import (
-    MotorPositions, StageModel, apply_found_offset, check_height, checked_sn, focus_correction, found_offset,
+    MotorPositions, StageModel, apply_found_offset, beam_in_plate, check_height, checked_sn, focus_correction, found_offset,
     height_from_sn, sn_from_height, sn_to_focus,
 )
 from .common import APIError, motors_dict, motors_from, number, optic_short, optic_type, rounded
@@ -742,7 +742,7 @@ class AlignmentSession:
         s = self._sample(sample)
         sn = number(sn, "sn")
         c = self.model.config
-        h = height_from_sn(c, sn, self.layout.plate)
+        h = height_from_sn(c, sn, self.layout.plate, s.u, s.v)
         if h < 0:
             raise APIError(f"SN = {sn:g} puts the reference line {-h:.3f} mm below the plate top (SN_f = {c.sn_f:g}): "
                            "check the SN value and the configuration.")
@@ -966,7 +966,7 @@ class AlignmentSession:
             du, dv, dw = u - uvw[0], v - uvw[1], 0.0
         out = {"target": label, "stage": motors_dict(m), "shift_mm": rounded({"dx": du, "dy": dv, "dH": dw})}
         if eye_sn is not None:
-            sn = sn_from_height(self.model.config, number(height, "height"), self.layout.plate)
+            sn = sn_from_height(self.model.config, number(height, "height"), self.layout.plate, sample.u, sample.v)
             out["sn_by_eye_check"] = (f"SN set by eye {eye_sn:.3f} mm, SN for the known H on the analyzer focus "
                                       f"{sn:.3f} mm (difference {eye_sn - sn:+.3f} mm"
                                       + ("; more than 0.1 mm: check SN_f of the configuration or the mounting)."
@@ -998,7 +998,8 @@ class AlignmentSession:
                                     "was found.")
         if apply:
             if plate_move:
-                apply_found_offset(self.model.config, self.layout, sample, du, dv, dw)
+                kept = None if (at_focus and configuration is None and not height_exact) else beam_in_plate(model, m)
+                apply_found_offset(self.model.config, self.layout, sample, du, dv, dw, beam=kept)
                 self.motors = m
             else:  # positions read with another configuration are not the stage now
                 sample.u += du

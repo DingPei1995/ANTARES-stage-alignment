@@ -104,6 +104,14 @@ def has_tilt(config: StageConfig) -> bool:
     return bool(config.plate_tilt_u or config.plate_tilt_v)
 
 
+def plate_normal(config: StageConfig) -> np.ndarray:
+    """Plate surface normal (+w, towards the analyzer) in the holder frame, the frame the ARPES angle tools
+    (alignment.rotation, alignment.bz_target) work in: (0, 0, 1) without a plate tilt."""
+    if not has_tilt(config):
+        return Z_HAT.copy()
+    return tilt_matrix(config) @ Z_HAT
+
+
 def plate_to_holder(config: StageConfig, points) -> np.ndarray:
     """Plate points (u, v, w), shape (3,) or (N, 3), in the holder frame (the frame of the untilted plate)."""
     p = np.asarray(points, float)

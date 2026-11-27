@@ -9,7 +9,10 @@ slit with the deflector near 0, and the slit along a high-symmetry line
 as possible.
 
 The stage has no tilt axis: SRn turns about the plate normal, SRz about the
-vertical, and the plate normal always stays horizontal. With the slit
+vertical, and the plate normal always stays horizontal. (A plate tilted in the
+holder, StageConfig.plate_tilt_u / _v, is a fixed tilt of the sample: SRn turns
+about the holder normal. The directions here are in the holder frame, so a
+measured Γ includes it; without Γ the tilted plate normal is the starting guess.) With the slit
 horizontal (ANTARES) a point at the slit centre with the deflector at 0
 therefore always has the slit along the line through Gamma (Gamma-K for K,
 Gamma-M for M); a slit across that line (K-M, M-K) needs the deflector at the
@@ -32,7 +35,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .rotation import AnalyzerGeometry, analyzer_angles, emission_in_plate, plate_to_lab_dir, wrap180
-from ..core.stage import B, MotorPositions, StageModel
+from ..core.stage import B, MotorPositions, StageModel, plate_normal
 
 SRN_RANGE = (60.0, 180.0)  # deg, usable SRn (120 +- 60)
 SRZ_RANGE = (-25.0, 10.0)  # deg, usable SRz
@@ -120,7 +123,8 @@ class SampleFrame:
         self.e2 = np.cross(self.n, self.e1)
         self.ref_k = k0(t.hv_map, 0.0, t.work_function) * float(np.linalg.norm(inplane))  # measured |Gamma-ref|
         self.ref_k_expected = gamma_k(t.a) if t.ref_label == "K" else gamma_m(t.a)
-        self.tilt = float(np.degrees(np.arccos(np.clip(self.n[2], -1, 1))))  # from the plate normal
+        # from the plate normal (with a plate tilted in the holder: from the tilted plate's normal)
+        self.tilt = float(np.degrees(np.arccos(np.clip(self.n @ plate_normal(model.config), -1, 1))))
 
     def vec(self, kx, ky) -> np.ndarray:
         return np.multiply.outer(kx, self.e1) + np.multiply.outer(ky, self.e2)
@@ -583,17 +587,18 @@ def point_frame(model: StageModel, geo: AnalyzerGeometry, measured: MotorPositio
                 work_function: float = WORK_FUNCTION) -> PointFrame:
     """The sample frame from the point read on a map. Without Gamma the surface normal is the plate normal tilted
     towards the point by just enough to put the point at its lattice angle from Gamma (the smallest tilt that agrees
-    with the map; a tilt across that direction cannot be seen with one point)."""
+    with the map; a tilt across that direction cannot be seen with one point). The plate normal includes a plate
+    tilted in the holder (StageConfig.plate_tilt_u / _v)."""
     d = emission_in_plate(model, geo, measured, *ref)
     s = ref_k / k0(hv_map, binding, work_function)
     if s >= 1:
         raise ValueError("The point is outside the photoemission horizon at the map's photon energy.")
     expected = float(np.degrees(np.arcsin(s)))
+    z = plate_normal(model.config)
     if gamma is not None:
         n = emission_in_plate(model, geo, measured, *gamma)
         given = True
     else:
-        z = np.array([0.0, 0.0, 1.0])
         perp = d - (d @ z) * z
         if np.linalg.norm(perp) < 1e-9:
             raise ValueError("The point is along the plate normal: give Γ as well.")
@@ -606,7 +611,7 @@ def point_frame(model: StageModel, geo: AnalyzerGeometry, measured: MotorPositio
         raise ValueError("The point and Γ are at the same angles.")
     e1 = inplane / np.linalg.norm(inplane)
     measured_angle = float(np.degrees(np.arccos(np.clip(d @ n, -1, 1))))
-    tilt_deg = float(np.degrees(np.arccos(np.clip(n[2], -1, 1))))
+    tilt_deg = float(np.degrees(np.arccos(np.clip(n @ z, -1, 1))))
     return PointFrame(n, e1, given, tilt_deg, measured_angle, expected)
 
 

@@ -31,6 +31,8 @@ CONFIG_SPECS = {
     "srn_axis_v": ("SRn axis v on plate", " mm"),
     "srz_offset_t": ("SRz axis offset along +ST", " mm"),
     "srz_offset_n": ("SRz axis offset along +SN", " mm"),
+    "plate_tilt_u": ("Plate tilt along u (surface rises to +u)", " °"),
+    "plate_tilt_v": ("Plate tilt along v (surface rises to +v)", " °"),
 }
 TOLERANCE = 1e-3  # mm; below this a move is reported as not needed
 LARGE_FOUND_OFFSET = 0.3  # mm; a larger "Found here" correction (x, H) hints at an outdated configuration

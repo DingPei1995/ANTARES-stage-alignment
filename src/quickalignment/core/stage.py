@@ -49,6 +49,11 @@ class StageConfig:
     srn_axis_v: float = 0.0
     srz_offset_t: float = 0.0  # SRz axis offset from the plate-surface centre line, along +ST (mm)
     srz_offset_n: float = 0.0  # ... along +SN (mm)
+    # Plate tilted in the holder (deg; rotates with SRn and the piezo, like the plate): the plate surface rises
+    # towards the analyzer (+w) by sin(tilt) per mm along +u / +v, about the plate centre on the standard riser top
+    # (u = v = 0, w = SN_REFERENCE_W), so ST0, SZ0 and SN_f keep their meaning. 0: the plate sits flat (as before).
+    plate_tilt_u: float = 0.0
+    plate_tilt_v: float = 0.0
 
 
 def config_for_plate(config: StageConfig, from_seat: float, to_seat: float) -> StageConfig:
@@ -81,6 +86,38 @@ def rot_2d(deg: float) -> np.ndarray:
     a = np.radians(deg)
     c, s = np.cos(a), np.sin(a)
     return np.array([[c, -s], [s, c]])
+
+
+TILT_PIVOT = np.array([0.0, 0.0, SN_REFERENCE_W])  # plate centre on the standard riser top
+
+
+def tilt_matrix(config: StageConfig) -> np.ndarray:
+    """Plate frame -> holder frame (u, v, w) for the plate tilted in the holder (about TILT_PIVOT): a point of the
+    plate surface at +u (+v) comes sin(plate_tilt_u) (sin(plate_tilt_v)) mm per mm higher (towards the analyzer)."""
+    a, b = np.radians(config.plate_tilt_u), np.radians(config.plate_tilt_v)
+    ru = np.array([[np.cos(a), 0.0, -np.sin(a)], [0.0, 1.0, 0.0], [np.sin(a), 0.0, np.cos(a)]])
+    rv = np.array([[1.0, 0.0, 0.0], [0.0, np.cos(b), -np.sin(b)], [0.0, np.sin(b), np.cos(b)]])
+    return rv @ ru
+
+
+def has_tilt(config: StageConfig) -> bool:
+    return bool(config.plate_tilt_u or config.plate_tilt_v)
+
+
+def plate_to_holder(config: StageConfig, points) -> np.ndarray:
+    """Plate points (u, v, w), shape (3,) or (N, 3), in the holder frame (the frame of the untilted plate)."""
+    p = np.asarray(points, float)
+    if not has_tilt(config):
+        return p
+    return (p - TILT_PIVOT) @ tilt_matrix(config).T + TILT_PIVOT
+
+
+def holder_to_plate(config: StageConfig, points) -> np.ndarray:
+    """Inverse of plate_to_holder."""
+    p = np.asarray(points, float)
+    if not has_tilt(config):
+        return p
+    return (p - TILT_PIVOT) @ tilt_matrix(config) + TILT_PIVOT
 
 
 class StageModel:
@@ -118,6 +155,7 @@ class StageModel:
     # -- forward / inverse -----------------------------------------------------
     def plate_to_lab(self, m: MotorPositions, u: float, v: float, w: float) -> np.ndarray:
         c = self.config
+        u, v, w = plate_to_holder(c, (u, v, w))
         axis = np.array([c.srn_axis_u, c.srn_axis_v])
         q = np.array([u, v]) + self._piezo(m)
         q = rot_2d(self._srn_angle(m)) @ (q - axis) + axis
@@ -128,7 +166,7 @@ class StageModel:
     def plate_to_lab_many(self, m: MotorPositions, points) -> np.ndarray:
         """plate_to_lab for an (N, 3) array of plate points (u, v, w); returns (N, 3) lab points."""
         c = self.config
-        pts = np.asarray(points, float)
+        pts = plate_to_holder(c, np.asarray(points, float).reshape(-1, 3))
         axis = np.array([c.srn_axis_u, c.srn_axis_v])
         q = (pts[:, :2] + self._piezo(m) - axis) @ rot_2d(self._srn_angle(m)).T + axis
         local = np.column_stack([q, pts[:, 2]])
@@ -143,10 +181,11 @@ class StageModel:
         local = a + B.T @ (rot_z(-self._srz_angle(m)) @ rel)
         axis = np.array([c.srn_axis_u, c.srn_axis_v])
         q = rot_2d(-self._srn_angle(m)) @ (local[:2] - axis) + axis - self._piezo(m)
-        return np.array([q[0], q[1], local[2]])
+        return holder_to_plate(c, np.array([q[0], q[1], local[2]]))
 
     def stage_frame(self, m: MotorPositions, u: float, v: float) -> np.ndarray:
-        """Plate point (u, v) after piezo + SRn, in the SRz-stage frame (as seen from the analyzer at SRz = 0)."""
+        """Plate point (u, v) after piezo + SRn, in the SRz-stage frame (as seen from the analyzer at SRz = 0).
+        Drawing only: a plate tilt (plate_tilt_u / _v) is left out (in-plane change below sin(tilt) * height)."""
         c = self.config
         axis = np.array([c.srn_axis_u, c.srn_axis_v])
         q = np.array([u, v]) + self._piezo(m)
@@ -161,6 +200,7 @@ class StageModel:
     def reference_motors(self, u: float, v: float, w: float) -> tuple[float, float, float]:
         """(ST, SZ, SN) putting plate point (u, v, w) on the focus at SRn = ref, SRz = 0, piezo centred."""
         c = self.config
+        u, v, w = (float(x) for x in plate_to_holder(c, (u, v, w)))
         return c.st0 - u, c.sz0 - v, c.sn_f + w - SN_REFERENCE_W
 
     def focal_plane_height(self, m: MotorPositions) -> float:
@@ -169,12 +209,17 @@ class StageModel:
         return float(self.lab_to_plate(m, np.zeros(3))[2])
 
     def reference_to_plate(self, st: float, sz: float) -> tuple[float, float]:
+        """Plate (u, v) on the focus at (ST, SZ), SRn ref, SRz 0, piezo centred (holder frame: a plate tilt is left out,
+        below sin(tilt) * height in u, v)."""
         c = self.config
         return c.st0 - st, c.sz0 - sz
 
     def surface_normal(self, m: MotorPositions) -> np.ndarray:
         """Lab direction of the plate +w axis (towards the analyzer)."""
-        return rot_z(self._srz_angle(m)) @ B[:, 2]
+        normal = rot_z(self._srz_angle(m)) @ B[:, 2]
+        if not has_tilt(self.config):
+            return normal
+        return self.plate_to_lab(m, 0.0, 0.0, 1.0) - self.plate_to_lab(m, 0.0, 0.0, 0.0)
 
     def beam_hit(self, m: MotorPositions, w: float) -> np.ndarray | None:
         """Where the beam (the lab y axis) crosses the plane at plate height w."""
@@ -224,21 +269,28 @@ def sn_to_focus(model: StageModel, m: MotorPositions, u: float, v: float, w: flo
     return -model.beam_position(m, u, v, w) / np.sqrt(2)
 
 
-def height_from_sn(config: StageConfig, sn: float, plate: PlateGeometry) -> float:
+def height_from_sn(config: StageConfig, sn: float, plate: PlateGeometry, u: float = 0.0, v: float = 0.0) -> float:
     """Sample height H above the plate surface whose top is on the analyzer focal plane (the camera reference line)
-    at SN = `sn`, SRn ref, SRz 0 (inverse of SN = SN_f + (plate top - 5.0) + H; piezo, ST, SZ do not matter)."""
-    return sn - config.sn_f + SN_REFERENCE_W - plate.total_thickness
+    at SN = `sn`, SRn ref, SRz 0 (inverse of SN = SN_f + (plate top - 5.0) + H; piezo, ST, SZ do not matter). With a
+    plate tilt the surface height in the holder depends on where the point is: (u, v), the plate point looked at."""
+    if not has_tilt(config):
+        return sn - config.sn_f + SN_REFERENCE_W - plate.total_thickness
+    r = tilt_matrix(config)[2]
+    target = sn - config.sn_f  # holder height above the pivot
+    return float((target - r[0] * u - r[1] * v) / r[2]) + SN_REFERENCE_W - plate.total_thickness
 
 
-def sn_from_height(config: StageConfig, height: float, plate: PlateGeometry) -> float:
-    """SN putting a surface H above the plate top on the analyzer focal plane at SRn ref, SRz 0."""
-    return config.sn_f - SN_REFERENCE_W + plate.total_thickness + height
+def sn_from_height(config: StageConfig, height: float, plate: PlateGeometry, u: float = 0.0, v: float = 0.0) -> float:
+    """SN putting a surface H above the plate top on the analyzer focal plane at SRn ref, SRz 0 (at plate point
+    (u, v): it matters only with a plate tilt)."""
+    w = float(plate_to_holder(config, (u, v, plate.total_thickness + height))[2])
+    return config.sn_f - SN_REFERENCE_W + w
 
 
 def check_height(config: StageConfig, layout: SampleLayout, sample, sn: float) -> float:
     """Height check: the top surface of `sample` was on the camera reference line (analyzer focal plane) at SN = sn,
     SRn ref, SRz 0. Sets its height from it (never below 0) and remembers sn; returns the change of H (mm)."""
-    h = max(height_from_sn(config, sn, layout.plate), 0.0)
+    h = max(height_from_sn(config, sn, layout.plate, sample.u, sample.v), 0.0)
     dh = h - sample.height
     sample.height, sample.sn_checked = h, float(sn)
     return dh
@@ -254,7 +306,7 @@ def apply_found_offset(config: StageConfig, layout: SampleLayout, sample, du: fl
     sample.u += du
     sample.height = max(sample.height + dw, 0.0)
     if sample.sn_checked is not None and dw:
-        sample.sn_checked = sn_from_height(config, sample.height, layout.plate)
+        sample.sn_checked = sn_from_height(config, sample.height, layout.plate, sample.u, sample.v)
 
 
 def checked_sn(layout: SampleLayout, label: str) -> float | None:

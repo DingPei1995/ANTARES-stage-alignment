@@ -1,0 +1,113 @@
+{
+  "created": "2026-11-27 12:20:44",
+  "comment": "Gating plate + zone plate, 2026-11-27, sample config 20261127.json (S1/D1, S2/D2 and gold-line points on two substrates, H 1.0 exact). Anchored on device S2/D2 (plate x -2.310 / y 1.212 from 20261127.json, taken as right): ST 1.5495, SZ 39.929, SN -0.052, PIX 6, PIY 110, ZPS 53.83 in focus at SRn 120 / SRz 0. NEW: plate tilted in the holder (StageConfig.plate_tilt_u / _v, pivot plate centre on the riser top): tilt_v +1.595 +- 0.14 deg (+- 0.19 scaled by chi2) (surface rises towards the analyzer to +v, i.e. tab side), tilt_u -0.263 +- 0.14 deg (+- 0.19) (not significant), fitted from the ZPS foci (SN kept -0.052, +-0.01) of D1 53.74, S7 53.82, S5 53.93, S3 53.61, S6 53.74 against D2; residuals D1 +0.012, S7 +0.007, S5 -0.001, S3 -0.020, S6 +0.022 mm, chi2 5.5 / 3 dof. Interpreted as the plate inserted tilted (assumption: a tilt of the SRz stage in the lab is not excluded; it would stay fixed in the lab when SRn turns, a plate tilt turns with SRn). Kept from 2026-11-20 14:29:37 (standard plate): SN_f, SRn axis, SRz axis, PLATE_SEAT_V 0. Only one SRn / SRz: rotation axes not checked with this mounting. Open: SN_f not measured today: with it, D2 at SN -0.052 is 0.044 mm off the analyzer focal plane along the normal (D2 SN for the analyzer focus -0.008), so the ZPS at the analyzer focus (53.893) depends on SN_f. D1 lies 0.17 mm from its 20261127.json position in x (2.664 vs 2.836).",
+  "stage_config": {
+    "st0": -0.9441,
+    "sz0": 41.1524,
+    "sn_f": -1.0517,
+    "srn_ref": 120.0,
+    "pi_center": 150.0,
+    "srn_axis_u": 0.0375,
+    "srn_axis_v": -0.1332,
+    "srz_offset_t": -0.2828,
+    "srz_offset_n": 2.361,
+    "plate_tilt_u": -0.2634,
+    "plate_tilt_v": 1.5952
+  },
+  "optics": {
+    "enabled": true,
+    "motors": {
+      "st": 1.5495,
+      "sn": -0.052,
+      "sz": 39.929,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 6,
+      "piy": 110
+    },
+    "surface_w": 6.0,
+    "optic_position": 53.83,
+    "optic_sign": 1,
+    "optic_type": "zone plate + OSA",
+    "last_position": null,
+    "photon_energy": 95.0
+  },
+  "check": {
+    "type": "one device on the beam (anchor) + ZPS foci for the plate tilt",
+    "plate": "gating",
+    "sample_config": "20261127.json",
+    "point_plate_uvw": [
+      -2.31,
+      1.212,
+      6.0
+    ],
+    "found": {
+      "st": 1.5495,
+      "sz": 39.929,
+      "sn": -0.052,
+      "srn": 120.0,
+      "srz": 0.0,
+      "pix": 6,
+      "piy": 110,
+      "zps": 53.83
+    },
+    "tilt_points": {
+      "D1": [
+        -3.5802,
+        36.537,
+        234,
+        134,
+        53.74
+      ],
+      "S7": [
+        3.996,
+        39.941,
+        134,
+        140,
+        53.82
+      ],
+      "S5": [
+        1.0992,
+        42.499,
+        150,
+        145,
+        53.93
+      ],
+      "S3": [
+        -3.6556,
+        34.004,
+        150,
+        120,
+        53.61
+      ],
+      "S6": [
+        -1.4791,
+        36.649,
+        282,
+        150,
+        53.74
+      ]
+    },
+    "tilt_points_columns": [
+      "st",
+      "sz",
+      "pix",
+      "piy",
+      "zps"
+    ],
+    "tilt_points_sn": -0.052,
+    "plate_tilt_deg": {
+      "u": [
+        -0.2634,
+        0.14
+      ],
+      "v": [
+        1.5952,
+        0.14
+      ]
+    },
+    "previous": [
+      "2026-11-20 14:29:37 zone plate"
+    ]
+  }
+}

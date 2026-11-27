@@ -174,3 +174,59 @@ def test_on_beam_with_sn_kept():
     assert sn_to_focus(model, m, u, v, w) == pytest.approx(-0.1)
     back = slide_to_sn(m, m.sn + sn_to_focus(model, m, u, v, w))
     assert close(model.plate_to_lab(back, u, v, w), [0, 0, 0])
+
+
+# --- plate tilted in the holder (plate_tilt_u / plate_tilt_v) ---------------------------------------------------
+TILTED = StageConfig(st0=-0.9, sz0=41.2, sn_f=-1.05, srn_axis_u=0.04, srn_axis_v=-0.13, srz_offset_t=-0.28,
+                     srz_offset_n=2.36, plate_tilt_u=0.4, plate_tilt_v=-1.6)
+
+
+def test_plate_tilt_zero_changes_nothing():
+    flat = StageConfig(st0=-0.9, sz0=41.2, sn_f=-1.05, srn_axis_u=0.04, srz_offset_n=2.36)
+    m = MotorPositions(st=1.2, sn=-0.3, sz=39.0, srn=140, srz=-15, pix=120, piy=170)
+    model = StageModel(flat)
+    assert close(model.plate_to_lab(m, 2.0, -1.5, 6.0), StageModel(flat).plate_to_lab_many(m, [[2.0, -1.5, 6.0]])[0])
+    assert model.reference_motors(2.0, -1.5, 6.0) == pytest.approx((flat.st0 - 2.0, flat.sz0 + 1.5, flat.sn_f + 1.0))
+
+
+def test_plate_tilt_round_trip_and_many():
+    model = StageModel(TILTED)
+    m = MotorPositions(st=1.2, sn=-0.3, sz=39.0, srn=140, srz=-15, pix=120, piy=170)
+    p = model.plate_to_lab(m, 2.0, -1.5, 6.0)
+    assert close(model.lab_to_plate(m, p), [2.0, -1.5, 6.0])
+    assert close(model.plate_to_lab_many(m, [[2.0, -1.5, 6.0], [0, 0, 5.0]])[0], p)
+
+
+def test_plate_tilt_surface_rises_along_v():
+    """A surface point at +v is sin(tilt_v) per mm higher in the holder: at SRn ref, SRz 0 its SN for the focus
+    changes by that much, the pivot (plate centre on the riser top) does not move."""
+    cfg = StageConfig(plate_tilt_v=2.0)
+    model = StageModel(cfg)
+    assert model.reference_motors(0.0, 0.0, 5.0) == pytest.approx((0.0, 40.0, 0.0))
+    sn0 = model.reference_motors(0.0, 0.0, 6.0)[2]
+    sn1 = model.reference_motors(0.0, 3.0, 6.0)[2]
+    assert sn1 - sn0 == pytest.approx(3.0 * np.sin(np.radians(2.0)))
+
+
+@pytest.mark.parametrize("srn, srz", [(120, 0), (150, 0), (120, -20), (95, -10)])
+def test_plate_tilt_reference_motors_and_normal(srn, srz):
+    model = StageModel(TILTED)
+    u, v, w = -2.3, 1.2, 6.0
+    m = model.motors_for_target(u, v, w, srn, srz)
+    assert close(model.plate_to_lab(m, u, v, w), [0, 0, 0])
+    if srn == 120 and srz == 0:
+        assert close((m.st, m.sz, m.sn), model.reference_motors(u, v, w))
+    n = model.surface_normal(m)
+    a, b = model.plate_to_lab(m, u, v, w), model.plate_to_lab(m, u + 1.0, v - 0.5, w)
+    assert abs(n @ (b - a)) < 1e-12 and np.isclose(np.linalg.norm(n), 1.0)
+    hit = model.beam_hit(m, w)
+    assert close(hit, [0, 0, 0], 1e-9)
+
+
+def test_plate_tilt_height_and_sn_inverse():
+    from quickalignment.core.geometry import STANDARD_PLATE
+    from quickalignment.core.stage import height_from_sn, sn_from_height
+
+    sn = sn_from_height(TILTED, 1.0, STANDARD_PLATE, 2.8, 4.6)
+    assert height_from_sn(TILTED, sn, STANDARD_PLATE, 2.8, 4.6) == pytest.approx(1.0)
+    assert sn == pytest.approx(StageModel(TILTED, STANDARD_PLATE).reference_motors(2.8, 4.6, 6.0)[2])

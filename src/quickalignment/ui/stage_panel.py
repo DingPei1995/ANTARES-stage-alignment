@@ -528,7 +528,7 @@ class StagePanel(QtWidgets.QWidget):
         eye = self._eye_sn.get(id(sample))
         if eye is None or not self.is_exact(sample):
             return ""
-        sn = sn_from_height(self.config(), sample.height, self._layout_getter().plate)
+        sn = sn_from_height(self.config(), sample.height, self._layout_getter().plate, sample.u, sample.v)
         text = (f"SN set by eye {eye:.3f} mm, SN for the exact H on the analyzer focus {sn:.3f} mm "
                 f"(Δ {unsigned_zero(eye - sn, 3):+.3f} mm")
         return text + (f", more than {EYE_SN_WARN:g} mm: check SN_f of the configuration or the mounting)"

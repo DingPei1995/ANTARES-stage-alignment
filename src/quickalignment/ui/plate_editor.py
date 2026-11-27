@@ -902,7 +902,7 @@ class PlateEditor(QtWidgets.QWidget):
         """SN putting the top surface of `sample` (its H) on the camera reference line at SRn 120°, SRz 0°."""
         from ..core.stage import StageConfig, sn_from_height
         config = self.config_getter() if self.config_getter else StageConfig()
-        return sn_from_height(config, sample.height, self.layout_model.plate)
+        return sn_from_height(config, sample.height, self.layout_model.plate, sample.u, sample.v)
 
     def _refresh_sn_hint(self) -> None:
         """Which SN the start positions use for the chosen sample: the SN set by eye if there is one, else the SN
@@ -938,7 +938,7 @@ class PlateEditor(QtWidgets.QWidget):
             return None
         sn = self.check_sn.value() if sn is None else sn
         config = self.config_getter() if self.config_getter else StageConfig()
-        h = height_from_sn(config, sn, self.layout_model.plate)
+        h = height_from_sn(config, sn, self.layout_model.plate, sample.u, sample.v)
         if h < 0:
             QtWidgets.QMessageBox.warning(
                 self, SET_SN_BUTTON, f"SN = {sn:.3f} puts the reference line {-h:.3f} mm below the plate top "

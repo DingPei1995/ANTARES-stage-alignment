@@ -77,10 +77,12 @@ At the start orientation a plate point (x, y) comes onto the beam at **ST = ST0 
 height H is in the analyzer focus at **SN = SN_f + H** (ST0, SZ0, SN_f come from the configuration). The motor fields
 refuse values outside the travel ranges.
 
-**Plate tilted in the holder.** A configuration can hold a tilt of the plate in its holder (*Plate tilt along u / v*
-in *Configuration…*, in degrees; u, v are the plate's x, y): the plate surface rises towards the analyzer by
-sin(tilt) per mm along +x / +y, and the tilt turns with SRn and the piezo like the plate. The zone plate
-configurations of 2026-11-27 hold −0.26° along x and +1.60° along y: a sample 3 mm higher on the plate (+y) is
+**Plate tilted in the holder.** The plate can sit tilted in its holder (*Plate tilt along u / v* in
+*Configuration…*, in degrees; u, v are the plate's x, y): the plate surface rises towards the analyzer by
+sin(tilt) per mm along +x / +y, and the tilt turns with SRn and the piezo like the plate. The tilt is a property of
+the sample stage, not of the optic: the newest tilt measured is used with every configuration, capillary and zone
+plate, older ones too (*Configuration…* says which configuration it comes from). Measured on 2026-11-27: −0.26° along
+x and +1.60° along y; a sample 3 mm higher on the plate (+y) is
 then in focus at an SN 0.084 mm larger than one at the centre. QuickAlignment takes this into account everywhere:
 the SN of a height H is computed at the sample's x, y (start positions, *Set SN by eye*, the SN hint of Stage &
 Optics), the positions after a rotation follow the tilted plate, and the Brillouin-zone tools start from the tilted

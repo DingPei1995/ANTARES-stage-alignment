@@ -17,6 +17,7 @@ Usage:  python devtools/guide_screenshots.py
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import sys
 import tempfile
@@ -34,7 +35,7 @@ from matplotlib.transforms import Bbox  # noqa: E402
 # the schematic as drawn by the program on the beamline computers (Windows: 72 dpi figure text scale)
 matplotlib.rcParams["figure.dpi"] = 90
 
-from quickalignment.core.calibration import CalibrationStore  # noqa: E402
+from quickalignment.core.calibration import STAGE_TILT, CalibrationStore  # noqa: E402
 from quickalignment.core.geometry import STANDARD_PLATE, SampleLayout  # noqa: E402
 from quickalignment.core.session import Session  # noqa: E402
 from quickalignment.core.stage import MotorPositions, StageModel  # noqa: E402
@@ -372,6 +373,11 @@ def main() -> int:
         shutil.copytree(HERE / "configs", folder)
         for old in (HERE / "tests" / "data" / "old_configs").glob("calibration_*.json"):
             shutil.copy(old, folder)          # the example's configurations, retired from configs/
+        # the examples are beamtimes of 2026-10-24 ... 11-15, before the plate tilt was measured (2026-11-27): the
+        # configurations that record a tilt are left out, so the windows show the numbers the guides quote
+        for path in folder.glob("calibration_*.json"):
+            if any(k in (json.loads(path.read_text(encoding="utf-8")).get("stage_config") or {}) for k in STAGE_TILT):
+                path.unlink()
         store = CalibrationStore(folder)
         quickalignment_shots(app, store)
         calibration_shots(app, store)

@@ -330,7 +330,10 @@ Both plates share the same back plate (18 × 15.5 × 1.1 mm Ta with tab), which 
   riser top, and turns with SRn and the piezo. `core/stage.py` applies it in `plate_to_lab` / `lab_to_plate`,
   `reference_motors`, `surface_normal`, `height_from_sn` / `sn_from_height` (which then need the sample's x, y) and
   `plate_normal` (the starting normal of `alignment/bz_target.py`); `stage_frame` and `reference_to_plate` (drawings)
-  leave it out. 0 = flat (files without it). The 2026-11-27 zone plate configurations: −0.263° / +1.595°.
+  leave it out. It is a property of the sample stage, not of the optic: `CalibrationStore.records()` reads every
+  configuration (capillary and zone plate, older ones too) with the tilt of the newest file that records one
+  (`core/calibration.py`, `with_stage_tilt`; `CalibrationRecord.tilt_from` names it). Measured 2026-11-27:
+  −0.263° / +1.595°.
 
 Plate frame (x, y), mm: front view (sample side) with the tab up, origin = centre of the 18 × 15.5 mm back
 plate, x right, y up. At the reference orientation (SRn = 120, SRz = 0) a plate point comes onto the beam at

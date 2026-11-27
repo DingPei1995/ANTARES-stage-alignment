@@ -43,7 +43,7 @@ faisceau suit +y, le plan focal de l'analyseur est à 45°, ST le long de ce pla
 | axe SRn x, y | position de l'axe de rotation SRn sur la plaquette | une série avec SRn tourné |
 | décalage SRz ST, SN | décalage de l'axe SRz par rapport à la ligne centrale de la surface | une série avec SRz tourné |
 | référence optique | position de l'optique mettant le foyer au foyer de l'analyseur | positions d'optique notées |
-| inclinaison u, v de la plaquette | inclinaison de la plaquette dans son support : la surface monte vers l'analyseur de sin(inclinaison) par mm le long de +x / +y ; tourne avec SRn et le piézo ; 0 = à plat | mesurée à part (ci-dessous) ; gardée, pas ajustée |
+| inclinaison u, v de la plaquette | inclinaison de la plaquette dans son support : la surface monte vers l'analyseur de sin(inclinaison) par mm le long de +x / +y ; tourne avec SRn et le piézo ; 0 = à plat | mesurée à part (ci-dessous) ; propriété de la platine : la valeur la plus récente sert pour toutes les configurations ; pas ajustée |
 
 SRn = 120° (plaquette verticale, languette en haut) est la référence mécanique ; PIX = PIY = 150 µm pendant
 l'étalonnage. L'optique est modélisée comme un foyer qui se déplace le long du faisceau : ST, SZ et SRn ne changent
@@ -56,8 +56,11 @@ Une plaquette n'est pas toujours à plat dans son support. L'inclinaison (`plate
 `stage_config`, en degrés) est une inclinaison fixe de la plaquette : elle tourne avec SRn et le piézo, autour du
 centre de la plaquette sur le dessus du support standard, si bien que ST0, SZ0 et SN_f gardent leur sens.
 QuickAlignment calcule alors les positions, le SN d'une hauteur (à la position x, y de l'échantillon) et la normale de
-départ des outils de zone de Brillouin avec la plaquette inclinée ; RealSampleCalibration garde l'inclinaison de la
-configuration dont il part et ajuste les autres constantes avec elle.
+départ des outils de zone de Brillouin avec la plaquette inclinée. L'inclinaison est une propriété de la platine
+porte-échantillon, pas de l'optique : QuickAlignment et RealSampleCalibration lisent **toutes** les configurations,
+capillaire et zone plate, anciennes comprises, avec l'inclinaison du fichier le plus récent qui en contient une
+(*Configuration…* l'indique) ; RealSampleCalibration ajuste les autres constantes avec elle et l'écrit dans le nouveau
+fichier.
 
 - **La mesurer** à SRn 120°, SRz 0° sur des repères d'une surface plane connue, éloignés sur la plaquette
   (2026-11-27 : les lignes d'or S de la plaquette gating), le long de x et le long de y : le SN qui met la surface au
@@ -66,8 +69,10 @@ configuration dont il part et ajuste les autres constantes avec elle.
   SRn (p. ex. 90 / 150°) doit donner la même inclinaison : une inclinaison de la plaquette tourne avec SRn, une erreur
   de l'axe SRn non.
 - **La saisir** comme les solides de l'anticollision : modifier une copie de la configuration la plus récente
-  (`"stage_config"` : `"plate_tilt_u"`, `"plate_tilt_v"`), réajuster si besoin, l'enregistrer comme nouveau fichier.
-  0 (ou pas d'entrée, fichiers plus anciens) = à plat.
+  (`"stage_config"` : `"plate_tilt_u"`, `"plate_tilt_v"`), réajuster si besoin, l'enregistrer comme nouveau fichier :
+  dès lors elle sert pour toutes les configurations, des deux optiques. Pour revenir à une plaquette à plat,
+  enregistrer un fichier avec 0 (un fichier sans l'entrée, comme avant le 2026-11-27, n'en contient pas et est lu avec
+  la plus récente).
 - **Elle appartient à un montage** : après avoir retiré et remis la plaquette, la mesurer à nouveau (ou la mettre à 0
   et compter sur *Fine tunings by ZPS/CPS*).
 

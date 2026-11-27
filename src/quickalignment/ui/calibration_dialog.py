@@ -120,7 +120,9 @@ class CalibrationDialog(QtWidgets.QDialog):
                       f"SN {m.sn:.4f}, SRn {m.srn:.3f}, SRz {m.srz:.3f}")
         else:
             optics = f"{o.optic_type}: not calibrated (focus assumed on the analyzer focus at optic {o.optic_position:.4f})"
-        text = f"<table cellspacing=4>{rows}</table>Optics reference: {optics}"
+        tilt = (f"Plate tilt: from {rec.tilt_from} (a property of the sample stage, used with every configuration)<br>"
+                if rec.tilt_from else "")
+        text = f"<table cellspacing=4>{rows}</table>{tilt}Optics reference: {optics}"
         self.constants.setText(text)
         # Qt underestimates the height of a rich-text table (more so with more rows): measure it, keep the table whole
         doc = QtGui.QTextDocument()

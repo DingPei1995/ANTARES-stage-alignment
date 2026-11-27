@@ -77,3 +77,39 @@ def test_gating_capillary_configuration_reproduces_its_measurements():
         assert rel.new.st == pytest.approx(b[0], abs=0.06)
         assert rel.new.sz == pytest.approx(b[1], abs=0.06)
         assert rel.optic_new == pytest.approx(b[5], abs=0.1)
+
+
+def test_plate_tilt_is_a_property_of_the_stage(tmp_path):
+    """The plate tilt belongs to the sample stage: every configuration (capillary too, and older ones) is read with
+    the tilt of the newest file that records one; a newer file recording 0 (re-measured flat) wins."""
+    import json
+    from datetime import datetime
+
+    from quickalignment.core.calibration import CalibrationRecord, CalibrationStore
+    from quickalignment.core.stage import OpticsCalibration, StageConfig
+
+    store = CalibrationStore(tmp_path)
+
+    def write(stamp, optic, tilt=None):
+        rec = store.save(CalibrationRecord(config=StageConfig(st0=float(stamp[-2:])),
+                                           optics=OpticsCalibration(optic_type=optic)), datetime.fromisoformat(stamp))
+        data = json.loads(rec.path.read_text(encoding="utf-8"))
+        for key in ("plate_tilt_u", "plate_tilt_v"):
+            data["stage_config"].pop(key)                 # a file written before the tilt existed
+        if tilt is not None:
+            data["stage_config"].update(plate_tilt_u=tilt[0], plate_tilt_v=tilt[1])
+        rec.path.write_text(json.dumps(data), encoding="utf-8")
+
+    write("2026-11-15 15:13:56", "capillary")
+    write("2026-11-20 14:29:37", "zone_plate")
+    assert all(r.config.plate_tilt_v == 0 and not r.tilt_from for r in store.records())   # no tilt recorded yet
+    write("2026-11-27 21:54:18", "zone_plate", (-0.26, 1.6))
+    cap = store.latest("capillary")
+    assert (cap.config.plate_tilt_u, cap.config.plate_tilt_v) == (-0.26, 1.6)
+    assert cap.tilt_from == "2026-11-27 21:54:18 zone plate" and cap.config.st0 == 56.0      # the rest is its own
+    zp = store.latest("zone_plate")
+    assert zp.config.plate_tilt_v == 1.6 and not zp.tilt_from
+    assert {r.config.plate_tilt_v for r in store.records()} == {1.6}
+    write("2026-12-01 10:00:00", "capillary", (0.0, 0.0))                                     # re-measured: flat
+    assert {r.config.plate_tilt_v for r in store.records()} == {0.0}
+    assert store.latest("zone_plate").tilt_from == "2026-12-01 10:00:00 capillary"

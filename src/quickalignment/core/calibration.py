@@ -8,6 +8,10 @@ Files in the configuration folder (default: ``configs/`` at the repository root)
 
 At start-up the newest of them (by its time stamp) made with the chosen optic
 is loaded.
+
+The plate tilt (StageConfig.plate_tilt_u / _v) is a property of the sample stage (the plate as it sits in its
+holder), not of the optic: every configuration is read with the tilt of the newest file that records one, whatever
+its optic (STAGE_TILT, CalibrationRecord.tilt_from).
 """
 
 from __future__ import annotations
@@ -27,6 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_FOLDER = REPO_ROOT / "configs"
 LIMITS_FILE = "motor_limits.json"  # motor limits set by hand in the Configuration window
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+STAGE_TILT = ("plate_tilt_u", "plate_tilt_v")  # stage properties: the newest recorded values serve every configuration
 
 
 def _from_dict(cls, data: dict):
@@ -59,6 +64,7 @@ class CalibrationRecord:
     check: dict | None = None  # what the calibration measured, for the record
     path: Path | None = None
     collision: CollisionGeometry | None = None  # analyzer / optic solids; None: defaults for the optic
+    tilt_from: str = ""  # label of the configuration the plate tilt was taken from, when not this one's own file
 
     @property
     def plate(self) -> str | None:
@@ -140,19 +146,40 @@ class CalibrationRecord:
         )
 
 
+def with_stage_tilt(records: list[CalibrationRecord], recorded: set) -> list[CalibrationRecord]:
+    """`records` (newest first) with the plate tilt of the newest one whose file records a tilt (its path in
+    `recorded`): the tilt of the plate in its holder belongs to the sample stage, so a capillary configuration, or
+    one made before the tilt was measured, gets it too. Unchanged when no file records a tilt."""
+    source = next((r for r in records if r.path in recorded), None)
+    if source is None:
+        return records
+    tilt = {k: getattr(source.config, k) for k in STAGE_TILT}
+    out = []
+    for r in records:
+        if r is source or all(getattr(r.config, k) == v for k, v in tilt.items()) and r.path in recorded:
+            out.append(r)
+        else:
+            out.append(replace(r, config=replace(r.config, **tilt), tilt_from=source.label))
+    return out
+
+
 class CalibrationStore:
     def __init__(self, folder: str | Path | None = None):
         self.folder = Path(folder) if folder else DEFAULT_FOLDER
 
     def records(self) -> list[CalibrationRecord]:
-        """All readable configurations, newest first."""
-        out = []
+        """All readable configurations, newest first, each with the plate tilt of the sample stage (stage_tilt)."""
+        out, recorded = [], set()
         for path in self.folder.glob("calibration_*.json"):
             try:  # a damaged or foreign file is skipped, not fatal
-                out.append(CalibrationRecord.from_dict(read_json(path), path))
+                data = read_json(path)
+                out.append(CalibrationRecord.from_dict(data, path))
             except (OSError, ValueError, TypeError, KeyError, AttributeError):
                 continue
-        return sorted(out, key=lambda r: (r.created, r.path.name), reverse=True)
+            if any(k in (data.get("stage_config") or {}) for k in STAGE_TILT):
+                recorded.add(path)
+        out.sort(key=lambda r: (r.created, r.path.name), reverse=True)
+        return with_stage_tilt(out, recorded)
 
     def latest(self, optic: str | None = None) -> CalibrationRecord:
         """The most recently written configuration.

@@ -36,6 +36,23 @@ def api(configs):
     return AgentAPI(configs)
 
 
+@pytest.fixture
+def before_tilt(configs):
+    """The stage as measured 2026-11-14 ... 11-20, before the plate tilt (2026-11-27): the configurations that record a
+    tilt are left out, so the tests reproducing measurements of those days see the plate flat, as it was taken then."""
+    from quickalignment.core.calibration import STAGE_TILT
+
+    for path in configs.glob("calibration_*.json"):
+        if any(k in json.loads(path.read_text(encoding="utf-8")).get("stage_config", {}) for k in STAGE_TILT):
+            path.unlink()
+    return configs
+
+
+@pytest.fixture
+def api_before_tilt(before_tilt):
+    return AgentAPI(before_tilt)
+
+
 def started(api, plate="gating"):
     api.alignment.start(plate, "capillary")
     api.alignment.register_photo(CORNERS, path=str(PHOTO))
@@ -90,7 +107,8 @@ def test_detection_with_a_picked_sample_colour(api):
     assert a.samples()["samples"] == []  # detection adds nothing
 
 
-def test_samples_positions_and_found_here(api):
+def test_samples_positions_and_found_here(api_before_tilt):
+    api = api_before_tilt
     a = started(api)
     out = a.add_sample_from_photo([[290, 330], [520, 370], [480, 590], [250, 545]], height=0.525, name="flake")
     s = out["added"]
@@ -114,7 +132,8 @@ def test_samples_positions_and_found_here(api):
     assert "calibration" in big["warning"]
 
 
-def test_bring_to_beam_rotate_and_edge(api):
+def test_bring_to_beam_rotate_and_edge(api_before_tilt):
+    api = api_before_tilt
     a = started(api)
     a.add_sample(2.0, 3.0, 3.0, 2.0, 0.525, name="S1")
     sn_focus = round(a.record.config.sn_f + 0.525, 3)  # S1's surface at the analyzer focus (newest config)
@@ -152,7 +171,8 @@ def test_bz_angles(api):
     assert out["check"]["from_lattice"] == pytest.approx(4 * np.pi / (3 * 3.282), abs=1e-3)
 
 
-def test_bz_point_to_keep_srn(api):
+def test_bz_point_to_keep_srn(api_before_tilt):
+    api = api_before_tilt
     """2026-11-14, graphene with the slit along Γ–K: K read at θ 1, φ -0.86 at 115 eV (SRn 120 / SRz -24), wanted at
     φ -1 at 95 eV with the in-plane orientation kept: only SRz turns."""
     a = api.alignment
@@ -173,7 +193,8 @@ def test_bz_point_to_keep_srn(api):
     assert free["theta"] == pytest.approx(0, abs=1e-3) and free["SRn"] != pytest.approx(120, abs=0.5)
 
 
-def test_found_here_not_in_focus_and_old_configuration(api):
+def test_found_here_not_in_focus_and_old_configuration(api_before_tilt):
+    api = api_before_tilt
     """2026-11-14: a position noted with the 2026-10-24 configuration, SN not at the analyzer focus: x, y follow from
     that configuration, H is kept (found_here used to turn the SN offset into a 1.9 mm height)."""
     a = api.alignment
@@ -284,7 +305,8 @@ def test_real_sample_optics_mode_needs_a_configuration(api, configs, tmp_path):
         api.real_sample.fit()
 
 
-def test_real_sample_full_mode_sn_kept(api, configs):
+def test_real_sample_full_mode_sn_kept(before_tilt):
+    api, configs = AgentAPI(before_tilt), before_tilt
     """As at the beamline: set 1 at the analyzer focus, rotated sets with SN kept and the optic refocused; the
     expected positions follow set 1 once it is measured; test points keep SN."""
     r = api.real_sample

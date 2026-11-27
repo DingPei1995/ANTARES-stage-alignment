@@ -43,7 +43,7 @@ along +y, the analyzer focal plane at 45°, ST along it and SN perpendicular to 
 | SRn axis x, y | position of the SRn rotation axis on the plate | a set with SRn rotated |
 | SRz offset ST, SN | offset of the SRz axis from the plate-surface centre line | a set with SRz rotated |
 | optic reference | optic position putting the focus on the analyzer focus | optic position noted in the sets |
-| plate tilt u, v | tilt of the plate in its holder: the surface rises towards the analyzer by sin(tilt) per mm along +x / +y; turns with SRn and the piezo; 0 = flat | measured apart (below); kept, not fitted |
+| plate tilt u, v | tilt of the plate in its holder: the surface rises towards the analyzer by sin(tilt) per mm along +x / +y; turns with SRn and the piezo; 0 = flat | measured apart (below); a stage property: the newest value serves every configuration; not fitted |
 
 SRn = 120° (plate vertical, tab up) is the mechanical reference; PIX = PIY = 150 µm during calibration. The optic is
 modelled as a focus point moving along the beam: ST, SZ and SRn do not change the surface plane, so they need no
@@ -54,8 +54,10 @@ optic move; SN, SRz and the sample height do (1 mm along SN moves the spot √2 
 A plate does not always sit flat in its holder. The tilt (`plate_tilt_u`, `plate_tilt_v` in `stage_config`, degrees)
 is a fixed tilt of the plate: it turns with SRn and the piezo, about the plate centre on the standard riser top, so
 ST0, SZ0 and SN_f keep their meaning. QuickAlignment then computes positions, the SN of a height (at the sample's
-x, y) and the starting normal of the Brillouin-zone tools with the tilted plate; RealSampleCalibration keeps the
-tilt of the configuration it starts from and fits the other constants with it.
+x, y) and the starting normal of the Brillouin-zone tools with the tilted plate. The tilt is a property of the
+sample stage, not of the optic: QuickAlignment and RealSampleCalibration read **every** configuration, capillary and
+zone plate, older ones too, with the tilt of the newest file that records one (*Configuration…* names it);
+RealSampleCalibration fits the other constants with that tilt and writes it into the new file.
 
 - **Measure it** at SRn 120°, SRz 0° on features of a known flat surface far apart on the plate (2026-11-27: the
   gold lines S of the gating plate), along x and along y: the SN that puts the surface on the analyzer focus (or the
@@ -63,7 +65,9 @@ tilt of the configuration it starts from and fits the other constants with it.
   and the same along x for `plate_tilt_u`. A check at other SRn (e.g. 90 / 150°) must give the same tilt: a plate
   tilt turns with SRn, an error of the SRn axis does not.
 - **Enter it** like the anti-collision solids: edit a copy of the newest configuration (`"stage_config"`:
-  `"plate_tilt_u"`, `"plate_tilt_v"`), refit if needed, save it as a new file. 0 (or no entry, older files) = flat.
+  `"plate_tilt_u"`, `"plate_tilt_v"`), refit if needed, save it as a new file: from then on it serves every
+  configuration of either optic. To go back to a flat plate, save a file with 0 (a file without the entry, as
+  before 2026-11-27, records no tilt and is read with the newest one).
 - **It belongs to one mounting**: after the plate is taken out and put back, measure it again (or set it to 0 and
   rely on *Fine tunings by ZPS/CPS*).
 

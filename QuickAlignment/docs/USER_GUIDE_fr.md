@@ -80,11 +80,12 @@ utilisée :
 un échantillon de hauteur H est au foyer de l'analyseur à **SN = SN_f + H** (ST0, SZ0, SN_f viennent de la
 configuration). Les champs moteurs refusent les valeurs hors course.
 
-**Plaquette inclinée dans son support.** Une configuration peut contenir une inclinaison de la plaquette dans son
-support (*Plate tilt along u / v* dans *Configuration…*, en degrés ; u, v sont les x, y de la plaquette) : la
-surface de la plaquette monte vers l'analyseur de sin(inclinaison) par mm le long de +x / +y, et l'inclinaison tourne
-avec SRn et le piézo comme la plaquette. Les configurations zone plate du 2026-11-27 contiennent −0,26° le long de x
-et +1,60° le long de y : un échantillon 3 mm plus haut sur la plaquette (+y) est alors au foyer à un SN plus grand de
+**Plaquette inclinée dans son support.** La plaquette peut être inclinée dans son support (*Plate tilt along u / v*
+dans *Configuration…*, en degrés ; u, v sont les x, y de la plaquette) : la surface de la plaquette monte vers
+l'analyseur de sin(inclinaison) par mm le long de +x / +y, et l'inclinaison tourne avec SRn et le piézo comme la
+plaquette. L'inclinaison est une propriété de la platine porte-échantillon, pas de l'optique : la plus récente mesurée
+sert avec toutes les configurations, capillaire et zone plate, anciennes comprises (*Configuration…* indique de quelle
+configuration elle vient). Mesurée le 2026-11-27 : −0,26° le long de x et +1,60° le long de y ; un échantillon 3 mm plus haut sur la plaquette (+y) est alors au foyer à un SN plus grand de
 0,084 mm qu'un échantillon au centre. QuickAlignment en tient compte partout : le SN d'une hauteur H est calculé à
 la position x, y de l'échantillon (positions de départ, *Set SN by eye*, l'indication de SN de Stage & Optics), les
 positions après une rotation suivent la plaquette inclinée, et les outils de zone de Brillouin partent de la normale

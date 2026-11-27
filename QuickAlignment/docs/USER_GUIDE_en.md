@@ -77,6 +77,16 @@ At the start orientation a plate point (x, y) comes onto the beam at **ST = ST0 
 height H is in the analyzer focus at **SN = SN_f + H** (ST0, SZ0, SN_f come from the configuration). The motor fields
 refuse values outside the travel ranges.
 
+**Plate tilted in the holder.** A configuration can hold a tilt of the plate in its holder (*Plate tilt along u / v*
+in *Configuration…*, in degrees; u, v are the plate's x, y): the plate surface rises towards the analyzer by
+sin(tilt) per mm along +x / +y, and the tilt turns with SRn and the piezo like the plate. The zone plate
+configurations of 2026-11-27 hold −0.26° along x and +1.60° along y: a sample 3 mm higher on the plate (+y) is
+then in focus at an SN 0.084 mm larger than one at the centre. QuickAlignment takes this into account everywhere:
+the SN of a height H is computed at the sample's x, y (start positions, *Set SN by eye*, the SN hint of Stage &
+Optics), the positions after a rotation follow the tilted plate, and the Brillouin-zone tools start from the tilted
+plate normal. 0 means the plate sits flat. The tilt belongs to one mounting of the plate: after the plate is taken
+out and put back, the staff measure it again.
+
 ## Samples tab: drawing the plate
 
 ![Samples tab](images/guide/samples_tab.png)
@@ -500,8 +510,8 @@ first use of a new kind of measurement, check that the point appears where the a
   the motor positions, in one JSON file. The first *Save* asks for the file name. Files are written safely: if
   saving fails (disk full, no permission), the previous file stays intact and a message tells you why.
 - **Change plate…**: another plate; the samples are kept and misplaced ones are flagged.
-- **Configuration…**: read-only view of the configuration in use (stage constants and optics reference), made by
-  the beamline staff. An older configuration can be chosen for this session. Under *Motor limits* the min / max of
+- **Configuration…**: read-only view of the configuration in use (stage constants, the plate tilt and optics
+  reference), made by the beamline staff. An older configuration can be chosen for this session. Under *Motor limits* the min / max of
   ST, SZ, SN, SRn and SRz can be changed by hand (*Defaults* restores the built-in ones); *Apply limits* uses them for
   the input fields, the out-of-range and the anti-collision checks, and saves them in `configs/motor_limits.json`
   for the next starts.

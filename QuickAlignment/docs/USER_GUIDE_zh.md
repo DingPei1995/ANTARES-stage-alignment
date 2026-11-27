@@ -65,6 +65,13 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 在初始取向下，托上一点 (x, y) 在 **ST = ST0 − x，SZ = SZ0 − y** 时位于光斑上；高度为 H 的样品在
 **SN = SN_f + H** 时位于分析器焦点（ST0、SZ0、SN_f 来自配置文件）。电机输入框不接受超出行程的数值。
 
+**样品托在托座里有倾斜。** 配置文件可以包含样品托在托座里的倾斜（*Configuration…* 中的 *Plate tilt along u / v*，
+单位为度；u、v 即样品托上的 x、y）：样品托表面沿 +x / +y 每 mm 朝分析器升高 sin(倾角)，倾斜和样品托一样随 SRn 与
+压电台转动。2026-11-27 的 zone plate 配置为沿 x −0.26°、沿 y +1.60°：样品托上高 3 mm（+y）的样品，其聚焦 SN
+比中心处的样品大 0.084 mm。QuickAlignment 在所有地方都考虑了这一点：由高度 H 求 SN 时按样品的 x、y 计算（初始位置、
+*Set SN by eye*、Stage & Optics 中的 SN 提示），转动后的位置按倾斜的样品托计算，布里渊区工具以倾斜样品托的法线为
+初始表面法线。0 表示样品托是平的。倾斜只对应样品托的一次安装：样品托取出再装回后，由线站人员重新测量。
+
 ## Samples 页：绘制样品托
 
 ![Samples 页](images/guide/samples_tab.png)
@@ -252,7 +259,7 @@ ANTARES 的光斑在微米量级或更小，而样品托有 18 × 15.5 mm。Quic
 
 - **New / Open… / Save**（工具栏）：一个 session 保存样品托、样品和 device（包括修正）以及电机位置，存为一个 JSON 文件。第一次 *Save* 时会询问文件名。文件以安全方式写入：如果保存失败（磁盘满、无权限），原文件保持不变，并提示原因。
 - **Change plate…**：更换样品托；样品保留，位置不合适的会被标出。
-- **Configuration…**：只读查看当前使用的配置（样品台常数和光学参考），由线站人员制作。可以为本次 session 选择较早的配置。在 *Motor limits* 中可以手动修改 ST、SZ、SN、SRn、SRz 的运动极限（最小 / 最大值，*Defaults* 恢复默认值）；*Apply limits* 将其用于输入框、超出行程和防碰撞检查，并保存到 `configs/motor_limits.json`，以后启动时继续使用。
+- **Configuration…**：只读查看当前使用的配置（样品台常数、样品托倾斜和光学参考），由线站人员制作。可以为本次 session 选择较早的配置。在 *Motor limits* 中可以手动修改 ST、SZ、SN、SRn、SRz 的运动极限（最小 / 最大值，*Defaults* 恢复默认值）；*Apply limits* 将其用于输入框、超出行程和防碰撞检查，并保存到 `configs/motor_limits.json`，以后启动时继续使用。
 
 ![配置窗口](images/guide/configuration_dialog.png)
 

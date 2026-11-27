@@ -325,7 +325,14 @@ Both plates share the same back plate (18 × 15.5 × 1.1 mm Ta with tab), which 
   Seen from the analyzer: PIX 0→300 = left→right, PIY 0→300 = up→down (against +SZ; checked at the
   beamline 2026-11-14: a feature seen at a larger PIY needs a larger SZ). PIX checked 2026-11-15: a feature seen at a
   larger PIX needs a smaller ST, as in the model.
+- **Plate tilt in the holder** (`StageConfig.plate_tilt_u / plate_tilt_v`, deg; shown in *Configuration…*): the plate
+  surface rises towards the analyzer by sin(tilt) per mm along +x (u) / +y (v), about the plate centre on the standard
+  riser top, and turns with SRn and the piezo. `core/stage.py` applies it in `plate_to_lab` / `lab_to_plate`,
+  `reference_motors`, `surface_normal`, `height_from_sn` / `sn_from_height` (which then need the sample's x, y) and
+  `plate_normal` (the starting normal of `alignment/bz_target.py`); `stage_frame` and `reference_to_plate` (drawings)
+  leave it out. 0 = flat (files without it). The 2026-11-27 zone plate configurations: −0.263° / +1.595°.
 
 Plate frame (x, y), mm: front view (sample side) with the tab up, origin = centre of the 18 × 15.5 mm back
 plate, x right, y up. At the reference orientation (SRn = 120, SRz = 0) a plate point comes onto the beam at
-`ST = ST0 − x`, `SZ = SZ0 − y`, `SN = SN_f + H`.
+`ST = ST0 − x`, `SZ = SZ0 − y`, `SN = SN_f + H`. (with a plate tilt, SN and, below sin(tilt) × height, ST / SZ
+follow the tilted plate: `StageModel.reference_motors`).

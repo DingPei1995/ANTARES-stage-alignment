@@ -43,11 +43,33 @@ faisceau suit +y, le plan focal de l'analyseur est à 45°, ST le long de ce pla
 | axe SRn x, y | position de l'axe de rotation SRn sur la plaquette | une série avec SRn tourné |
 | décalage SRz ST, SN | décalage de l'axe SRz par rapport à la ligne centrale de la surface | une série avec SRz tourné |
 | référence optique | position de l'optique mettant le foyer au foyer de l'analyseur | positions d'optique notées |
+| inclinaison u, v de la plaquette | inclinaison de la plaquette dans son support : la surface monte vers l'analyseur de sin(inclinaison) par mm le long de +x / +y ; tourne avec SRn et le piézo ; 0 = à plat | mesurée à part (ci-dessous) ; gardée, pas ajustée |
 
 SRn = 120° (plaquette verticale, languette en haut) est la référence mécanique ; PIX = PIY = 150 µm pendant
 l'étalonnage. L'optique est modélisée comme un foyer qui se déplace le long du faisceau : ST, SZ et SRn ne changent
 pas le plan de la surface et ne demandent pas de déplacer l'optique ; SN, SRz et la hauteur de l'échantillon si
 (1 mm en SN déplace le spot de √2 mm le long du faisceau).
+
+### Inclinaison de la plaquette dans son support
+
+Une plaquette n'est pas toujours à plat dans son support. L'inclinaison (`plate_tilt_u`, `plate_tilt_v` dans
+`stage_config`, en degrés) est une inclinaison fixe de la plaquette : elle tourne avec SRn et le piézo, autour du
+centre de la plaquette sur le dessus du support standard, si bien que ST0, SZ0 et SN_f gardent leur sens.
+QuickAlignment calcule alors les positions, le SN d'une hauteur (à la position x, y de l'échantillon) et la normale de
+départ des outils de zone de Brillouin avec la plaquette inclinée ; RealSampleCalibration garde l'inclinaison de la
+configuration dont il part et ajuste les autres constantes avec elle.
+
+- **La mesurer** à SRn 120°, SRz 0° sur des repères d'une surface plane connue, éloignés sur la plaquette
+  (2026-11-27 : les lignes d'or S de la plaquette gating), le long de x et le long de y : le SN qui met la surface au
+  foyer de l'analyseur (ou le foyer de la zone plate, converti en hauteur) en deux points distants de Δy donne
+  `plate_tilt_v = asin((SN(+y) − SN) / Δy)`, et de même le long de x pour `plate_tilt_u`. Une vérification à un autre
+  SRn (p. ex. 90 / 150°) doit donner la même inclinaison : une inclinaison de la plaquette tourne avec SRn, une erreur
+  de l'axe SRn non.
+- **La saisir** comme les solides de l'anticollision : modifier une copie de la configuration la plus récente
+  (`"stage_config"` : `"plate_tilt_u"`, `"plate_tilt_v"`), réajuster si besoin, l'enregistrer comme nouveau fichier.
+  0 (ou pas d'entrée, fichiers plus anciens) = à plat.
+- **Elle appartient à un montage** : après avoir retiré et remis la plaquette, la mesurer à nouveau (ou la mettre à 0
+  et compter sur *Fine tunings by ZPS/CPS*).
 
 ## Quand réétalonner
 
@@ -197,6 +219,12 @@ Rapports : `RealSampleCalibration/docs/reports/` (2026-11-14 capillaire, 2026-11
 - **Autre plaquette.** Une configuration faite avec la plaquette gating sert pour la plaquette standard et
   inversement : le 2026-11-19, la plaquette gating s'est révélée à la même hauteur dans le porte-échantillon que la
   standard (à 0,08 mm près).
+- **Inclinaison de la plaquette (2026-11-27, zone plate, plaquette gating).** La plaquette s'est révélée inclinée
+  dans son support : −0,263° le long de x, +1,595° le long de y, d'après les foyers sur les lignes d'or S à SRn 120
+  (un ajustement sur les seules lignes d'or à SRn 90 / 120 / 150 a donné −0,10 / +1,53 ± 0,14°, cohérent). Avec elle,
+  l'ajustement commun de la journée reproduit les positions à 6 µm près et ZPS à 0,014 près (configuration
+  `calibration_2026-11-27_215418_zone_plate.json` ; celles de zone plate du 2026-11-17 au 11-20, faites sans
+  l'inclinaison, sont dans `configs/archive/`). SN_f a été gardé du 2026-11-20, pas vérifié avec ce montage.
 - **Quand les lectures contredisent le modèle**, lister les écarts et tester les causes possibles une à une contre
   toutes les données, au lieu de libérer d'autres constantes pour les absorber (c'est ainsi que l'erreur d'axe SRz a
   été trouvée).

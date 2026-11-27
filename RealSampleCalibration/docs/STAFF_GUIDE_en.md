@@ -43,10 +43,29 @@ along +y, the analyzer focal plane at 45°, ST along it and SN perpendicular to 
 | SRn axis x, y | position of the SRn rotation axis on the plate | a set with SRn rotated |
 | SRz offset ST, SN | offset of the SRz axis from the plate-surface centre line | a set with SRz rotated |
 | optic reference | optic position putting the focus on the analyzer focus | optic position noted in the sets |
+| plate tilt u, v | tilt of the plate in its holder: the surface rises towards the analyzer by sin(tilt) per mm along +x / +y; turns with SRn and the piezo; 0 = flat | measured apart (below); kept, not fitted |
 
 SRn = 120° (plate vertical, tab up) is the mechanical reference; PIX = PIY = 150 µm during calibration. The optic is
 modelled as a focus point moving along the beam: ST, SZ and SRn do not change the surface plane, so they need no
 optic move; SN, SRz and the sample height do (1 mm along SN moves the spot √2 mm along the beam).
+
+### Plate tilt in the holder
+
+A plate does not always sit flat in its holder. The tilt (`plate_tilt_u`, `plate_tilt_v` in `stage_config`, degrees)
+is a fixed tilt of the plate: it turns with SRn and the piezo, about the plate centre on the standard riser top, so
+ST0, SZ0 and SN_f keep their meaning. QuickAlignment then computes positions, the SN of a height (at the sample's
+x, y) and the starting normal of the Brillouin-zone tools with the tilted plate; RealSampleCalibration keeps the
+tilt of the configuration it starts from and fits the other constants with it.
+
+- **Measure it** at SRn 120°, SRz 0° on features of a known flat surface far apart on the plate (2026-11-27: the
+  gold lines S of the gating plate), along x and along y: the SN that puts the surface on the analyzer focus (or the
+  zone plate focus, converted to a height) at two points Δy apart gives `plate_tilt_v = asin((SN(+y) − SN) / Δy)`,
+  and the same along x for `plate_tilt_u`. A check at other SRn (e.g. 90 / 150°) must give the same tilt: a plate
+  tilt turns with SRn, an error of the SRn axis does not.
+- **Enter it** like the anti-collision solids: edit a copy of the newest configuration (`"stage_config"`:
+  `"plate_tilt_u"`, `"plate_tilt_v"`), refit if needed, save it as a new file. 0 (or no entry, older files) = flat.
+- **It belongs to one mounting**: after the plate is taken out and put back, measure it again (or set it to 0 and
+  rely on *Fine tunings by ZPS/CPS*).
 
 ## When to recalibrate
 
@@ -192,6 +211,12 @@ Reports: `RealSampleCalibration/docs/reports/` (2026-11-14 capillary, 2026-11-15
 - **Another plate.** A configuration made with the gating plate is used for the standard plate and vice versa: on
   2026-11-19 the gating plate was found to sit at the same height in the holder as the standard plate (within
   0.08 mm).
+- **Plate tilt (2026-11-27, zone plate, gating plate).** The plate was found tilted in its holder: −0.263° along x,
+  +1.595° along y, from the foci on the gold lines S at SRn 120 (a fit on the gold lines alone over SRn 90 / 120 / 150
+  gave −0.10 / +1.53 ± 0.14°, consistent). With it
+  the joint fit of the day reproduces positions within 6 µm and ZPS within 0.014 (configuration
+  `calibration_2026-11-27_215418_zone_plate.json`; the 2026-11-17 … 11-20 zone plate ones, made without the tilt,
+  are in `configs/archive/`). SN_f was kept from 2026-11-20, not checked with this mounting.
 - **When readings contradict the model**, list the mismatches and test the possible causes one by one against all the
   data, instead of freeing more constants to absorb them (how the SRz-axis error was found).
 

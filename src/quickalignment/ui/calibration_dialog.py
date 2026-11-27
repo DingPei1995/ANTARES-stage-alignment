@@ -13,7 +13,7 @@ configuration folder (motor_limits.json) and used at every start.
 
 from __future__ import annotations
 
-from ._qt import QtCore, QtWidgets, Signal
+from ._qt import QtCore, QtGui, QtWidgets, Signal
 from .stage_panel import CONFIG_SPECS, DEFAULT_LIMITS, LIMIT_MOTORS, MOTOR_SPECS, current_limits, set_motor_limits, spin
 from ..core.calibration import CalibrationRecord, CalibrationStore
 
@@ -120,10 +120,16 @@ class CalibrationDialog(QtWidgets.QDialog):
                       f"SN {m.sn:.4f}, SRn {m.srn:.3f}, SRz {m.srz:.3f}")
         else:
             optics = f"{o.optic_type}: not calibrated (focus assumed on the analyzer focus at optic {o.optic_position:.4f})"
-        self.constants.setText(f"<table cellspacing=4>{rows}</table>Optics reference: {optics}")
-        # the wrapped labels make Qt underestimate the height: keep the table whole
-        self.constants.setMinimumHeight(self.constants.sizeHint().height())
+        text = f"<table cellspacing=4>{rows}</table>Optics reference: {optics}"
+        self.constants.setText(text)
+        # Qt underestimates the height of a rich-text table (more so with more rows): measure it, keep the table whole
+        doc = QtGui.QTextDocument()
+        doc.setDefaultFont(self.constants.font())
+        doc.setHtml(text)
+        self.constants.setMinimumHeight(max(self.constants.sizeHint().height(), int(doc.size().height()) + 2))
         self._show_limits(current_limits())
+        if self.layout() is not None and self.height() < self.sizeHint().height():   # another record: room for it
+            self.resize(self.width(), self.sizeHint().height() + 40)
 
     def _show_limits(self, limits: dict) -> None:
         for name, (lo, hi) in limits.items():

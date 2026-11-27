@@ -370,6 +370,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp) / "configs"
         shutil.copytree(HERE / "configs", folder)
+        for old in (HERE / "tests" / "data" / "old_configs").glob("calibration_*.json"):
+            shutil.copy(old, folder)          # the example's configurations, retired from configs/
         store = CalibrationStore(folder)
         quickalignment_shots(app, store)
         calibration_shots(app, store)
